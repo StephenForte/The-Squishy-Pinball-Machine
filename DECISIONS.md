@@ -1,7 +1,7 @@
 # Decisions — The Squishy Pinball Machine
 
 Numbered, append-only. Never renumber; supersede in place with date and reason.
-Workers cite these instead of re-deciding. Next free number: **D-009**.
+Workers cite these instead of re-deciding. Next free number: **D-010**.
 
 ## D-001 — Engine: Godot 4.x, GDScript (2026-09-02)
 Per PRD. Exact version to be pinned as D-006 once installed on the build machine.
@@ -49,3 +49,13 @@ Superseded: original had a `timeout 30` wrapper; this Mac has no coreutils `time
 Godot's own guidance — they keep references stable when files move. They belong to
 whichever task owns the adjacent file. `.godot/` and `*.import` stay ignored.
 
+
+## D-009 — Table scene contract (2026-09-02)
+`scenes/table.tscn` root node `Table` (script `scripts/table.gd`) exposes:
+- signal `ball_drained` — emitted once per ball that enters the drain
+- `func spawn_ball() -> void` — places a fresh ball in the launcher lane
+- Until T4 lands, `table.gd` self-wires drain → 1 s delay → `spawn_ball()` behind a
+  `# TEMP: T4 replaces with Game.on_ball_drained()` comment. T4 removes that wiring.
+- Ball is `scenes/ball.tscn`, root `RigidBody2D`, in node group `"ball"`.
+- Physics tuning values (gravity, launch impulse, tick rate, CCD mode) are reported
+  in T2's handoff and recorded here as D-010 by the planner.
