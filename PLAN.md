@@ -10,7 +10,7 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 
 | ID | Task | Phase | Status | Model tier | Depends on |
 |----|------|-------|--------|------------|------------|
-| T1 | Project scaffold | 0/1 | review passed 2026-09-02; PR #1 awaiting .uid commit + merge | cheap (Sonnet) | — |
+| T1 | Project scaffold | 0/1 | approved 2026-09-02; PR #1 ready to merge | cheap (Sonnet) | — |
 | T2 | Table, ball, launcher, drain | 1 | not started | strong (Opus+) | T1 |
 | T3 | Flippers + controls | 2 | not started | strong (Opus+) | T2 |
 | T4 | Game flow: 3 balls, restart | 2 | not started | mid | T2 (not T3) |
