@@ -10,7 +10,7 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 
 | ID | Task | Phase | Status | Model tier | Depends on |
 |----|------|-------|--------|------------|------------|
-| T1 | Project scaffold | 0/1 | dispatched 2026-09-02 | cheap (Sonnet) | — |
+| T1 | Project scaffold | 0/1 | review passed 2026-09-02; PR #1 awaiting .uid commit + merge | cheap (Sonnet) | — |
 | T2 | Table, ball, launcher, drain | 1 | not started | strong (Opus+) | T1 |
 | T3 | Flippers + controls | 2 | not started | strong (Opus+) | T2 |
 | T4 | Game flow: 3 balls, restart | 2 | not started | mid | T2 (not T3) |
@@ -86,3 +86,10 @@ Art/sound/screen-shake vs. title screen can parallelize; ownership drawn when T5
 
 - 2026-09-02: Repo state verified: `main` at 45ebf1f, only PRD.md + README.md. Godot
   absence verified via `which godot` + /Applications scan.
+- 2026-09-02: T1 (PR #1, e5f0c87) reviewed in isolated scratch clone. Base = current
+  main (merge-base 4e74259 ✓). Scope = exactly the 5 owned files ✓. Both D-007 gates
+  re-run independently: import exit 0, 300-frame run exit 0. project.godot read line
+  by line: D-003 display settings and all four D-004 action names verified with
+  correct physical keycodes (65/4194319, 68/4194321, 32, 82). Findings: `timeout`
+  absent on macOS (D-007 corrected — planner error, worker caught it);
+  `scripts/main.gd.uid` untracked → D-008, worker asked to commit it in PR #1.
