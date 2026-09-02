@@ -1,7 +1,7 @@
 # Decisions — The Squishy Pinball Machine
 
 Numbered, append-only. Never renumber; supersede in place with date and reason.
-Workers cite these instead of re-deciding. Next free number: **D-007**.
+Workers cite these instead of re-deciding. Next free number: **D-008**.
 
 ## D-001 — Engine: Godot 4.x, GDScript (2026-09-02)
 Per PRD. Exact version to be pinned as D-006 once installed on the build machine.
@@ -32,5 +32,13 @@ Autoload `Game` → `res://autoload/game.gd`.
 - Balls per game: 3. High score: JSON at `user://highscore.save`
 - Node groups: bumpers in `"bumpers"`, targets in `"targets"`
 
-## D-006 — (reserved) Godot version pin
-To be filled when Godot is installed; include exact version and download channel.
+## D-006 — Godot version pin: 4.7.2.stable.official (2026-09-02)
+Verified on the build machine: `godot --version` → `4.7.2.stable.official.ed1daf0bf`,
+binary at `/usr/local/bin/godot` (Godot.app in /Applications). All workers use the
+`godot` command; do not upgrade mid-project without a superseding decision here.
+
+## D-007 — Verification gate commands (2026-09-02)
+Run from repo root before every handoff:
+1. `godot --headless --import` — must complete with zero script/parse errors
+2. `timeout 30 godot --headless --quit-after 300` — main scene runs 300 frames, no errors
+
