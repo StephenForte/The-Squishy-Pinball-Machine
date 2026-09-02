@@ -10,7 +10,7 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 
 | ID | Task | Phase | Status | Model tier | Depends on |
 |----|------|-------|--------|------------|------------|
-| T1 | Project scaffold | 0/1 | not started | cheap (Sonnet) | — |
+| T1 | Project scaffold | 0/1 | dispatched 2026-09-02 | cheap (Sonnet) | — |
 | T2 | Table, ball, launcher, drain | 1 | not started | strong (Opus+) | T1 |
 | T3 | Flippers + controls | 2 | not started | strong (Opus+) | T2 |
 | T4 | Game flow: 3 balls, restart | 2 | not started | mid | T2 (not T3) |
@@ -23,9 +23,7 @@ T5 and T6 are the only truly parallel pair; ownership below is drawn to keep the
 
 ## Blockers / open items
 
-- **Godot is not installed on the build machine** (checked 2026-09-02: no binary, no app).
-  Install Godot 4.x stable, then record the exact version as D-006 and pin it in T1's brief.
-  Until then the verification gate cannot run and nothing should be dispatched.
+- None. Godot 4.7.2.stable installed and verified 2026-09-02 (D-006); gate is D-007.
 
 ## Task details
 
@@ -70,9 +68,7 @@ Art/sound/screen-shake vs. title screen can parallelize; ownership drawn when T5
 
 1. Branch from current `main`: `task/T<N>-<slug>`.
 2. One task per branch; no drive-by edits outside the task's ownership list.
-3. Gate before handoff (run from repo root; exact command pinned after D-006):
-   `godot --headless --import` completes with zero script errors, then
-   `godot --headless --quit-after 300` runs the main scene without errors.
+3. Gate before handoff: run the D-007 commands from repo root; both must pass clean.
 4. Open a PR to `main`; hand off in the dispatch-worker format. Planner reviews
    (review-handoff), Steve merges. Natasha play-tests before a phase is called done.
 5. Workers never edit PLAN.md, DECISIONS.md, or PRD.md.
