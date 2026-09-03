@@ -69,7 +69,7 @@ hold-to-charge deferred until flippers exist (Natasha decides). T3 geometry anch
 lane x 636–696, spawn (666, 1219), drain x 250–470, guide walls end y=1120, flipper
 pivots (250, 1120) and (470, 1120).
 
-## D-011 — Game-flow wiring: `Game` is pure state, `main.gd` is the glue (2026-09-02)
+## D-011 — Game-flow wiring: `Game` is pure state, `main.gd` is the glue (2026-09-02; superseded in place 2026-09-02)
 - `Game` (autoload, `res://autoload/game.gd`) holds `score`, `balls_left`, `high_score`,
   `state` (`READY | PLAYING | GAME_OVER`), and never references scene nodes. It owns
   high-score persistence (`user://highscore.save`, JSON `{"high_score": int}`), loaded
@@ -79,6 +79,9 @@ pivots (250, 1120) and (470, 1120).
   `game_restarted` → free all nodes in group `"ball"`, then `$Table.spawn_ball()`.
   `restart` input action → `Game.restart()` (allowed in any state).
 - `on_ball_drained()` while `GAME_OVER` is a no-op. `game_over` emits exactly once per game.
+- **Superseded (T4 review, Bugbot double-spawn):** `restart()` emits ONLY `game_restarted`,
+  never `ball_count_changed`; `main.gd` respawns only when `balls_left` *decreases*.
+  T6 reads `Game.balls_left` / `Game.score` directly on `game_restarted` to redraw.
 - T6 reads `Game.high_score` / signals for display; it never touches the save file.
 - Flippers (T3) read `flipper_left` / `flipper_right` via `Input.is_action_pressed` in
   `_physics_process` (hold = up, release = down). Flipper implementation (AnimatableBody2D
