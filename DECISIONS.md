@@ -1,7 +1,7 @@
 # Decisions — The Squishy Pinball Machine
 
 Numbered, append-only. Never renumber; supersede in place with date and reason.
-Workers cite these instead of re-deciding. Next free number: **D-016**.
+Workers cite these instead of re-deciding. Next free number: **D-017**.
 
 ## D-001 — Engine: Godot 4.x, GDScript (2026-09-02)
 Per PRD. Exact version to be pinned as D-006 once installed on the build machine.
@@ -133,3 +133,11 @@ Bumpers r=28, sensor r=32, kick impulse 750, bounce 0.55, cooldown 0.18 s, at (2
 (30,290) rot 90°, (560,310) rot 90°, (360,30). Bank reset 0.5 s with restart-generation
 guard. Launch impulses below ~1600 do not leave the lane (gameplay impulse is 1850).
 Worker proposal for Natasha: bumper 100 → 150 (hit rate makes 100 feel cheap). Unchanged.
+
+## D-016 — Flipper-base fill + pivot nudge (T3.1, 2026-09-03)
+Static fill wedges on `Walls` at each pivot: left (250,1120)-(250,1110)-(260,1112)-(258,1122),
+right mirrored at x=470/460/462; max y 1122 so no shelf above the Drain box. Plus a
+safety net in `flipper.gd`: a ball within 30 px of the pivot moving under 5 px/s gets a
+140 impulse along rest-direction + playfield-normal. Verified not to fire on cradled
+balls (speed gate) and to fire ≤1 frame per full game. Rest angle, gap, and HIT vy
+(−1157.9) unchanged from D-012.
