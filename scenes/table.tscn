@@ -1,7 +1,8 @@
-[gd_scene load_steps=13 format=3]
+[gd_scene load_steps=14 format=3]
 
 [ext_resource type="Script" path="res://scripts/table.gd" id="1_table"]
 [ext_resource type="Script" path="res://scripts/launcher.gd" id="2_launcher"]
+[ext_resource type="PackedScene" path="res://scenes/flipper.tscn" id="3_flipper"]
 
 [sub_resource type="PhysicsMaterial" id="PhysicsMaterial_walls"]
 friction = 0.25
@@ -135,3 +136,11 @@ monitorable = false
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Launcher/LaneSensor"]
 position = Vector2(666, 1160)
 shape = SubResource("RectangleShape2D_lane")
+
+[node name="FlipperLeft" parent="." instance=ExtResource("3_flipper")]
+position = Vector2(250, 1120)
+
+[node name="FlipperRight" parent="." instance=ExtResource("3_flipper")]
+position = Vector2(470, 1120)
+action_name = &"flipper_right"
+facing = -1
