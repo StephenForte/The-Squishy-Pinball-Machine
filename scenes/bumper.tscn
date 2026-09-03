@@ -1,0 +1,36 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scripts/bumper.gd" id="1_bumper"]
+
+[sub_resource type="PhysicsMaterial" id="PhysicsMaterial_bumper"]
+friction = 0.05
+bounce = 0.55
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_body"]
+radius = 28.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_sensor"]
+radius = 32.0
+
+[node name="Bumper" type="StaticBody2D" groups=["bumpers"]]
+physics_material_override = SubResource("PhysicsMaterial_bumper")
+script = ExtResource("1_bumper")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("CircleShape2D_body")
+
+[node name="Visual" type="Polygon2D" parent="."]
+color = Color(0.86, 0.32, 0.28, 1)
+polygon = PackedVector2Array(28, 0, 25.87, 10.72, 19.8, 19.8, 10.72, 25.87, 0, 28, -10.72, 25.87, -19.8, 19.8, -25.87, 10.72, -28, 0, -25.87, -10.72, -19.8, -19.8, -10.72, -25.87, 0, -28, 10.72, -25.87, 19.8, -19.8, 25.87, -10.72)
+
+[node name="Core" type="Polygon2D" parent="."]
+color = Color(0.95, 0.78, 0.35, 1)
+polygon = PackedVector2Array(10, 0, 8.66, 5, 5, 8.66, 0, 10, -5, 8.66, -8.66, 5, -10, 0, -8.66, -5, -5, -8.66, 0, -10, 5, -8.66, 8.66, -5)
+
+[node name="Sensor" type="Area2D" parent="."]
+collision_layer = 0
+collision_mask = 1
+monitorable = false
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Sensor"]
+shape = SubResource("CircleShape2D_sensor")

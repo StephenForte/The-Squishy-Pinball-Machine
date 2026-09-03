@@ -1,8 +1,9 @@
-[gd_scene load_steps=14 format=3]
+[gd_scene load_steps=15 format=3]
 
 [ext_resource type="Script" path="res://scripts/table.gd" id="1_table"]
 [ext_resource type="Script" path="res://scripts/launcher.gd" id="2_launcher"]
 [ext_resource type="PackedScene" path="res://scenes/flipper.tscn" id="3_flipper"]
+[ext_resource type="PackedScene" path="res://scenes/bumper.tscn" id="4_bumper"]
 
 [sub_resource type="PhysicsMaterial" id="PhysicsMaterial_walls"]
 friction = 0.25
@@ -144,3 +145,6 @@ position = Vector2(250, 1120)
 position = Vector2(470, 1120)
 action_name = &"flipper_right"
 facing = -1
+
+[node name="Bumper1" parent="." instance=ExtResource("4_bumper")]
+position = Vector2(250, 420)
