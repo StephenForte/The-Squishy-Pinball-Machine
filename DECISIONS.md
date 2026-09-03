@@ -1,7 +1,7 @@
 # Decisions — The Squishy Pinball Machine
 
 Numbered, append-only. Never renumber; supersede in place with date and reason.
-Workers cite these instead of re-deciding. Next free number: **D-013**.
+Workers cite these instead of re-deciding. Next free number: **D-015**.
 
 ## D-001 — Engine: Godot 4.x, GDScript (2026-09-02)
 Per PRD. Exact version to be pinned as D-006 once installed on the build machine.
@@ -95,3 +95,29 @@ vs -1158). Paddle length 90 px, half-width 8, rest 22° below horizontal inward,
 `facing` (+1 left, -1 right). Rest geometry chosen so a ball on the paddle clears the
 Drain box (top y=1150) until it rounds the tip. Known: the 220 px gap cannot cradle;
 revisit in Phase 4 tuning (pivots ~270/450 or lower drain box), Natasha decides.
+
+## D-013 — Scoring nodes contract (2026-09-03)
+- `scenes/bumper.tscn` root `Bumper` (StaticBody2D, group `"bumpers"`, script
+  `scripts/bumper.gd`): on ball contact calls `Game.add_score(100)` and kicks the ball
+  away from its centre (`@export var kick_impulse`). Detection via its own child Area2D —
+  `ball.tscn` is not edited.
+- `scenes/target.tscn` root `Target` (StaticBody2D, group `"targets"`, script
+  `scripts/target.gd`): `signal hit`, `var lit: bool`, `func reset()`. First hit while
+  unlit → `Game.add_score(500)`, `lit = true`, `hit.emit()`. Hits while lit score nothing.
+- `scripts/target_bank.gd` on a `TargetBank` Node in `table.tscn` owns all targets: when
+  every child target is lit → `Game.add_score(2500)`, `signal all_targets_hit`, then
+  `reset()` all after 0.5 s. Also resets on `Game.game_restarted`.
+- Placement invariant: with idle flippers a launched ball must still drain within 3000
+  frames (no trap pockets); the launch arc from the lane must not be blocked.
+
+## D-014 — UI contract (2026-09-03)
+- `scenes/ui/hud.tscn` root `HUD` (CanvasLayer, script `scripts/ui/hud.gd`), instanced in
+  `main.tscn` under `Main`. Labels named `ScoreLabel`, `BallsLabel`, `HighScoreLabel`.
+  Display-only: subscribes to `Game` signals in its own `_ready()`; on `game_restarted`
+  reads `Game.score` / `Game.balls_left` directly (D-011 superseded).
+- `scenes/ui/game_over.tscn` root `GameOver` (CanvasLayer, script
+  `scripts/ui/game_over.gd`), instanced under `Main`; hidden until `Game.game_over`,
+  hidden again on `Game.game_restarted`. Shows final score, high score, a
+  `NewHighScoreLabel` visible only when `is_high_score`, a `RestartButton` that calls
+  `Game.restart()`, and "Press R to restart".
+- `scripts/main.gd` is not edited by T6; UI nodes wire themselves.
