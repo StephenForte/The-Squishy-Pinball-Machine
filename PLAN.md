@@ -16,10 +16,13 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T4 | Game flow: 3 balls, restart | 2 | merged 2026-09-02 (PR #3) | mid | T2 (not T3) |
 | T5 | Bumpers, targets, scoring | 3 | merged 2026-09-03 (PR #8) | mid | T3, T4 |
 | T6 | HUD, game over, high score | 3 | merged 2026-09-03 (PR #7); Steve play-tested ✓ | mid | T4 |
-| T3.1 | Flipper-base trap pocket (V1 blocker) | 2 fix | approved 2026-09-03; PR #9 (4e023fb) ready to merge | mid | T5 merged |
-| T7 | Theme & polish | 4 | not started | split at dispatch | T5, T6 |
+| T3.1 | Flipper-base trap pocket (V1 blocker) | 2 fix | merged 2026-09-03 (PR #9) | mid | T5 merged |
+| T7a | Streak scoring, screen shake, big-score moment | 4 | dispatched 2026-09-03 | mid-strong | T3.1 |
+| T7b | Title screen + instructions | 4 | dispatched 2026-09-03 (start after T7a merges) | cheap | T7a |
+| T7c | Sound effects | 4 | dispatched 2026-09-03 (start after T7a merges) | mid | T7a |
+| T8 | Squishy art + theme pass | 4 | not started (Natasha: later) | strong | T7a–c |
 
-**Run order:** T1 → T2 → (T3, then T4 — T4 may start once T2 merges) → T5 ∥ T6 → T7.
+**Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8.
 T5 and T6 are the only truly parallel pair; ownership below is drawn to keep them apart.
 
 ## Blockers / open items
@@ -74,7 +77,25 @@ Owns: `scenes/ui/` (all), `scripts/ui/` (all); edits `scenes/main.tscn` to add t
 layer. Score/balls display driven only by `Game` signals (D-005) — no references into
 table or gameplay scenes. High score persisted at `user://highscore.save` (D-005).
 
-### T7 — Theme & polish (split into sub-briefs at dispatch time)
+### Phase 3 play-test (2026-09-03)
+Natasha scored 4 800. Flippers responsive ✓, bumper value OK but wants a streak bonus,
+squishy art/theme deferred to T8. Steve's first game scored 0 (didn't flip into bumpers).
+
+### T7a — Streak scoring, screen shake, big-score moment
+Owns: `autoload/game.gd` (additive: streak state + signals, D-017/D-018), `scripts/bumper.gd`
+(additive: `hit` signal, streak call), `scenes/ui/hud.tscn` + `scripts/ui/hud.gd` (additive:
+`StreakLabel`), new `scenes/effects.tscn` + `scripts/effects.gd` instanced in `table.tscn`
+(additive), `tests/streak_test.gd`. Must not touch `main.tscn`/`main.gd` (T7b) or add audio (T7c).
+
+### T7b — Title screen + instructions
+Owns: `scenes/ui/title.tscn`, `scripts/ui/title.gd`, `tests/title_test.gd`; additive edits to
+`scenes/main.tscn` and `scripts/main.gd`. Nothing under table/gameplay/autoload.
+
+### T7c — Sound effects
+Owns: `assets/sfx/*`, `autoload/sfx.gd` (autoload `Sfx`, `[autoload]` line in project.godot),
+`tests/sfx_test.gd`. Listens to signals only (D-018); edits no gameplay or UI file.
+
+### T7 — Theme & polish (original note)
 Art/sound/screen-shake vs. title screen can parallelize; ownership drawn when T5/T6 land.
 Tuning backlog from reviews (Natasha decides): flippers cannot cradle a ball — T3 worker
 suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a bit strong.
