@@ -11,7 +11,7 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | ID | Task | Phase | Status | Model tier | Depends on |
 |----|------|-------|--------|------------|------------|
 | T1 | Project scaffold | 0/1 | merged 2026-09-02 (PR #1 → a9d3e35) | cheap (Sonnet) | — |
-| T2 | Table, ball, launcher, drain | 1 | dispatched 2026-09-02 | strong (Opus+) | T1 |
+| T2 | Table, ball, launcher, drain | 1 | changes requested 2026-09-02 (PR #2: fall-back soft-lock) | strong (Opus+) | T1 |
 | T3 | Flippers + controls | 2 | not started | strong (Opus+) | T2 |
 | T4 | Game flow: 3 balls, restart | 2 | not started | mid | T2 (not T3) |
 | T5 | Bumpers, targets, scoring | 3 | not started | mid | T3, T4 |
@@ -93,3 +93,11 @@ Art/sound/screen-shake vs. title screen can parallelize; ownership drawn when T5
   correct physical keycodes (65/4194319, 68/4194321, 32, 82). Findings: `timeout`
   absent on macOS (D-007 corrected — planner error, worker caught it);
   `scripts/main.gd.uid` untracked → D-008, worker asked to commit it in PR #1.
+- 2026-09-02: T2 (PR #2, f1a6992) reviewed in scratch clone. Base ✓, scope ✓ (12 files;
+  project.godot = [physics] only; main.tscn +3 lines). All 3 gates re-run: import 0,
+  300-frame 0, SOAK PASS 20/12000/0. Planner probe (fixed-fps): 12 gameplay launches
+  through real drain+respawn → 12 drained, 0 stuck, 0 OOB, 417 frames each; overdrive
+  2600/4000/8000 all in bounds. DEFECT: weak launch falls back into lane with
+  launched=true → Space dead forever (soft-lock; reachable once T3 flippers exist).
+  Fix proven in scratch (drop `launched` gate in ball.gd): relaunch moved=true, soak
+  still green. Changes requested on PR #2 with patch + regression property.
