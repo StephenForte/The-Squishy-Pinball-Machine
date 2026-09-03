@@ -12,6 +12,9 @@ const HALF_WIDTH := 8.0
 const BALL_RADIUS := 12.0
 const UP_SPEED_DEG := 720.0
 const DOWN_SPEED_DEG := 560.0
+const PIVOT_TRAP_RADIUS := 30.0
+const PIVOT_TRAP_SPEED := 5.0
+const PIVOT_NUDGE := 140.0
 
 var rest_rad: float
 var up_rad: float
@@ -32,6 +35,22 @@ func _physics_process(delta: float) -> void:
 	var speed_deg := UP_SPEED_DEG if pressed else DOWN_SPEED_DEG
 	angle = move_toward(angle, target, deg_to_rad(speed_deg) * delta)
 	rotation = angle
+	_nudge_pivot_trap()
+
+
+func _nudge_pivot_trap() -> void:
+	for body in get_tree().get_nodes_in_group("ball"):
+		if not (body is RigidBody2D) or not is_instance_valid(body):
+			continue
+		var to_ball: Vector2 = body.global_position - global_position
+		if to_ball.length() >= PIVOT_TRAP_RADIUS:
+			continue
+		if body.linear_velocity.length() >= PIVOT_TRAP_SPEED:
+			continue
+		var nudge := rest_direction() + playfield_normal_at_rest()
+		if nudge.length_squared() < 0.001:
+			continue
+		body.apply_central_impulse(nudge.normalized() * PIVOT_NUDGE)
 
 
 func rest_direction() -> Vector2:
