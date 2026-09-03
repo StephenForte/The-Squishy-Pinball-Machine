@@ -1,9 +1,15 @@
-[gd_scene load_steps=3 format=3 uid="uid://c8xk2m5n7pqr1"]
+[gd_scene load_steps=5 format=3 uid="uid://c8xk2m5n7pqr1"]
 
 [ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
 [ext_resource type="PackedScene" path="res://scenes/table.tscn" id="2_table"]
+[ext_resource type="PackedScene" path="res://scenes/ui/hud.tscn" id="3_hud"]
+[ext_resource type="PackedScene" path="res://scenes/ui/game_over.tscn" id="4_game_over"]
 
 [node name="Main" type="Node2D"]
 script = ExtResource("1_main")
 
 [node name="Table" parent="." instance=ExtResource("2_table")]
+
+[node name="HUD" parent="." instance=ExtResource("3_hud")]
+
+[node name="GameOver" parent="." instance=ExtResource("4_game_over")]
