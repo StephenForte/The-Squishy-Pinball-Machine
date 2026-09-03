@@ -1,7 +1,7 @@
 # Decisions — The Squishy Pinball Machine
 
 Numbered, append-only. Never renumber; supersede in place with date and reason.
-Workers cite these instead of re-deciding. Next free number: **D-010**.
+Workers cite these instead of re-deciding. Next free number: **D-011**.
 
 ## D-001 — Engine: Godot 4.x, GDScript (2026-09-02)
 Per PRD. Exact version to be pinned as D-006 once installed on the build machine.
@@ -59,3 +59,12 @@ whichever task owns the adjacent file. `.godot/` and `*.import` stay ignored.
 - Ball is `scenes/ball.tscn`, root `RigidBody2D`, in node group `"ball"`.
 - Physics tuning values (gravity, launch impulse, tick rate, CCD mode) are reported
   in T2's handoff and recorded here as D-010 by the planner.
+
+## D-010 — Physics tuning values from T2 (2026-09-02)
+Gravity 980 px/s² (project default), physics 120 ticks/s, ball CCD `CAST_SHAPE` armed
+4 physics frames after spawn, launch impulse fixed 1850 (soak range 1100–1850), ball
+radius 12, ball bounce 0.32 / friction 0.1, wall bounce 0.28 / friction 0.25.
+Verified margin: impulses up to 8000 stay in bounds. Launch style is fixed impulse;
+hold-to-charge deferred until flippers exist (Natasha decides). T3 geometry anchors:
+lane x 636–696, spawn (666, 1219), drain x 250–470, guide walls end y=1120, flipper
+pivots (250, 1120) and (470, 1120).
