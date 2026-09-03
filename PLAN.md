@@ -12,7 +12,7 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 |----|------|-------|--------|------------|------------|
 | T1 | Project scaffold | 0/1 | merged 2026-09-02 (PR #1 → a9d3e35) | cheap (Sonnet) | — |
 | T2 | Table, ball, launcher, drain | 1 | merged 2026-09-02 (PR #2 → 784740f); Steve play-tested ✓ | strong (Opus+) | T1 |
-| T3 | Flippers + controls | 2 | dispatched 2026-09-02 | strong (Opus+) | T2 |
+| T3 | Flippers + controls | 2 | approved 2026-09-03; PR #5 (d91e321) ready to merge | strong (Opus+) | T2 |
 | T4 | Game flow: 3 balls, restart | 2 | approved 2026-09-02; PR #3 (669ee95) ready to merge | mid | T2 (not T3) |
 | T5 | Bumpers, targets, scoring | 3 | not started | mid | T3, T4 |
 | T6 | HUD, game over, high score | 3 | not started | mid | T4 |
@@ -65,6 +65,8 @@ table or gameplay scenes. High score persisted at `user://highscore.save` (D-005
 
 ### T7 — Theme & polish (split into sub-briefs at dispatch time)
 Art/sound/screen-shake vs. title screen can parallelize; ownership drawn when T5/T6 land.
+Tuning backlog from reviews (Natasha decides): flippers cannot cradle a ball — T3 worker
+suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a bit strong.
 
 ## Commit-and-merge contract (referenced by every worker brief)
 
@@ -116,3 +118,10 @@ Art/sound/screen-shake vs. title screen can parallelize; ownership drawn when T5
   ball, game_over ×1; restart via InputEventAction from GAME_OVER, mid-flight, during
   pending respawn timer (Bugbot race, fixed 48d7ac0), R×3 mash → always exactly 1 ball;
   second game + restart OK. Approved. D-011 superseded: restart emits only game_restarted.
+- 2026-09-03: T3 (PR #5, d91e321) reviewed in scratch clone. Scope ✓ (6 files; table.tscn
+  purely additive). All 4 gates re-run: import 0, 300-frame 0, SOAK PASS relaunch=1,
+  REST PASS + FLIP PASS hits=2 hold=1 tip_flips=20. Planner probes on real main.tscn with
+  Drain ON: tip shot at 0.95 lifts (vy -800) with no drain; hub pinch 10 flips 0 OOB;
+  both-up centre gap drains; 9000-frame mashed game 0 OOB. Bugbot drain-overlap finding
+  measured: balls at along 0.70–1.00 drain only at projected 0.99–1.02 (rounding the tip),
+  0.70 survives 48 frames → fixed at 97eb9a1. Approved. Cradle/gap note → T7 backlog.
