@@ -21,6 +21,13 @@ func _run() -> void:
 	root.add_child(table)
 	await process_frame
 	await physics_frame
+	_free_balls()
+	await process_frame
+
+	if not await _test_rest_clears_drain(table):
+		quit(1)
+		return
+
 	table.get_node("Drain").monitoring = false
 	_free_balls()
 	await process_frame
@@ -51,6 +58,36 @@ func _run() -> void:
 
 	print("FLIP PASS hits=%d hold=1 tip_flips=%d oob=0" % [hits, TIP_FLIPS])
 	quit(0)
+
+
+func _test_rest_clears_drain(table: Node2D) -> bool:
+	table.get_node("Drain").monitoring = true
+	_release_flippers()
+	_free_balls()
+	await process_frame
+	await physics_frame
+
+	for flipper_name in ["FlipperLeft", "FlipperRight"]:
+		var flipper: Node2D = table.get_node(flipper_name)
+		var ball := await _spawn_frozen_ball(table, flipper.ball_rest_spot(0.92))
+		if ball == null:
+			print("REST FAIL %s no_ball" % flipper_name)
+			return false
+		ball.freeze = false
+		ball.sleeping = false
+		for _i in 8:
+			await physics_frame
+			if not is_instance_valid(ball) or ball.is_queued_for_deletion():
+				print("REST FAIL %s drained_on_paddle" % flipper_name)
+				return false
+			if ball.global_position.distance_to(flipper.global_position) > flipper.LENGTH + 24.0:
+				print("REST FAIL %s left_paddle" % flipper_name)
+				return false
+		ball.queue_free()
+		await process_frame
+
+	print("REST PASS")
+	return true
 
 
 func _test_hit(table: Node2D, flipper_name: String, action: StringName) -> bool:

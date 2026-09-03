@@ -7,7 +7,7 @@ friction = 0.2
 bounce = 0.18
 
 [sub_resource type="ConvexPolygonShape2D" id="ConvexPolygonShape2D_paddle"]
-points = PackedVector2Array(8, -8, 96, -6, 104, 0, 96, 6, 8, 8)
+points = PackedVector2Array(8, -8, 82, -6, 90, 0, 82, 6, 8, 8)
 
 [node name="Flipper" type="AnimatableBody2D"]
 sync_to_physics = true
@@ -19,7 +19,7 @@ shape = SubResource("ConvexPolygonShape2D_paddle")
 
 [node name="Visual" type="Polygon2D" parent="."]
 color = Color(0.92, 0.62, 0.28, 1)
-polygon = PackedVector2Array(8, -8, 96, -6, 104, 0, 96, 6, 8, 8)
+polygon = PackedVector2Array(8, -8, 82, -6, 90, 0, 82, 6, 8, 8)
 
 [node name="Hub" type="Polygon2D" parent="."]
 color = Color(0.75, 0.48, 0.2, 1)

@@ -5,9 +5,9 @@ extends AnimatableBody2D
 @export var action_name: StringName = &"flipper_left"
 @export var facing: int = 1
 
-const REST_DEG := 32.0
+const REST_DEG := 22.0
 const SWING_DEG := 65.0
-const LENGTH := 100.0
+const LENGTH := 90.0
 const HALF_WIDTH := 8.0
 const BALL_RADIUS := 12.0
 const UP_SPEED_DEG := 720.0
