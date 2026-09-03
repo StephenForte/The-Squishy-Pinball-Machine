@@ -59,7 +59,60 @@ func _run_soak() -> void:
 					quit(1)
 					return
 
-	print("SOAK PASS launches=%d frames=%d out_of_bounds=0" % [LAUNCH_COUNT, frames])
+	var fallback := await _fresh_lane_ball(table)
+	if fallback == null:
+		push_error("SOAK: no lane ball for relaunch regression")
+		print(
+			"SOAK FAIL launches=%d frames=%d out_of_bounds=0 relaunch=0"
+			% [LAUNCH_COUNT, frames]
+		)
+		quit(1)
+		return
+	launcher.launch(1100.0)
+	if not bool(fallback.get("launched")):
+		push_error("SOAK: weak launch did not fire")
+		print(
+			"SOAK FAIL launches=%d frames=%d out_of_bounds=0 relaunch=0"
+			% [LAUNCH_COUNT, frames]
+		)
+		quit(1)
+		return
+	for _w in FRAMES_PER_LAUNCH:
+		await physics_frame
+	if not is_instance_valid(fallback) or _find_lane_ball() != fallback:
+		push_error("SOAK: weak launch did not fall back into the lane")
+		print(
+			"SOAK FAIL launches=%d frames=%d out_of_bounds=0 relaunch=0"
+			% [LAUNCH_COUNT, frames]
+		)
+		quit(1)
+		return
+	var y_before: float = fallback.global_position.y
+	launcher.launch(1850.0)
+	for _r in 120:
+		await physics_frame
+	if not is_instance_valid(fallback):
+		push_error("SOAK: ball freed during relaunch")
+		print(
+			"SOAK FAIL launches=%d frames=%d out_of_bounds=0 relaunch=0"
+			% [LAUNCH_COUNT, frames]
+		)
+		quit(1)
+		return
+	var moved: float = absf(fallback.global_position.y - y_before)
+	if moved <= 20.0:
+		push_error("SOAK: relaunch after fallback moved only %s px" % moved)
+		print(
+			"SOAK FAIL launches=%d frames=%d out_of_bounds=0 relaunch=0"
+			% [LAUNCH_COUNT, frames]
+		)
+		quit(1)
+		return
+
+	print(
+		"SOAK PASS launches=%d frames=%d out_of_bounds=0 relaunch=1"
+		% [LAUNCH_COUNT, frames]
+	)
 	quit(0)
 
 

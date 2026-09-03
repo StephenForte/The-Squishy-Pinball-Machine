@@ -13,7 +13,7 @@ func _ready() -> void:
 
 
 func launch(impulse: float) -> void:
-	if launched or not _ccd_ready:
+	if not _ccd_ready:
 		return
 	launched = true
 	sleeping = false
