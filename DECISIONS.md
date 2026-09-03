@@ -1,7 +1,7 @@
 # Decisions — The Squishy Pinball Machine
 
 Numbered, append-only. Never renumber; supersede in place with date and reason.
-Workers cite these instead of re-deciding. Next free number: **D-017**.
+Workers cite these instead of re-deciding. Next free number: **D-019**.
 
 ## D-001 — Engine: Godot 4.x, GDScript (2026-09-02)
 Per PRD. Exact version to be pinned as D-006 once installed on the build machine.
@@ -141,3 +141,25 @@ safety net in `flipper.gd`: a ball within 30 px of the pivot moving under 5 px/s
 140 impulse along rest-direction + playfield-normal. Verified not to fire on cradled
 balls (speed gate) and to fire ≤1 frame per full game. Rest angle, gap, and HIT vy
 (−1157.9) unchanged from D-012.
+
+## D-017 — Bumper streak rule (Natasha, 2026-09-03)
+Consecutive bumper hits within 2.0 s of the previous bumper hit form a streak. Points per
+bumper hit = 100 × min(streak, 5) → 100, 200, 300, 400, 500 cap. Streak resets after 2.0 s
+without a bumper hit, on drain, and on restart. Targets (500) and the bank bonus (2 500) are
+unchanged and do not affect the streak. Natasha may retune numbers after play.
+
+## D-018 — Phase 4 signal contracts (2026-09-03)
+- `Bumper`: `signal hit` emitted once per scored hit (after `Game.register_bumper_hit()`).
+- `Game`: `func register_bumper_hit() -> int` applies D-017, calls `add_score`, returns points
+  awarded; `var streak: int`; `signal streak_changed(streak: int)`;
+  `signal big_score_reached(score: int)` emitted once per game the first time score ≥ 10 000.
+- `Effects` node (`scenes/effects.tscn`, instanced in `table.tscn` as `Effects`, script
+  `scripts/effects.gd`): owns a `Camera2D` for screen shake (camera offset only — never
+  moves physics bodies) and the big-score fireworks (particles). Listens to `Bumper.hit`
+  (via group `"bumpers"`), `Game.big_score_reached`, `Game.game_restarted`.
+- `Sfx` autoload (`autoload/sfx.gd`): plays WAVs from `assets/sfx/`; listens to `Bumper.hit`,
+  `Target.hit`, `Game.ball_count_changed`, `Game.game_over`, `Game.big_score_reached`, and
+  `flipper_left`/`flipper_right` just-pressed. No gameplay file calls `Sfx` directly.
+- `HUD`: `StreakLabel` shows `x<streak>` when streak ≥ 2, hidden otherwise.
+- Title (`scenes/ui/title.tscn`, root `Title` CanvasLayer): visible at app start; hidden on
+  the first `launch_ball` press; never shown again until the app restarts.
