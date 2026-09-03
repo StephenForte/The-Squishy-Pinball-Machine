@@ -1,8 +1,11 @@
-[gd_scene load_steps=14 format=3]
+[gd_scene load_steps=17 format=3]
 
 [ext_resource type="Script" path="res://scripts/table.gd" id="1_table"]
 [ext_resource type="Script" path="res://scripts/launcher.gd" id="2_launcher"]
 [ext_resource type="PackedScene" path="res://scenes/flipper.tscn" id="3_flipper"]
+[ext_resource type="PackedScene" path="res://scenes/bumper.tscn" id="4_bumper"]
+[ext_resource type="Script" path="res://scripts/target_bank.gd" id="5_target_bank"]
+[ext_resource type="PackedScene" path="res://scenes/target.tscn" id="6_target"]
 
 [sub_resource type="PhysicsMaterial" id="PhysicsMaterial_walls"]
 friction = 0.25
@@ -144,3 +147,26 @@ position = Vector2(250, 1120)
 position = Vector2(470, 1120)
 action_name = &"flipper_right"
 facing = -1
+
+[node name="Bumper1" parent="." instance=ExtResource("4_bumper")]
+position = Vector2(250, 400)
+
+[node name="Bumper2" parent="." instance=ExtResource("4_bumper")]
+position = Vector2(455, 410)
+
+[node name="Bumper3" parent="." instance=ExtResource("4_bumper")]
+position = Vector2(295, 530)
+
+[node name="TargetBank" type="Node" parent="."]
+script = ExtResource("5_target_bank")
+
+[node name="TargetLeft" parent="TargetBank" instance=ExtResource("6_target")]
+position = Vector2(30, 290)
+rotation = 1.5708
+
+[node name="TargetRight" parent="TargetBank" instance=ExtResource("6_target")]
+position = Vector2(560, 310)
+rotation = 1.5708
+
+[node name="TargetTop" parent="TargetBank" instance=ExtResource("6_target")]
+position = Vector2(360, 30)
