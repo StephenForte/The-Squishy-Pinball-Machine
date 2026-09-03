@@ -4,8 +4,8 @@
 [ext_resource type="Script" path="res://scripts/launcher.gd" id="2_launcher"]
 
 [sub_resource type="PhysicsMaterial" id="PhysicsMaterial_walls"]
-friction = 0.2
-bounce = 0.35
+friction = 0.25
+bounce = 0.28
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_top"]
 size = Vector2(720, 24)
