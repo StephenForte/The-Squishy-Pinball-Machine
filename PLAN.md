@@ -11,7 +11,7 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | ID | Task | Phase | Status | Model tier | Depends on |
 |----|------|-------|--------|------------|------------|
 | T1 | Project scaffold | 0/1 | merged 2026-09-02 (PR #1 → a9d3e35) | cheap (Sonnet) | — |
-| T2 | Table, ball, launcher, drain | 1 | changes requested 2026-09-02 (PR #2: fall-back soft-lock) | strong (Opus+) | T1 |
+| T2 | Table, ball, launcher, drain | 1 | approved 2026-09-02; PR #2 (c1a41b9) ready to merge | strong (Opus+) | T1 |
 | T3 | Flippers + controls | 2 | not started | strong (Opus+) | T2 |
 | T4 | Game flow: 3 balls, restart | 2 | not started | mid | T2 (not T3) |
 | T5 | Bumpers, targets, scoring | 3 | not started | mid | T3, T4 |
@@ -101,3 +101,8 @@ Art/sound/screen-shake vs. title screen can parallelize; ownership drawn when T5
   launched=true → Space dead forever (soft-lock; reachable once T3 flippers exist).
   Fix proven in scratch (drop `launched` gate in ball.gd): relaunch moved=true, soak
   still green. Changes requested on PR #2 with patch + regression property.
+- 2026-09-02: T2 fix-up (c1a41b9) re-verified in scratch clone: diff = ball.gd 1 line +
+  soak +55 lines only. Gates: import 0, 300-frame 0, SOAK PASS 20/12000/0 relaunch=1.
+  Proved regression can fail by restoring old gate → SOAK FAIL relaunch=0 (0.87 px),
+  exit 1. No check runs exist on the commit (repo has no CI). Approved; Phase 1 closes
+  on merge. Natasha play-test still owed before Phase 2 is called done.
