@@ -14,8 +14,9 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T2 | Table, ball, launcher, drain | 1 | merged 2026-09-02 (PR #2 → 784740f); Steve play-tested ✓ | strong (Opus+) | T1 |
 | T3 | Flippers + controls | 2 | merged 2026-09-03 (PR #5) | strong (Opus+) | T2 |
 | T4 | Game flow: 3 balls, restart | 2 | merged 2026-09-02 (PR #3) | mid | T2 (not T3) |
-| T5 | Bumpers, targets, scoring | 3 | dispatched 2026-09-03 | mid | T3, T4 |
+| T5 | Bumpers, targets, scoring | 3 | approved 2026-09-03; PR #8 (fa98729) ready to merge | mid | T3, T4 |
 | T6 | HUD, game over, high score | 3 | merged 2026-09-03 (PR #7); Steve play-tested ✓ | mid | T4 |
+| T3.1 | Flipper-base trap pocket (V1 blocker) | 2 fix | not started | mid | T5 merged |
 | T7 | Theme & polish | 4 | not started | split at dispatch | T5, T6 |
 
 **Run order:** T1 → T2 → (T3, then T4 — T4 may start once T2 merges) → T5 ∥ T6 → T7.
@@ -44,6 +45,16 @@ walls at launch speed — that is the acceptance test.
 Owns: `scenes/flipper.tscn`, `scripts/flipper.gd`. May edit `scenes/table.tscn` only to
 place two flipper instances. Uses input actions from D-004 (already defined in T1 —
 do not add new ones). Tuning target: player can trap and aim the ball at least crudely.
+
+### T3.1 — Flipper-base trap pocket (found in T5 review, pre-existing since T3)
+Owns: `scenes/table.tscn` (additive: base-fill geometry) and/or `scenes/flipper.tscn` /
+`scripts/flipper.gd`; `tests/flipper_test.gd` (add the regression). A ball can rest at the
+flipper base between hub and guide-wall end and no flipping frees it. Reproduction (idle
+flippers, `launcher.launch(imp)` from the lane, `--fixed-fps 120`): on main pre-T5,
+impulses 1600/1750/1800 → rest at (252, 1107); with T5, 1700 → rest at (467, 1106);
+30 double-flips leave it at speed 0. Acceptance: every idle launch 1500–1850 step 50
+either drains within 3000 frames or is freed by one flip; ball never rests within 30 px
+of either pivot. Blocks Version 1 "definition of done".
 
 ### T4 — Game flow
 Owns: `autoload/game.gd` (autoload name `Game`), edits `scripts/main.gd`.
@@ -134,3 +145,9 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   fails: real drain → BALLS 2; 3 successive games (300/500/100) → panel + HUD HIGH track
   correctly, NEW HIGH only when beaten; button restart leaves no focus owner; R works
   with panel showing; zero-score game over shows FINAL 0. Approved.
+- 2026-09-03: T5 (PR #8, fa98729) reviewed in scratch clone. Scope ✓ (11 files; table.tscn
+  additive). All 6 gates re-run green. Probes: bumper 17 score events / 0 within 12 frames;
+  targets physical → 500×3 + 2500, reset 0.5 s, lit re-hit = 0, restart-race generation
+  guard holds, 3 bonuses across restarts. Approved. FOUND (pre-existing): flipper-base
+  pocket — idle 1600/1750/1800 rest at (252,1107) on main; 1700 → (467,1106) on branch;
+  30 double-flips don't free it → task T3.1 (V1 blocker).
