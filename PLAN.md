@@ -71,7 +71,8 @@ Art/sound/screen-shake vs. title screen can parallelize; ownership drawn when T5
 1. Branch from current `main`: `task/T<N>-<slug>`.
 2. One task per branch; no drive-by edits outside the task's ownership list.
 3. Gate before handoff: run the D-007 commands from repo root; both must pass clean.
-4. Open a PR to `main`; hand off in the dispatch-worker format. Planner reviews
+4. Open a PR to `main`; hand off in the dispatch-worker format. CI (Semgrep SAST + Trivy,
+   `.github/workflows/security-scans.yml`, PR #4) must be green. Planner reviews
    (review-handoff), Steve merges. Natasha play-tests before a phase is called done.
 5. Workers never edit PLAN.md, DECISIONS.md, or PRD.md.
 
