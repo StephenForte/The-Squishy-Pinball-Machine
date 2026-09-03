@@ -11,9 +11,9 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | ID | Task | Phase | Status | Model tier | Depends on |
 |----|------|-------|--------|------------|------------|
 | T1 | Project scaffold | 0/1 | merged 2026-09-02 (PR #1 → a9d3e35) | cheap (Sonnet) | — |
-| T2 | Table, ball, launcher, drain | 1 | approved 2026-09-02; PR #2 (c1a41b9) ready to merge | strong (Opus+) | T1 |
-| T3 | Flippers + controls | 2 | not started | strong (Opus+) | T2 |
-| T4 | Game flow: 3 balls, restart | 2 | not started | mid | T2 (not T3) |
+| T2 | Table, ball, launcher, drain | 1 | merged 2026-09-02 (PR #2 → 784740f); Steve play-tested ✓ | strong (Opus+) | T1 |
+| T3 | Flippers + controls | 2 | dispatched 2026-09-02 | strong (Opus+) | T2 |
+| T4 | Game flow: 3 balls, restart | 2 | dispatched 2026-09-02 | mid | T2 (not T3) |
 | T5 | Bumpers, targets, scoring | 3 | not started | mid | T3, T4 |
 | T6 | HUD, game over, high score | 3 | not started | mid | T4 |
 | T7 | Theme & polish | 4 | not started | split at dispatch | T5, T6 |
@@ -47,8 +47,10 @@ do not add new ones). Tuning target: player can trap and aim the ball at least c
 
 ### T4 — Game flow
 Owns: `autoload/game.gd` (autoload name `Game`), edits `scripts/main.gd`.
-Implements the D-005 contract: 3 balls per game, ball-drained → respawn or game over,
-restart on R. Must not touch table.tscn or any T3/T5 file.
+Implements the D-005 contract per D-011 wiring: 3 balls per game, drain → respawn or
+game over, restart on R, high-score persistence. May edit `scripts/table.gd` ONLY to delete
+the `# TEMP` respawn block (D-009); may add `[autoload]` to `project.godot`. Must not
+touch `scenes/table.tscn` (T3 is editing it) or any T3/T5 file.
 
 ### T5 — Bumpers, targets, scoring
 Owns: `scenes/bumper.tscn`, `scenes/target.tscn`, `scripts/bumper.gd`,
