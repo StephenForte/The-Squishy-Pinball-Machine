@@ -121,3 +121,8 @@ revisit in Phase 4 tuning (pivots ~270/450 or lower drain box), Natasha decides.
   `NewHighScoreLabel` visible only when `is_high_score`, a `RestartButton` that calls
   `Game.restart()`, and "Press R to restart".
 - `scripts/main.gd` is not edited by T6; UI nodes wire themselves.
+- As built (T6 review): label format `SCORE  %d` / `BALLS  %d` / `HIGH  %d`, no separators.
+  HUD is a top strip under the 24 px wall, x ≤ 612 (clear of the lane). Extra GameOver
+  nodes for T7 theming: `TitleLabel`, `FinalScoreLabel` (`FINAL  %d`),
+  `GameOverHighScoreLabel`, `HintLabel`. `RestartButton.focus_mode = NONE` so Space never
+  triggers it; keep that when restyling.
