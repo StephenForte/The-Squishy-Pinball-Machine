@@ -1,7 +1,7 @@
 # Decisions — The Squishy Pinball Machine
 
 Numbered, append-only. Never renumber; supersede in place with date and reason.
-Workers cite these instead of re-deciding. Next free number: **D-015**.
+Workers cite these instead of re-deciding. Next free number: **D-016**.
 
 ## D-001 — Engine: Godot 4.x, GDScript (2026-09-02)
 Per PRD. Exact version to be pinned as D-006 once installed on the build machine.
@@ -126,3 +126,10 @@ revisit in Phase 4 tuning (pivots ~270/450 or lower drain box), Natasha decides.
   nodes for T7 theming: `TitleLabel`, `FinalScoreLabel` (`FINAL  %d`),
   `GameOverHighScoreLabel`, `HintLabel`. `RestartButton.focus_mode = NONE` so Space never
   triggers it; keep that when restyling.
+
+## D-015 — Scoring placement and kick, as built by T5 (2026-09-03)
+Bumpers r=28, sensor r=32, kick impulse 750, bounce 0.55, cooldown 0.18 s, at (250,400),
+(455,410), (295,530). Targets 70×12 (sensor 76×18), bounce 0.35, cooldown 0.12 s, at
+(30,290) rot 90°, (560,310) rot 90°, (360,30). Bank reset 0.5 s with restart-generation
+guard. Launch impulses below ~1600 do not leave the lane (gameplay impulse is 1850).
+Worker proposal for Natasha: bumper 100 → 150 (hit rate makes 100 feel cheap). Unchanged.
