@@ -13,7 +13,7 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T1 | Project scaffold | 0/1 | merged 2026-09-02 (PR #1 → a9d3e35) | cheap (Sonnet) | — |
 | T2 | Table, ball, launcher, drain | 1 | merged 2026-09-02 (PR #2 → 784740f); Steve play-tested ✓ | strong (Opus+) | T1 |
 | T3 | Flippers + controls | 2 | dispatched 2026-09-02 | strong (Opus+) | T2 |
-| T4 | Game flow: 3 balls, restart | 2 | dispatched 2026-09-02 | mid | T2 (not T3) |
+| T4 | Game flow: 3 balls, restart | 2 | approved 2026-09-02; PR #3 (669ee95) ready to merge | mid | T2 (not T3) |
 | T5 | Bumpers, targets, scoring | 3 | not started | mid | T3, T4 |
 | T6 | HUD, game over, high score | 3 | not started | mid | T4 |
 | T7 | Theme & polish | 4 | not started | split at dispatch | T5, T6 |
@@ -108,3 +108,10 @@ Art/sound/screen-shake vs. title screen can parallelize; ownership drawn when T5
   Proved regression can fail by restoring old gate → SOAK FAIL relaunch=0 (0.87 px),
   exit 1. No check runs exist on the commit (repo has no CI). Approved; Phase 1 closes
   on merge. Natasha play-test still owed before Phase 2 is called done.
+- 2026-09-02: T4 (PR #3, 669ee95) reviewed in scratch clone. Base ✓, scope ✓ (7 files;
+  project.godot = [autoload] only; table.gd = TEMP block only). All 4 gates re-run:
+  import 0, 300-frame 0, SOAK PASS relaunch=1, FLOW PASS cases=5 autoload_used=true.
+  Planner integration probe on real main.tscn: 27 checks / 0 fails — 3 drains → no 4th
+  ball, game_over ×1; restart via InputEventAction from GAME_OVER, mid-flight, during
+  pending respawn timer (Bugbot race, fixed 48d7ac0), R×3 mash → always exactly 1 ball;
+  second game + restart OK. Approved. D-011 superseded: restart emits only game_restarted.
