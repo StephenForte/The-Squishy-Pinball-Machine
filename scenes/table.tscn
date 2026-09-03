@@ -1,4 +1,4 @@
-[gd_scene load_steps=18 format=3]
+[gd_scene load_steps=19 format=3]
 
 [ext_resource type="Script" path="res://scripts/table.gd" id="1_table"]
 [ext_resource type="Script" path="res://scripts/launcher.gd" id="2_launcher"]
