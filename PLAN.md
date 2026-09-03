@@ -12,10 +12,10 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 |----|------|-------|--------|------------|------------|
 | T1 | Project scaffold | 0/1 | merged 2026-09-02 (PR #1 → a9d3e35) | cheap (Sonnet) | — |
 | T2 | Table, ball, launcher, drain | 1 | merged 2026-09-02 (PR #2 → 784740f); Steve play-tested ✓ | strong (Opus+) | T1 |
-| T3 | Flippers + controls | 2 | approved 2026-09-03; PR #5 (d91e321) ready to merge | strong (Opus+) | T2 |
+| T3 | Flippers + controls | 2 | merged 2026-09-03 (PR #5) | strong (Opus+) | T2 |
 | T4 | Game flow: 3 balls, restart | 2 | approved 2026-09-02; PR #3 (669ee95) ready to merge | mid | T2 (not T3) |
-| T5 | Bumpers, targets, scoring | 3 | not started | mid | T3, T4 |
-| T6 | HUD, game over, high score | 3 | not started | mid | T4 |
+| T5 | Bumpers, targets, scoring | 3 | dispatched 2026-09-03 | mid | T3, T4 |
+| T6 | HUD, game over, high score | 3 | dispatched 2026-09-03 | mid | T4 |
 | T7 | Theme & polish | 4 | not started | split at dispatch | T5, T6 |
 
 **Run order:** T1 → T2 → (T3, then T4 — T4 may start once T2 merges) → T5 ∥ T6 → T7.
