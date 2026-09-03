@@ -1,0 +1,97 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/game_over.gd" id="1_game_over"]
+
+[node name="GameOver" type="CanvasLayer"]
+layer = 20
+visible = false
+script = ExtResource("1_game_over")
+
+[node name="Shade" type="ColorRect" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0, 0, 0, 0.72)
+
+[node name="TitleLabel" type="Label" parent="."]
+offset_left = 40.0
+offset_top = 280.0
+offset_right = 680.0
+offset_bottom = 380.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 10
+theme_override_font_sizes/font_size = 72
+text = "GAME OVER"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="FinalScoreLabel" type="Label" parent="."]
+offset_left = 40.0
+offset_top = 400.0
+offset_right = 680.0
+offset_bottom = 470.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 1, 0.88, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 8
+theme_override_font_sizes/font_size = 44
+text = "FINAL  0"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="GameOverHighScoreLabel" type="Label" parent="."]
+offset_left = 40.0
+offset_top = 470.0
+offset_right = 680.0
+offset_bottom = 530.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 1, 0.88, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 8
+theme_override_font_sizes/font_size = 36
+text = "HIGH  0"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="NewHighScoreLabel" type="Label" parent="."]
+visible = false
+offset_left = 40.0
+offset_top = 540.0
+offset_right = 680.0
+offset_bottom = 620.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 0.92, 0.2, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 8
+theme_override_font_sizes/font_size = 40
+text = "NEW HIGH SCORE!"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="RestartButton" type="Button" parent="."]
+offset_left = 200.0
+offset_top = 680.0
+offset_right = 520.0
+offset_bottom = 770.0
+focus_mode = 0
+theme_override_font_sizes/font_size = 36
+text = "Restart"
+
+[node name="HintLabel" type="Label" parent="."]
+offset_left = 40.0
+offset_top = 790.0
+offset_right = 680.0
+offset_bottom = 850.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.92, 0.92, 0.92, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 6
+theme_override_font_sizes/font_size = 28
+text = "Press R to restart"
+horizontal_alignment = 1
+vertical_alignment = 1
