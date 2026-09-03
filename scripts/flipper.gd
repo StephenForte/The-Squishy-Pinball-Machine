@@ -10,8 +10,8 @@ const SWING_DEG := 65.0
 const LENGTH := 100.0
 const HALF_WIDTH := 8.0
 const BALL_RADIUS := 12.0
-const UP_SPEED_DEG := 850.0
-const DOWN_SPEED_DEG := 540.0
+const UP_SPEED_DEG := 720.0
+const DOWN_SPEED_DEG := 560.0
 
 var rest_rad: float
 var up_rad: float

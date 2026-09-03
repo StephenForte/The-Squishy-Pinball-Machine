@@ -21,7 +21,6 @@ func _run() -> void:
 	root.add_child(table)
 	await process_frame
 	await physics_frame
-	table.set("_respawn_pending", true)
 	table.get_node("Drain").monitoring = false
 	_free_balls()
 	await process_frame
@@ -138,18 +137,21 @@ func _test_tip(table: Node2D) -> Dictionary:
 	await physics_frame
 
 	var flipper: Node2D = table.get_node("FlipperLeft")
-	var ball := await _spawn_frozen_ball(table, flipper.ball_rest_spot(0.92))
 	var flips := 0
 	var oob := 0
-	if ball == null:
-		return {flips = 0, oob = 1}
 
 	for _i in TIP_FLIPS:
+		_release_flippers()
+		_free_balls()
+		await process_frame
+		await physics_frame
+		var ball := await _spawn_frozen_ball(table, flipper.ball_rest_spot(0.92))
+		if ball == null:
+			return {flips = flips, oob = 1}
 		Input.action_press("flipper_left")
 		await physics_frame
-		if is_instance_valid(ball):
-			ball.freeze = false
-			ball.sleeping = false
+		ball.freeze = false
+		ball.sleeping = false
 		var up_frames := 0
 		while up_frames < 18:
 			await physics_frame

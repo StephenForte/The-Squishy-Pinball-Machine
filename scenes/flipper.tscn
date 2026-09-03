@@ -3,8 +3,8 @@
 [ext_resource type="Script" path="res://scripts/flipper.gd" id="1_flipper"]
 
 [sub_resource type="PhysicsMaterial" id="PhysicsMaterial_flipper"]
-friction = 0.18
-bounce = 0.22
+friction = 0.2
+bounce = 0.18
 
 [sub_resource type="ConvexPolygonShape2D" id="ConvexPolygonShape2D_paddle"]
 points = PackedVector2Array(8, -8, 96, -6, 104, 0, 96, 6, 8, 8)
