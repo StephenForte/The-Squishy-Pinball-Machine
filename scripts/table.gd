@@ -4,9 +4,6 @@ signal ball_drained
 
 const BALL_SCENE := preload("res://scenes/ball.tscn")
 const BALL_SPAWN := Vector2(666, 1219)
-const RESPAWN_DELAY := 1.0
-
-var _respawn_pending := false
 
 
 func _ready() -> void:
@@ -35,17 +32,3 @@ func _on_drain_body_entered(body: Node2D) -> void:
 		return
 	body.queue_free()
 	ball_drained.emit()
-	# TEMP: T4 replaces with Game.on_ball_drained()
-	_schedule_respawn()
-
-
-func _schedule_respawn() -> void:
-	if _respawn_pending:
-		return
-	_respawn_pending = true
-	get_tree().create_timer(RESPAWN_DELAY).timeout.connect(_on_respawn_timer, CONNECT_ONE_SHOT)
-
-
-func _on_respawn_timer() -> void:
-	_respawn_pending = false
-	spawn_ball()
