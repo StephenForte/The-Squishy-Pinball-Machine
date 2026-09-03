@@ -14,9 +14,9 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T2 | Table, ball, launcher, drain | 1 | merged 2026-09-02 (PR #2 → 784740f); Steve play-tested ✓ | strong (Opus+) | T1 |
 | T3 | Flippers + controls | 2 | merged 2026-09-03 (PR #5) | strong (Opus+) | T2 |
 | T4 | Game flow: 3 balls, restart | 2 | merged 2026-09-02 (PR #3) | mid | T2 (not T3) |
-| T5 | Bumpers, targets, scoring | 3 | approved 2026-09-03; PR #8 (fa98729) ready to merge | mid | T3, T4 |
+| T5 | Bumpers, targets, scoring | 3 | merged 2026-09-03 (PR #8) | mid | T3, T4 |
 | T6 | HUD, game over, high score | 3 | merged 2026-09-03 (PR #7); Steve play-tested ✓ | mid | T4 |
-| T3.1 | Flipper-base trap pocket (V1 blocker) | 2 fix | not started | mid | T5 merged |
+| T3.1 | Flipper-base trap pocket (V1 blocker) | 2 fix | approved 2026-09-03; PR #9 (4e023fb) ready to merge | mid | T5 merged |
 | T7 | Theme & polish | 4 | not started | split at dispatch | T5, T6 |
 
 **Run order:** T1 → T2 → (T3, then T4 — T4 may start once T2 merges) → T5 ∥ T6 → T7.
@@ -151,3 +151,8 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   guard holds, 3 bonuses across restarts. Approved. FOUND (pre-existing): flipper-base
   pocket — idle 1600/1750/1800 rest at (252,1107) on main; 1700 → (467,1106) on branch;
   30 double-flips don't free it → task T3.1 (V1 blocker).
+- 2026-09-03: T3.1 (PR #9, 4e023fb) reviewed in scratch clone. Scope ✓ (3 files; table.tscn
+  additive). All 6 gates green incl. BASE. Probes: idle sweep step 25 → no rests/traps;
+  20 slow drops around both pivots all drain; cradle on raised flipper held 600 frames
+  (nudge does not fire on holds); mashed game → GAME_OVER 8016 frames, score 5700, nudge
+  condition 1 frame. Approved; V1 blocker cleared.
