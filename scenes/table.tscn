@@ -1,0 +1,137 @@
+[gd_scene load_steps=13 format=3]
+
+[ext_resource type="Script" path="res://scripts/table.gd" id="1_table"]
+[ext_resource type="Script" path="res://scripts/launcher.gd" id="2_launcher"]
+
+[sub_resource type="PhysicsMaterial" id="PhysicsMaterial_walls"]
+friction = 0.2
+bounce = 0.35
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_top"]
+size = Vector2(720, 24)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_left"]
+size = Vector2(24, 1280)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_right"]
+size = Vector2(24, 1280)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_separator"]
+size = Vector2(24, 1130)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_floor"]
+size = Vector2(60, 48)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_drain"]
+size = Vector2(240, 130)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_lane"]
+size = Vector2(56, 140)
+
+[sub_resource type="ConvexPolygonShape2D" id="ConvexPolygonShape2D_curve"]
+points = PackedVector2Array(720, 0, 720, 90, 705.92, 88.89, 692.19, 85.6, 679.14, 80.19, 667.1, 72.81, 656.36, 63.64, 647.19, 52.9, 639.81, 40.86, 634.4, 27.81, 631.11, 14.08, 630, 0)
+
+[sub_resource type="ConvexPolygonShape2D" id="ConvexPolygonShape2D_left"]
+points = PackedVector2Array(0, 980, 24, 980, 250, 1120, 250, 1280, 0, 1280)
+
+[sub_resource type="ConvexPolygonShape2D" id="ConvexPolygonShape2D_right"]
+points = PackedVector2Array(612, 980, 612, 1280, 470, 1280, 470, 1120)
+
+[node name="Table" type="Node2D"]
+script = ExtResource("1_table")
+
+[node name="Background" type="Polygon2D" parent="."]
+z_index = -1
+color = Color(0.11, 0.22, 0.16, 1)
+polygon = PackedVector2Array(0, 0, 720, 0, 720, 1280, 0, 1280)
+
+[node name="Walls" type="StaticBody2D" parent="."]
+physics_material_override = SubResource("PhysicsMaterial_walls")
+
+[node name="Top" type="CollisionShape2D" parent="Walls"]
+position = Vector2(360, 12)
+shape = SubResource("RectangleShape2D_top")
+
+[node name="Left" type="CollisionShape2D" parent="Walls"]
+position = Vector2(12, 640)
+shape = SubResource("RectangleShape2D_left")
+
+[node name="Right" type="CollisionShape2D" parent="Walls"]
+position = Vector2(708, 640)
+shape = SubResource("RectangleShape2D_right")
+
+[node name="LaneSeparator" type="CollisionShape2D" parent="Walls"]
+position = Vector2(624, 715)
+shape = SubResource("RectangleShape2D_separator")
+
+[node name="LaneFloor" type="CollisionShape2D" parent="Walls"]
+position = Vector2(666, 1256)
+shape = SubResource("RectangleShape2D_floor")
+
+[node name="TopRightCurve" type="CollisionShape2D" parent="Walls"]
+shape = SubResource("ConvexPolygonShape2D_curve")
+
+[node name="LeftGuide" type="CollisionShape2D" parent="Walls"]
+shape = SubResource("ConvexPolygonShape2D_left")
+
+[node name="RightGuide" type="CollisionShape2D" parent="Walls"]
+shape = SubResource("ConvexPolygonShape2D_right")
+
+[node name="WallVisuals" type="Node2D" parent="."]
+
+[node name="Top" type="Polygon2D" parent="WallVisuals"]
+color = Color(0.28, 0.36, 0.45, 1)
+polygon = PackedVector2Array(0, 0, 720, 0, 720, 24, 0, 24)
+
+[node name="Left" type="Polygon2D" parent="WallVisuals"]
+color = Color(0.28, 0.36, 0.45, 1)
+polygon = PackedVector2Array(0, 0, 24, 0, 24, 1280, 0, 1280)
+
+[node name="Right" type="Polygon2D" parent="WallVisuals"]
+color = Color(0.28, 0.36, 0.45, 1)
+polygon = PackedVector2Array(696, 0, 720, 0, 720, 1280, 696, 1280)
+
+[node name="LaneSeparator" type="Polygon2D" parent="WallVisuals"]
+color = Color(0.28, 0.36, 0.45, 1)
+polygon = PackedVector2Array(612, 150, 636, 150, 636, 1280, 612, 1280)
+
+[node name="LaneFloor" type="Polygon2D" parent="WallVisuals"]
+color = Color(0.22, 0.28, 0.36, 1)
+polygon = PackedVector2Array(636, 1232, 696, 1232, 696, 1280, 636, 1280)
+
+[node name="TopRightCurve" type="Polygon2D" parent="WallVisuals"]
+color = Color(0.28, 0.36, 0.45, 1)
+polygon = PackedVector2Array(720, 0, 720, 90, 705.92, 88.89, 692.19, 85.6, 679.14, 80.19, 667.1, 72.81, 656.36, 63.64, 647.19, 52.9, 639.81, 40.86, 634.4, 27.81, 631.11, 14.08, 630, 0)
+
+[node name="LeftGuide" type="Polygon2D" parent="WallVisuals"]
+color = Color(0.28, 0.36, 0.45, 1)
+polygon = PackedVector2Array(24, 980, 250, 1120, 250, 1280, 0, 1280, 0, 980)
+
+[node name="RightGuide" type="Polygon2D" parent="WallVisuals"]
+color = Color(0.28, 0.36, 0.45, 1)
+polygon = PackedVector2Array(612, 980, 470, 1120, 470, 1280, 612, 1280)
+
+[node name="Drain" type="Area2D" parent="."]
+collision_layer = 0
+collision_mask = 1
+monitorable = false
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Drain"]
+position = Vector2(360, 1215)
+shape = SubResource("RectangleShape2D_drain")
+
+[node name="Visual" type="Polygon2D" parent="Drain"]
+color = Color(0.12, 0.05, 0.05, 1)
+polygon = PackedVector2Array(250, 1120, 470, 1120, 470, 1280, 250, 1280)
+
+[node name="Launcher" type="Node2D" parent="."]
+script = ExtResource("2_launcher")
+
+[node name="LaneSensor" type="Area2D" parent="Launcher"]
+collision_layer = 0
+collision_mask = 1
+monitorable = false
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Launcher/LaneSensor"]
+position = Vector2(666, 1160)
+shape = SubResource("RectangleShape2D_lane")
