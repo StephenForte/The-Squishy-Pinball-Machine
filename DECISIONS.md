@@ -1,7 +1,7 @@
 # Decisions — The Squishy Pinball Machine
 
 Numbered, append-only. Never renumber; supersede in place with date and reason.
-Workers cite these instead of re-deciding. Next free number: **D-011**.
+Workers cite these instead of re-deciding. Next free number: **D-012**.
 
 ## D-001 — Engine: Godot 4.x, GDScript (2026-09-02)
 Per PRD. Exact version to be pinned as D-006 once installed on the build machine.
@@ -68,3 +68,18 @@ Verified margin: impulses up to 8000 stay in bounds. Launch style is fixed impul
 hold-to-charge deferred until flippers exist (Natasha decides). T3 geometry anchors:
 lane x 636–696, spawn (666, 1219), drain x 250–470, guide walls end y=1120, flipper
 pivots (250, 1120) and (470, 1120).
+
+## D-011 — Game-flow wiring: `Game` is pure state, `main.gd` is the glue (2026-09-02)
+- `Game` (autoload, `res://autoload/game.gd`) holds `score`, `balls_left`, `high_score`,
+  `state` (`READY | PLAYING | GAME_OVER`), and never references scene nodes. It owns
+  high-score persistence (`user://highscore.save`, JSON `{"high_score": int}`), loaded
+  in `_ready()`, saved on game over when beaten.
+- `scripts/main.gd` connects `$Table.ball_drained` → `Game.on_ball_drained()`, and
+  reacts to `Game` signals: `ball_count_changed(n)` with n>0 → 1 s → `$Table.spawn_ball()`;
+  `game_restarted` → free all nodes in group `"ball"`, then `$Table.spawn_ball()`.
+  `restart` input action → `Game.restart()` (allowed in any state).
+- `on_ball_drained()` while `GAME_OVER` is a no-op. `game_over` emits exactly once per game.
+- T6 reads `Game.high_score` / signals for display; it never touches the save file.
+- Flippers (T3) read `flipper_left` / `flipper_right` via `Input.is_action_pressed` in
+  `_physics_process` (hold = up, release = down). Flipper implementation (AnimatableBody2D
+  vs RigidBody2D+PinJoint2D) is T3's choice, recorded as D-012 after review.
