@@ -15,7 +15,7 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T3 | Flippers + controls | 2 | merged 2026-09-03 (PR #5) | strong (Opus+) | T2 |
 | T4 | Game flow: 3 balls, restart | 2 | approved 2026-09-02; PR #3 (669ee95) ready to merge | mid | T2 (not T3) |
 | T5 | Bumpers, targets, scoring | 3 | dispatched 2026-09-03 | mid | T3, T4 |
-| T6 | HUD, game over, high score | 3 | dispatched 2026-09-03 | mid | T4 |
+| T6 | HUD, game over, high score | 3 | approved 2026-09-03; PR #7 (41d1173) ready to merge | mid | T4 |
 | T7 | Theme & polish | 4 | not started | split at dispatch | T5, T6 |
 
 **Run order:** T1 → T2 → (T3, then T4 — T4 may start once T2 merges) → T5 ∥ T6 → T7.
@@ -128,3 +128,9 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   both-up centre gap drains; 9000-frame mashed game 0 OOB. Bugbot drain-overlap finding
   measured: balls at along 0.70–1.00 drain only at projected 0.99–1.02 (rounding the tip),
   0.70 survives 48 frames → fixed at 97eb9a1. Approved. Cradle/gap note → T7 backlog.
+- 2026-09-03: T6 (PR #7, 41d1173) reviewed in scratch clone. Base ✓ (f187421), scope ✓
+  (9 files; main.tscn additive). All 6 gates re-run green: UI PASS cases=7. UI scripts
+  audited: only Game reads + restart(). Planner probe on real main.tscn, 10 checks / 0
+  fails: real drain → BALLS 2; 3 successive games (300/500/100) → panel + HUD HIGH track
+  correctly, NEW HIGH only when beaten; button restart leaves no focus owner; R works
+  with panel showing; zero-score game over shows FINAL 0. Approved.
