@@ -15,7 +15,7 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T3 | Flippers + controls | 2 | merged 2026-09-03 (PR #5) | strong (Opus+) | T2 |
 | T4 | Game flow: 3 balls, restart | 2 | merged 2026-09-02 (PR #3) | mid | T2 (not T3) |
 | T5 | Bumpers, targets, scoring | 3 | dispatched 2026-09-03 | mid | T3, T4 |
-| T6 | HUD, game over, high score | 3 | approved 2026-09-03; PR #7 (41d1173) ready to merge | mid | T4 |
+| T6 | HUD, game over, high score | 3 | merged 2026-09-03 (PR #7); Steve play-tested ✓ | mid | T4 |
 | T7 | Theme & polish | 4 | not started | split at dispatch | T5, T6 |
 
 **Run order:** T1 → T2 → (T3, then T4 — T4 may start once T2 merges) → T5 ∥ T6 → T7.
