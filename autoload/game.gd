@@ -62,8 +62,6 @@ func on_ball_drained() -> void:
 func restart() -> void:
 	_reset_run()
 	game_restarted.emit()
-	score_changed.emit(score)
-	ball_count_changed.emit(balls_left)
 	print("Game game_restarted score=%d balls_left=%d high_score=%d" % [score, balls_left, high_score])
 
 

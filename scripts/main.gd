@@ -1,6 +1,7 @@
 extends Node2D
 
 var _respawn_generation: int = 0
+var _last_balls_left: int = 3
 var _game: Node
 
 
@@ -19,7 +20,9 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _on_ball_count_changed(balls_left: int) -> void:
-	if balls_left <= 0:
+	var drained := balls_left < _last_balls_left
+	_last_balls_left = balls_left
+	if not drained or balls_left <= 0:
 		return
 	var generation := _respawn_generation
 	get_tree().create_timer(1.0).timeout.connect(
@@ -38,6 +41,7 @@ func _spawn_if_current(generation: int) -> void:
 
 func _on_game_restarted() -> void:
 	_respawn_generation += 1
+	_last_balls_left = _game.balls_left
 	for node in get_tree().get_nodes_in_group("ball"):
 		if is_instance_valid(node):
 			node.queue_free()
