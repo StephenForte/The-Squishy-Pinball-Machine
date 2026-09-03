@@ -1,7 +1,7 @@
 # Decisions — The Squishy Pinball Machine
 
 Numbered, append-only. Never renumber; supersede in place with date and reason.
-Workers cite these instead of re-deciding. Next free number: **D-012**.
+Workers cite these instead of re-deciding. Next free number: **D-013**.
 
 ## D-001 — Engine: Godot 4.x, GDScript (2026-09-02)
 Per PRD. Exact version to be pinned as D-006 once installed on the build machine.
@@ -86,3 +86,12 @@ pivots (250, 1120) and (470, 1120).
 - Flippers (T3) read `flipper_left` / `flipper_right` via `Input.is_action_pressed` in
   `_physics_process` (hold = up, release = down). Flipper implementation (AnimatableBody2D
   vs RigidBody2D+PinJoint2D) is T3's choice, recorded as D-012 after review.
+
+## D-012 — Flipper implementation and tuning (2026-09-03)
+AnimatableBody2D with `sync_to_physics = true`, rotation driven in `_physics_process`
+via `move_toward` (velocity transfers to the ball; StaticBody2D proven not to: vy=196
+vs -1158). Paddle length 90 px, half-width 8, rest 22° below horizontal inward, swing
+65°, up 720°/s, down 560°/s, friction 0.2, bounce 0.18. Exports: `action_name`,
+`facing` (+1 left, -1 right). Rest geometry chosen so a ball on the paddle clears the
+Drain box (top y=1150) until it rounds the tip. Known: the 220 px gap cannot cradle;
+revisit in Phase 4 tuning (pivots ~270/450 or lower drain box), Natasha decides.
