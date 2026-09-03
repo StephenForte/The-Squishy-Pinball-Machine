@@ -3,7 +3,7 @@ extends StaticBody2D
 ## Pop bumper: one score + kick per visit. Detection is this node's Area2D,
 ## not the ball scene (D-013). Debounce keeps a jittering overlap from
 ## firing add_score more than once.
-@export var kick_impulse: float = 650.0
+@export var kick_impulse: float = 750.0
 @export var radius: float = 28.0
 
 const SCORE := 100
@@ -29,7 +29,7 @@ func _on_sensor_body_entered(body: Node2D) -> void:
 		return
 	_scored_bodies[body] = true
 	_cooling = true
-	Game.add_score(SCORE)
+	get_node("/root/Game").add_score(SCORE)
 	_kick(body)
 	get_tree().create_timer(COOLDOWN_SEC).timeout.connect(_end_cooldown, CONNECT_ONE_SHOT)
 
