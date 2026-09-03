@@ -1,4 +1,4 @@
-[gd_scene load_steps=17 format=3]
+[gd_scene load_steps=19 format=3]
 
 [ext_resource type="Script" path="res://scripts/table.gd" id="1_table"]
 [ext_resource type="Script" path="res://scripts/launcher.gd" id="2_launcher"]
@@ -41,6 +41,12 @@ points = PackedVector2Array(0, 980, 24, 980, 250, 1120, 250, 1280, 0, 1280)
 [sub_resource type="ConvexPolygonShape2D" id="ConvexPolygonShape2D_right"]
 points = PackedVector2Array(612, 980, 612, 1280, 470, 1280, 470, 1120)
 
+[sub_resource type="ConvexPolygonShape2D" id="ConvexPolygonShape2D_left_base"]
+points = PackedVector2Array(250, 1120, 250, 1110, 260, 1112, 258, 1122)
+
+[sub_resource type="ConvexPolygonShape2D" id="ConvexPolygonShape2D_right_base"]
+points = PackedVector2Array(470, 1120, 470, 1110, 460, 1112, 462, 1122)
+
 [node name="Table" type="Node2D"]
 script = ExtResource("1_table")
 
@@ -81,6 +87,12 @@ shape = SubResource("ConvexPolygonShape2D_left")
 [node name="RightGuide" type="CollisionShape2D" parent="Walls"]
 shape = SubResource("ConvexPolygonShape2D_right")
 
+[node name="LeftFlipperBase" type="CollisionShape2D" parent="Walls"]
+shape = SubResource("ConvexPolygonShape2D_left_base")
+
+[node name="RightFlipperBase" type="CollisionShape2D" parent="Walls"]
+shape = SubResource("ConvexPolygonShape2D_right_base")
+
 [node name="WallVisuals" type="Node2D" parent="."]
 
 [node name="Top" type="Polygon2D" parent="WallVisuals"]
@@ -114,6 +126,14 @@ polygon = PackedVector2Array(24, 980, 250, 1120, 250, 1280, 0, 1280, 0, 980)
 [node name="RightGuide" type="Polygon2D" parent="WallVisuals"]
 color = Color(0.28, 0.36, 0.45, 1)
 polygon = PackedVector2Array(612, 980, 470, 1120, 470, 1280, 612, 1280)
+
+[node name="LeftFlipperBase" type="Polygon2D" parent="WallVisuals"]
+color = Color(0.28, 0.36, 0.45, 1)
+polygon = PackedVector2Array(250, 1120, 250, 1110, 260, 1112, 258, 1122)
+
+[node name="RightFlipperBase" type="Polygon2D" parent="WallVisuals"]
+color = Color(0.28, 0.36, 0.45, 1)
+polygon = PackedVector2Array(470, 1120, 470, 1110, 460, 1112, 462, 1122)
 
 [node name="Drain" type="Area2D" parent="."]
 collision_layer = 0

@@ -10,6 +10,19 @@ const ANGLE_TOL_DEG := 3.0
 const TIP_FLIPS := 20
 const TIP_GAP_FRAMES := 40
 const MIN_UP_VY := -600.0
+const BASE_LAUNCH_COUNT := 8
+const BASE_DRAIN_FRAMES := 3000
+const BASE_FLIP_FRAMES := 600
+const BASE_IMPULSE_MIN := 1500
+const BASE_IMPULSE_MAX := 1850
+const BASE_IMPULSE_STEP := 50
+const PIVOT_LEFT := Vector2(250, 1120)
+const PIVOT_RIGHT := Vector2(470, 1120)
+const PIVOT_TRAP_RADIUS := 30.0
+const PIVOT_TRAP_SPEED := 5.0
+const PIVOT_TRAP_FRAMES := 60
+const LANE_MIN_X := 620.0
+const LANE_MIN_Y := 1100.0
 
 
 func _initialize() -> void:
@@ -25,6 +38,10 @@ func _run() -> void:
 	await process_frame
 
 	if not await _test_rest_clears_drain(table):
+		quit(1)
+		return
+
+	if not await _test_base(table):
 		quit(1)
 		return
 
@@ -88,6 +105,144 @@ func _test_rest_clears_drain(table: Node2D) -> bool:
 
 	print("REST PASS")
 	return true
+
+
+func _test_base(table: Node2D) -> bool:
+	table.get_node("Drain").monitoring = true
+	var launcher: Node = table.get_node("Launcher")
+	var trap_frames := 0
+	var launches := 0
+
+	for imp in range(BASE_IMPULSE_MIN, BASE_IMPULSE_MAX + 1, BASE_IMPULSE_STEP):
+		_release_flippers()
+		_free_balls()
+		await process_frame
+		var ball := await _fresh_lane_ball(table)
+		if ball == null:
+			print("BASE FAIL imp=%d no_ball" % imp)
+			return false
+		launcher.launch(float(imp))
+		trap_frames = 0
+		var drained := false
+		for _watch in BASE_DRAIN_FRAMES:
+			await physics_frame
+			if not is_instance_valid(ball) or ball.is_queued_for_deletion():
+				drained = true
+				break
+			if _pivot_trap_active(ball):
+				trap_frames += 1
+				if trap_frames > PIVOT_TRAP_FRAMES:
+					var pos := ball.global_position
+					print(
+						"BASE FAIL trap imp=%d pos=(%.1f,%.1f) dL=%.1f dR=%.1f"
+						% [
+							imp,
+							pos.x,
+							pos.y,
+							pos.distance_to(PIVOT_LEFT),
+							pos.distance_to(PIVOT_RIGHT),
+						]
+					)
+					return false
+			else:
+				trap_frames = 0
+
+		if not drained:
+			if _in_launcher_lane(ball.global_position):
+				launches += 1
+				continue
+			var action := _nearer_flipper_action(ball.global_position)
+			Input.action_press(action)
+			await physics_frame
+			trap_frames = 0
+			for _flip_watch in BASE_FLIP_FRAMES:
+				await physics_frame
+				if not is_instance_valid(ball) or ball.is_queued_for_deletion():
+					drained = true
+					break
+				if _pivot_trap_active(ball):
+					trap_frames += 1
+					if trap_frames > PIVOT_TRAP_FRAMES:
+						var pos := ball.global_position
+						print(
+							"BASE FAIL flip_trap imp=%d pos=(%.1f,%.1f)"
+							% [imp, pos.x, pos.y]
+						)
+						_release_flippers()
+						return false
+				else:
+					trap_frames = 0
+			_release_flippers()
+			if not drained:
+				var pos := ball.global_position
+				print(
+					"BASE FAIL imp=%d rest=(%.1f,%.1f) dL=%.1f dR=%.1f"
+					% [
+						imp,
+						pos.x,
+						pos.y,
+						pos.distance_to(PIVOT_LEFT),
+						pos.distance_to(PIVOT_RIGHT),
+					]
+				)
+				return false
+
+		launches += 1
+
+	if launches != BASE_LAUNCH_COUNT:
+		print("BASE FAIL launches=%d" % launches)
+		return false
+
+	print("BASE PASS launches=%d" % BASE_LAUNCH_COUNT)
+	return true
+
+
+func _pivot_trap_active(ball: Node) -> bool:
+	if not (ball is RigidBody2D):
+		return false
+	var body := ball as RigidBody2D
+	var pos := body.global_position
+	if body.linear_velocity.length() >= PIVOT_TRAP_SPEED:
+		return false
+	return (
+		pos.distance_to(PIVOT_LEFT) < PIVOT_TRAP_RADIUS
+		or pos.distance_to(PIVOT_RIGHT) < PIVOT_TRAP_RADIUS
+	)
+
+
+func _in_launcher_lane(pos: Vector2) -> bool:
+	return pos.x > LANE_MIN_X and pos.y > LANE_MIN_Y
+
+
+func _nearer_flipper_action(pos: Vector2) -> StringName:
+	if pos.distance_to(PIVOT_LEFT) <= pos.distance_to(PIVOT_RIGHT):
+		return &"flipper_left"
+	return &"flipper_right"
+
+
+func _fresh_lane_ball(table: Node2D) -> RigidBody2D:
+	_free_balls()
+	await process_frame
+	table.spawn_ball()
+	await physics_frame
+	var ball := _find_lane_ball()
+	if ball == null:
+		return null
+	while is_instance_valid(ball) and not bool(ball.get("_ccd_ready")):
+		await physics_frame
+	return ball if is_instance_valid(ball) else null
+
+
+func _find_lane_ball() -> RigidBody2D:
+	for node in get_nodes_in_group("ball"):
+		if not (node is RigidBody2D):
+			continue
+		if not is_instance_valid(node) or node.is_queued_for_deletion():
+			continue
+		var pos: Vector2 = (node as Node2D).global_position
+		if _in_launcher_lane(pos):
+			return node
+	return null
 
 
 func _test_hit(table: Node2D, flipper_name: String, action: StringName) -> bool:
