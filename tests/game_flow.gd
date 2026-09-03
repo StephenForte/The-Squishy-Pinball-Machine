@@ -161,14 +161,24 @@ func _case_3_score_and_high(game: Node) -> bool:
 
 func _case_4_restart_and_lower(game: Node) -> bool:
 	var restarts: Array[int] = [0]
+	var counts_on_restart: Array[int] = []
 	var on_restart := func() -> void:
 		restarts[0] += 1
+	var on_count := func(n: int) -> void:
+		counts_on_restart.append(n)
 	game.game_restarted.connect(on_restart)
+	game.ball_count_changed.connect(on_count)
 	game.restart()
 	await process_frame
 	game.game_restarted.disconnect(on_restart)
+	game.ball_count_changed.disconnect(on_count)
 	if restarts[0] != 1:
 		return _fail("case 4: expected game_restarted once, got %d" % restarts[0])
+	if not counts_on_restart.is_empty():
+		return _fail(
+			"case 4: restart must not emit ball_count_changed (would double-spawn), got %s"
+			% [counts_on_restart]
+		)
 	if game.balls_left != 3 or game.score != 0 or game.high_score != 300:
 		return _fail(
 			"case 4: expected balls=3 score=0 high=300, got balls=%s score=%s high=%s"
