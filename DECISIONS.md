@@ -161,5 +161,9 @@ unchanged and do not affect the streak. Natasha may retune numbers after play.
   `Target.hit`, `Game.ball_count_changed`, `Game.game_over`, `Game.big_score_reached`, and
   `flipper_left`/`flipper_right` just-pressed. No gameplay file calls `Sfx` directly.
 - `HUD`: `StreakLabel` shows `x<streak>` when streak ≥ 2, hidden otherwise.
+- As built (T7a): shake amplitude 4 px, 0.18 s decay, camera offset only; fireworks =
+  gold CPUParticles2D one-shot burst (56 particles) at (360, 420); `Game._process` runs
+  the 2.0 s streak clock; `register_bumper_hit()` returns 0 in GAME_OVER. Natasha to judge
+  shake/fireworks intensity; worker suspects the shake is too subtle.
 - Title (`scenes/ui/title.tscn`, root `Title` CanvasLayer): visible at app start; hidden on
   the first `launch_ball` press; never shown again until the app restarts.
