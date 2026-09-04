@@ -21,7 +21,8 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T7b | Title screen + instructions | 4 | merged 2026-09-03 (PR #11) | cheap | T7a |
 | T7c | Sound effects | 4 | merged 2026-09-03 (PR #13) | mid | T7a |
 | T7d | Tuning: stronger shake, more flipper power (D-019) | 4 | merged 2026-09-03 (PR #12) | cheap | T7a |
-| T8 | Squishy art + theme pass | 4 | not started (Natasha: later) | strong | T7a–c |
+| T8.0 | Commit design catalogs (assets/design) | 4 | Steve, PR pending | — | — |
+| T8 | Squishy art + theme pass (data-driven, D-020) | 4 | dispatched 2026-09-04 (after T8.0 merges) | strong | T8.0 |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8.
 T5 and T6 are the only truly parallel pair; ownership below is drawn to keep them apart.
@@ -110,7 +111,16 @@ Owns: `scenes/ui/title.tscn`, `scripts/ui/title.gd`, `tests/title_test.gd`; addi
 Owns: `assets/sfx/*`, `autoload/sfx.gd` (autoload `Sfx`, `[autoload]` line in project.godot),
 `tests/sfx_test.gd`. Listens to signals only (D-018); edits no gameplay or UI file.
 
-### T8 — Squishy art + theme pass (inputs gathered so far)
+### T8 — Squishy art + theme pass (data-driven)
+Owns: `scripts/theme.gd` (autoload `Theme`), `scripts/squishy_catalog.gd`, `scenes/squishy.tscn` +
+`scripts/squishy.gd`, `scenes/ui/theme_picker.tscn` + `scripts/ui/theme_picker.gd`,
+`tools/slice_squishies.gd` + generated `assets/design/squishes/art/*.png`, `tests/theme_test.gd`.
+Additive: `project.godot` (autoload line), `scenes/table.tscn` (swap placeholder visuals for
+Squishy instances at D-015 positions — collision shapes untouched), all `scenes/ui/*.tscn`
+(colours from Theme), `scenes/effects.tscn` (fireworks colours), `scenes/main.tscn` (picker).
+Input: assets/design catalogs per D-020. See Phase-3/4 feedback: vibrant, themed, squishy.
+
+### T8 — inputs gathered (history)
 Play-test feedback 2026-09-03 after T7b: colours should be more vibrant; the table and
 title need visibly more "squishy" theme (PRD §3: realistic-looking table, squishy theme,
 fireworks + squishy dance party at 10 000). Node names to theme are fixed in D-014/D-018
