@@ -21,8 +21,9 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T7b | Title screen + instructions | 4 | merged 2026-09-03 (PR #11) | cheap | T7a |
 | T7c | Sound effects | 4 | merged 2026-09-03 (PR #13) | mid | T7a |
 | T7d | Tuning: stronger shake, more flipper power (D-019) | 4 | merged 2026-09-03 (PR #12) | cheap | T7a |
-| T8.0 | Commit design catalogs (assets/design) | 4 | Steve, PR pending | — | — |
-| T8 | Squishy art + theme pass (data-driven, D-020) | 4 | dispatched 2026-09-04 (after T8.0 merges) | strong | T8.0 |
+| T8.0 | Commit design catalogs (assets/design) | 4 | merged 2026-09-04 (PR #14) | — | — |
+| T8 | Squishy art + theme pass (data-driven, D-020) | 4 | approved 2026-09-04; PR #15 (54f247a) ready to merge | strong | T8.0 |
+| T9 | Test isolation: tests must not touch the real user:// dir | hygiene | not started | cheap | — |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8.
 T5 and T6 are the only truly parallel pair; ownership below is drawn to keep them apart.
@@ -119,6 +120,15 @@ Additive: `project.godot` (autoload line), `scenes/table.tscn` (swap placeholder
 Squishy instances at D-015 positions — collision shapes untouched), all `scenes/ui/*.tscn`
 (colours from Theme), `scenes/effects.tscn` (fireworks colours), `scenes/main.tscn` (picker).
 Input: assets/design catalogs per D-020. See Phase-3/4 feedback: vibrant, themed, squishy.
+
+### T9 — Test isolation (found in T8 review)
+Every `-s tests/*.gd` run uses the app's real `user://` (macOS: ~/Library/Application
+Support/Godot/app_userdata/The Squishy Pinball Machine/). `game_flow.gd` and `ui_test.gd`
+delete `highscore.save`; `theme_test` writes `settings.save`. Test runs (workers, planner
+reviews, CI-less local gates) have been wiping Steve's high score. Fix options: an
+`override.cfg` (gitignored) written by a `tests/run_all.sh` that sets
+`application/config/custom_user_dir_name` to a test dir; or tests back up and restore both
+files. Owns: `tests/*.gd` (setup/teardown only), new `tests/run_all.sh`, `.gitignore`.
 
 ### T8 — inputs gathered (history)
 Play-test feedback 2026-09-03 after T7b: colours should be more vibrant; the table and
@@ -231,3 +241,9 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   tree → unwired/silent; wiring on main.tscn add, listener detached; each bumper connected
   once; plays==hits (3/3), pitch 1.00→1.12 with streak; drain×3 + game_over×1; restart
   silent; flipper hold=1 play; big_score/all_targets once. Approved. D-018 amended.
+- 2026-09-04: T8 (PR #15, 54f247a) reviewed in scratch clone. Scope ✓; project.godot autoload
+  line only; catalogs untouched. Physics: tscn physics lines identical (+2 decor positions,
+  no colliders); runtime 27 shapes same hash, drain 558×5 on branch and main. 9 suites PASS,
+  slice tool reproducible. Probes: 16 RGBA sprites clean border; 4 palettes recolour live;
+  settings persist; arrows cycle only on title; dance 8→0 on restart. Approved. Found T9
+  (tests write real user://).
