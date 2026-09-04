@@ -101,6 +101,14 @@ Owns: `scenes/ui/title.tscn`, `scripts/ui/title.gd`, `tests/title_test.gd`; addi
 Owns: `assets/sfx/*`, `autoload/sfx.gd` (autoload `Sfx`, `[autoload]` line in project.godot),
 `tests/sfx_test.gd`. Listens to signals only (D-018); edits no gameplay or UI file.
 
+### T8 — Squishy art + theme pass (inputs gathered so far)
+Play-test feedback 2026-09-03 after T7b: colours should be more vibrant; the table and
+title need visibly more "squishy" theme (PRD §3: realistic-looking table, squishy theme,
+fireworks + squishy dance party at 10 000). Node names to theme are fixed in D-014/D-018
+(HUD labels, GameOver labels, Title labels, Effects/Fireworks). Art assets must be
+original or clearly licensed; no downloads of unknown provenance. Brief written when
+T7c/T7d land.
+
 ### T7 — Theme & polish (original note)
 Art/sound/screen-shake vs. title screen can parallelize; ownership drawn when T5/T6 land.
 Tuning backlog from reviews (Natasha decides): flippers cannot cradle a ball — T3 worker
