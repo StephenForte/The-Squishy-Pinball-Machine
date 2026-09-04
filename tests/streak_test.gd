@@ -2,7 +2,7 @@ extends SceneTree
 
 const BALL_SCENE := preload("res://scenes/ball.tscn")
 const EXPECTED_HITS := [100, 200, 300, 400, 500, 500]
-const SHAKE_FRAMES := 30
+const SHAKE_FRAMES := 36
 
 var _game: Node
 var _table: Node2D
