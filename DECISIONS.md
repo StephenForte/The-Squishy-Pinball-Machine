@@ -158,7 +158,8 @@ unchanged and do not affect the streak. Natasha may retune numbers after play.
   moves physics bodies) and the big-score fireworks (particles). Listens to `Bumper.hit`
   (via group `"bumpers"`), `Game.big_score_reached`, `Game.game_restarted`.
 - `Sfx` autoload (`autoload/sfx.gd`): plays WAVs from `assets/sfx/`; listens to `Bumper.hit`,
-  `Target.hit`, `Game.ball_count_changed`, `Game.game_over`, `Game.big_score_reached`, and
+  `Target.hit`, `TargetBank.all_targets_hit` (added at T7c review — planner omission),
+  `Game.ball_count_changed`, `Game.game_over`, `Game.big_score_reached`, and
   `flipper_left`/`flipper_right` just-pressed. No gameplay file calls `Sfx` directly.
 - `HUD`: `StreakLabel` shows `x<streak>` when streak ≥ 2, hidden otherwise.
 - As built (T7a): shake amplitude 4 px, 0.18 s decay, camera offset only; fireworks =
