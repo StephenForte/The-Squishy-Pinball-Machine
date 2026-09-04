@@ -57,4 +57,5 @@ common/physics_ticks_per_second=120
 
 Game="*res://autoload/game.gd"
 Sfx="*res://autoload/sfx.gd"
+Theme="*res://autoload/theme.gd"
 

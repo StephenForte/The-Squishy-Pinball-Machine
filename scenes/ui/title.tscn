@@ -1,6 +1,7 @@
-[gd_scene load_steps=2 format=3 uid="uid://d4m8title7scene"]
+[gd_scene load_steps=3 format=3 uid="uid://d4m8title7scene"]
 
 [ext_resource type="Script" path="res://scripts/ui/title.gd" id="1_title"]
+[ext_resource type="PackedScene" path="res://scenes/ui/theme_picker.tscn" id="2_picker"]
 
 [node name="Title" type="CanvasLayer"]
 layer = 15
@@ -59,3 +60,5 @@ theme_override_font_sizes/font_size = 40
 text = "Press SPACE to play"
 horizontal_alignment = 1
 vertical_alignment = 1
+
+[node name="ThemePicker" parent="." instance=ExtResource("2_picker")]

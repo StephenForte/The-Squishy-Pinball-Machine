@@ -1,6 +1,7 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://scripts/target.gd" id="1_target"]
+[ext_resource type="PackedScene" path="res://scenes/squishy.tscn" id="2_squishy"]
 
 [sub_resource type="PhysicsMaterial" id="PhysicsMaterial_target"]
 friction = 0.2
@@ -20,8 +21,11 @@ script = ExtResource("1_target")
 shape = SubResource("RectangleShape2D_body")
 
 [node name="Visual" type="Polygon2D" parent="."]
+visible = false
 color = Color(0.42, 0.48, 0.58, 1)
 polygon = PackedVector2Array(-35, -6, 35, -6, 35, 6, -35, 6)
+
+[node name="Squishy" parent="." instance=ExtResource("2_squishy")]
 
 [node name="Sensor" type="Area2D" parent="."]
 collision_layer = 0

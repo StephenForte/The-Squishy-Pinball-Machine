@@ -15,7 +15,19 @@ func _ready() -> void:
 	_game.game_over.connect(_on_game_over)
 	_game.game_restarted.connect(_on_game_restarted)
 	_game.streak_changed.connect(_on_streak_changed)
+	var theme_node := get_node("/root/Theme")
+	theme_node.palette_changed.connect(_apply_theme)
+	_apply_theme(theme_node.palette_id)
 	_sync_from_game()
+
+
+func _apply_theme(_id: String = "") -> void:
+	var theme_node := get_node("/root/Theme")
+	var primary: Color = theme_node.color("text_primary")
+	_score_label.add_theme_color_override("font_color", primary)
+	_balls_label.add_theme_color_override("font_color", primary)
+	_high_score_label.add_theme_color_override("font_color", primary)
+	_streak_label.add_theme_color_override("font_color", theme_node.color("glow_gold"))
 
 
 func _on_score_changed(new_score: int) -> void:
