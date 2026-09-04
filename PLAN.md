@@ -18,9 +18,9 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T6 | HUD, game over, high score | 3 | merged 2026-09-03 (PR #7); Steve play-tested ✓ | mid | T4 |
 | T3.1 | Flipper-base trap pocket (V1 blocker) | 2 fix | merged 2026-09-03 (PR #9) | mid | T5 merged |
 | T7a | Streak scoring, screen shake, big-score moment | 4 | merged 2026-09-03 (PR #10); play-tested ✓ streak works | mid-strong | T3.1 |
-| T7b | Title screen + instructions | 4 | approved 2026-09-03; PR #11 (759ca30) ready to merge | cheap | T7a |
+| T7b | Title screen + instructions | 4 | merged 2026-09-03 (PR #11) | cheap | T7a |
 | T7c | Sound effects | 4 | dispatched 2026-09-03 (start after T7a merges) | mid | T7a |
-| T7d | Tuning: stronger shake, more flipper power (D-019) | 4 | dispatched 2026-09-03 | cheap | T7a |
+| T7d | Tuning: stronger shake, more flipper power (D-019) | 4 | approved 2026-09-03; PR #12 (24f2d32) ready to merge | cheap | T7a |
 | T8 | Squishy art + theme pass | 4 | not started (Natasha: later) | strong | T7a–c |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8.
@@ -201,3 +201,8 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   additive; main.gd untouched). 9 gates green (TITLE PASS cases=4). Probe: layers 10<15<20;
   controls text complete; R on title OK; one Space hides title + launches same frame;
   title never returns after game over/restart. Approved.
+- 2026-09-03: T7d (PR #12) reviewed. Diff = 3 D-019 constants only. Worker reported
+  streak_test case 5 failing (30-frame wait < 0.26 s shake) and correctly stopped — the
+  brief had scoped that test out (planner error). Reproduced, fixed wait 30→36 in scratch
+  (STREAK PASS), pushed to the branch as 24f2d32 with attribution. Scratch-merged current
+  main: all 7 suites PASS incl. TITLE; HIT vy −1157.9 → −1382.6, TIP 20/0, BASE 8. Approved.
