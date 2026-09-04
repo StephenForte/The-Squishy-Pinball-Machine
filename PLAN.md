@@ -19,8 +19,8 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T3.1 | Flipper-base trap pocket (V1 blocker) | 2 fix | merged 2026-09-03 (PR #9) | mid | T5 merged |
 | T7a | Streak scoring, screen shake, big-score moment | 4 | merged 2026-09-03 (PR #10); play-tested ✓ streak works | mid-strong | T3.1 |
 | T7b | Title screen + instructions | 4 | merged 2026-09-03 (PR #11) | cheap | T7a |
-| T7c | Sound effects | 4 | dispatched 2026-09-03 (start after T7a merges) | mid | T7a |
-| T7d | Tuning: stronger shake, more flipper power (D-019) | 4 | approved 2026-09-03; PR #12 (24f2d32) ready to merge | cheap | T7a |
+| T7c | Sound effects | 4 | approved 2026-09-03; PR #13 (53ca139) ready to merge | mid | T7a |
+| T7d | Tuning: stronger shake, more flipper power (D-019) | 4 | merged 2026-09-03 (PR #12) | cheap | T7a |
 | T8 | Squishy art + theme pass | 4 | not started (Natasha: later) | strong | T7a–c |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8.
@@ -206,3 +206,9 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   brief had scoped that test out (planner error). Reproduced, fixed wait 30→36 in scratch
   (STREAK PASS), pushed to the branch as 24f2d32 with attribution. Scratch-merged current
   main: all 7 suites PASS incl. TITLE; HIT vy −1157.9 → −1382.6, TIP 20/0, BASE 8. Approved.
+- 2026-09-03: T7c (PR #13, 53ca139) reviewed in scratch clone + merge with current main.
+  Scope ✓ (13 files, autoload line only in project.godot, no .import). WAVs valid mono
+  22050/16-bit, regen byte-identical. 8 suites PASS incl. SFX events=7. Probes: no-table
+  tree → unwired/silent; wiring on main.tscn add, listener detached; each bumper connected
+  once; plays==hits (3/3), pitch 1.00→1.12 with streak; drain×3 + game_over×1; restart
+  silent; flipper hold=1 play; big_score/all_targets once. Approved. D-018 amended.
