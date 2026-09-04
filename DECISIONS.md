@@ -1,7 +1,7 @@
 # Decisions — The Squishy Pinball Machine
 
 Numbered, append-only. Never renumber; supersede in place with date and reason.
-Workers cite these instead of re-deciding. Next free number: **D-019**.
+Workers cite these instead of re-deciding. Next free number: **D-020**.
 
 ## D-001 — Engine: Godot 4.x, GDScript (2026-09-02)
 Per PRD. Exact version to be pinned as D-006 once installed on the build machine.
@@ -167,3 +167,10 @@ unchanged and do not affect the streak. Natasha may retune numbers after play.
   shake/fireworks intensity; worker suspects the shake is too subtle.
 - Title (`scenes/ui/title.tscn`, root `Title` CanvasLayer): visible at app start; hidden on
   the first `launch_ball` press; never shown again until the app restarts.
+
+## D-019 — Play-test tuning round 1 (Natasha/Steve, 2026-09-03)
+Streak feels right (keep D-017). Shake too subtle: `SHAKE_AMPLITUDE` 4 → 9 px,
+`SHAKE_DURATION` 0.18 → 0.26 s. Flippers "a tiny bit more power": `UP_SPEED_DEG`
+720 → 830 (+15 %); `DOWN_SPEED_DEG`, angles, length unchanged (supersedes those two D-012
+values in place). Tip-tunnelling and REST/BASE invariants must still hold at the new
+speed; if `flipper_test` HIT vy threshold (−600) needs moving it moves *up* only.
