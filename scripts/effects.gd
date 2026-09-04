@@ -23,6 +23,24 @@ func _ready() -> void:
 	for bumper in get_tree().get_nodes_in_group("bumpers"):
 		if bumper.has_signal("hit"):
 			bumper.hit.connect(_on_bumper_hit)
+	var theme_node := get_node_or_null("/root/Theme")
+	if theme_node != null:
+		theme_node.palette_changed.connect(_apply_theme)
+		_apply_theme(String(theme_node.get("palette_id")))
+
+
+func _apply_theme(_id: String = "") -> void:
+	var theme_node := get_node_or_null("/root/Theme")
+	if theme_node == null or not theme_node.has_method("color"):
+		return
+	_fireworks.color = theme_node.color("glow_gold")
+	var ramp := Gradient.new()
+	ramp.colors = PackedColorArray([
+		theme_node.color("glow_gold"),
+		theme_node.color("glow_magenta"),
+		theme_node.color("glow_blue"),
+	])
+	_fireworks.color_ramp = ramp
 
 
 func shake() -> void:
@@ -47,6 +65,9 @@ func _on_bumper_hit() -> void:
 
 func _on_big_score_reached(_score: int) -> void:
 	_fireworks.restart()
+	for node in get_tree().get_nodes_in_group("squishies"):
+		if node.has_method("play_dance"):
+			node.play_dance(2.0)
 
 
 func _on_game_restarted() -> void:
