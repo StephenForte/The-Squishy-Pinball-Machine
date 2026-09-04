@@ -74,3 +74,6 @@ func _on_game_restarted() -> void:
 	_shake_left = 0.0
 	_camera.offset = Vector2.ZERO
 	_fireworks.emitting = false
+	for node in get_tree().get_nodes_in_group("squishies"):
+		if node.has_method("stop_dance"):
+			node.stop_dance()

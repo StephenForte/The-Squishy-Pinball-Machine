@@ -12,6 +12,7 @@ const DANCE_SEC := 2.0
 
 var _rest_scale := Vector2.ONE
 var _dancing := false
+var _dance_gen: int = 0
 var _hit_tween: Tween
 var _dance_tween: Tween
 
@@ -30,6 +31,7 @@ func _ready() -> void:
 func _process(_delta: float) -> void:
 	global_rotation = 0.0
 	_place_art()
+	_apply_lit()
 
 
 func setup(id: String) -> void:
@@ -59,30 +61,40 @@ func play_hit() -> void:
 func play_dance(duration: float = DANCE_SEC) -> void:
 	if _sprite == null:
 		return
+	_halt_dance_motion()
 	_dancing = true
-	if _dance_tween != null and _dance_tween.is_valid():
-		_dance_tween.kill()
-	_sprite.rotation_degrees = 0.0
+	_dance_gen += 1
+	var gen := _dance_gen
 	_dance_tween = create_tween()
 	_dance_tween.set_loops()
 	_dance_tween.tween_property(_sprite, "rotation_degrees", 14.0, 0.10)
 	_dance_tween.tween_property(_sprite, "scale", _rest_scale * Vector2(1.08, 0.90), 0.10)
 	_dance_tween.tween_property(_sprite, "rotation_degrees", -14.0, 0.10)
 	_dance_tween.tween_property(_sprite, "scale", _rest_scale, 0.10)
-	get_tree().create_timer(duration).timeout.connect(_stop_dance, CONNECT_ONE_SHOT)
+	get_tree().create_timer(duration).timeout.connect(
+		func() -> void:
+			if gen == _dance_gen:
+				stop_dance(),
+		CONNECT_ONE_SHOT
+	)
 
 
 func is_dancing() -> bool:
 	return _dancing
 
 
-func _stop_dance() -> void:
+func stop_dance() -> void:
+	_dance_gen += 1
+	_halt_dance_motion()
+	_dancing = false
+
+
+func _halt_dance_motion() -> void:
 	if _dance_tween != null and _dance_tween.is_valid():
 		_dance_tween.kill()
 	if _sprite != null:
 		_sprite.rotation_degrees = 0.0
 		_sprite.scale = _rest_scale
-	_dancing = false
 
 
 func _apply_fit() -> void:
@@ -115,3 +127,15 @@ func _place_art() -> void:
 	if absf(parent.rotation) < 0.2:
 		dist = 72.0
 	global_position = parent.global_position + inward.normalized() * dist
+
+
+func _apply_lit() -> void:
+	if _sprite == null:
+		return
+	var parent := get_parent()
+	if parent == null or not parent.is_in_group("targets"):
+		return
+	if bool(parent.get("lit")):
+		_sprite.modulate = Color(1, 1, 1, 1)
+	else:
+		_sprite.modulate = Color(0.62, 0.62, 0.72, 1)

@@ -238,6 +238,15 @@ func _case_7_dance() -> bool:
 			dancing += 1
 	if dancing < 8:
 		return _fail("case 7: dancing=%d" % dancing)
+	_game.restart()
+	await process_frame
+	await process_frame
+	for node in squishies:
+		if is_instance_valid(node) and bool(node.call("is_dancing")):
+			return _fail("case 7: dance continued after restart")
+	_game.add_score(10000)
+	await process_frame
+	await process_frame
 	var stopped := false
 	for _i in 360:
 		await process_frame
