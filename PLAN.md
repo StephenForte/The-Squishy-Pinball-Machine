@@ -18,7 +18,7 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T6 | HUD, game over, high score | 3 | merged 2026-09-03 (PR #7); Steve play-tested ✓ | mid | T4 |
 | T3.1 | Flipper-base trap pocket (V1 blocker) | 2 fix | merged 2026-09-03 (PR #9) | mid | T5 merged |
 | T7a | Streak scoring, screen shake, big-score moment | 4 | merged 2026-09-03 (PR #10); play-tested ✓ streak works | mid-strong | T3.1 |
-| T7b | Title screen + instructions | 4 | dispatched 2026-09-03 (start after T7a merges) | cheap | T7a |
+| T7b | Title screen + instructions | 4 | approved 2026-09-03; PR #11 (759ca30) ready to merge | cheap | T7a |
 | T7c | Sound effects | 4 | dispatched 2026-09-03 (start after T7a merges) | mid | T7a |
 | T7d | Tuning: stronger shake, more flipper power (D-019) | 4 | dispatched 2026-09-03 | cheap | T7a |
 | T8 | Squishy art + theme pass | 4 | not started (Natasha: later) | strong | T7a–c |
@@ -189,3 +189,7 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   physical drain clears streak + label; big score once per game, again after restart;
   shake moves no physics (0.000 drift, bumper fixed), offset returns to 0; mashed game
   deltas all valid, label consistent every frame. Approved.
+- 2026-09-03: T7b (PR #11, 759ca30) reviewed in scratch clone. Scope ✓ (6 files; main.tscn
+  additive; main.gd untouched). 9 gates green (TITLE PASS cases=4). Probe: layers 10<15<20;
+  controls text complete; R on title OK; one Space hides title + launches same frame;
+  title never returns after game over/restart. Approved.
