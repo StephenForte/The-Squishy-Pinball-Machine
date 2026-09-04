@@ -62,12 +62,13 @@ func _case_1_bumpers() -> bool:
 	if bumpers.size() < 3:
 		return _fail("case 1: expected >=3 bumpers, got %d" % bumpers.size())
 	var checked := 0
+	var expected_deltas := [100, 200, 300]
 	for bumper in bumpers:
 		if not (bumper is Node2D):
 			continue
 		if checked >= 3:
 			break
-		if not await _drop_on_bumper(bumper as Node2D):
+		if not await _drop_on_bumper(bumper as Node2D, expected_deltas[checked]):
 			return false
 		checked += 1
 	if checked != 3:
@@ -76,7 +77,7 @@ func _case_1_bumpers() -> bool:
 	return true
 
 
-func _drop_on_bumper(bumper: Node2D) -> bool:
+func _drop_on_bumper(bumper: Node2D, expected_delta: int) -> bool:
 	await _free_balls()
 	var start_score: int = _game.score
 	var ball := await _spawn_ball(bumper.global_position + Vector2(0, -DROP_ABOVE), Vector2.ZERO)
@@ -96,16 +97,16 @@ func _drop_on_bumper(bumper: Node2D) -> bool:
 	_game.score_changed.disconnect(on_score)
 	if not scored:
 		return _fail("case 1: bumper at %s did not score" % bumper.global_position)
-	if _game.score - start_score != 100:
+	if _game.score - start_score != expected_delta:
 		return _fail(
-			"case 1: expected +100 at %s, got +%d"
-			% [bumper.global_position, _game.score - start_score]
+			"case 1: expected +%d at %s, got +%d"
+			% [expected_delta, bumper.global_position, _game.score - start_score]
 		)
 	for _k in KICK_CHECK_FRAMES:
 		await physics_frame
 	if not is_instance_valid(ball):
 		return _fail("case 1: ball freed after bumper at %s" % bumper.global_position)
-	if _game.score - start_score != 100:
+	if _game.score - start_score != expected_delta:
 		return _fail(
 			"case 1: extra score after kick at %s, delta=%d"
 			% [bumper.global_position, _game.score - start_score]

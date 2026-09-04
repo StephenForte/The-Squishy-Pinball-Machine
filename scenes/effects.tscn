@@ -1,0 +1,26 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/effects.gd" id="1_effects"]
+
+[node name="Effects" type="Node2D"]
+script = ExtResource("1_effects")
+
+[node name="Camera2D" type="Camera2D" parent="."]
+position = Vector2(360, 640)
+enabled = true
+
+[node name="Fireworks" type="CPUParticles2D" parent="."]
+position = Vector2(360, 420)
+emitting = false
+amount = 56
+lifetime = 1.1
+one_shot = true
+explosiveness = 1.0
+direction = Vector2(0, -1)
+spread = 180.0
+gravity = Vector2(0, 280)
+initial_velocity_min = 160.0
+initial_velocity_max = 380.0
+scale_amount_min = 2.5
+scale_amount_max = 6.0
+color = Color(1, 0.75, 0.22, 1)
