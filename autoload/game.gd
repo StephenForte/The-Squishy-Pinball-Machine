@@ -4,9 +4,15 @@ signal score_changed(new_score: int)
 signal ball_count_changed(balls_left: int)
 signal game_over(final_score: int, is_high_score: bool)
 signal game_restarted
+signal streak_changed(streak: int)
+signal big_score_reached(score: int)
 
 const SAVE_PATH := "user://highscore.save"
 const BALLS_PER_GAME := 3
+const STREAK_WINDOW_SEC := 2.0
+const STREAK_CAP := 5
+const BUMPER_POINTS := 100
+const BIG_SCORE_THRESHOLD := 10000
 
 enum { READY, PLAYING, GAME_OVER }
 
@@ -14,8 +20,11 @@ var score: int = 0
 var balls_left: int = BALLS_PER_GAME
 var high_score: int = 0
 var state: int = READY
+var streak: int = 0
 
 var _drain_frame: int = -1
+var _streak_remaining: float = 0.0
+var _big_score_emitted: bool = false
 
 
 func _ready() -> void:
@@ -32,11 +41,31 @@ func add_score(points: int) -> void:
 	score += points
 	score_changed.emit(score)
 	print("Game score_changed score=%d" % score)
+	if not _big_score_emitted and score >= BIG_SCORE_THRESHOLD:
+		_big_score_emitted = true
+		big_score_reached.emit(score)
+		print("Game big_score_reached score=%d" % score)
+
+
+func register_bumper_hit() -> int:
+	if state == GAME_OVER:
+		return 0
+	if streak > 0 and _streak_remaining > 0.0:
+		streak = mini(streak + 1, STREAK_CAP)
+	else:
+		streak = 1
+	_streak_remaining = STREAK_WINDOW_SEC
+	var points := BUMPER_POINTS * streak
+	add_score(points)
+	streak_changed.emit(streak)
+	print("Game streak_changed streak=%d points=%d" % [streak, points])
+	return points
 
 
 func on_ball_drained() -> void:
 	if state == GAME_OVER:
 		return
+	_clear_streak()
 	var frame := Engine.get_physics_frames()
 	if frame == _drain_frame:
 		return
@@ -65,11 +94,30 @@ func restart() -> void:
 	print("Game game_restarted score=%d balls_left=%d high_score=%d" % [score, balls_left, high_score])
 
 
+func _process(delta: float) -> void:
+	if streak <= 0:
+		return
+	_streak_remaining -= delta
+	if _streak_remaining <= 0.0:
+		_clear_streak()
+
+
 func _reset_run() -> void:
 	score = 0
 	balls_left = BALLS_PER_GAME
 	state = READY
 	_drain_frame = -1
+	_big_score_emitted = false
+	_clear_streak()
+
+
+func _clear_streak() -> void:
+	_streak_remaining = 0.0
+	if streak == 0:
+		return
+	streak = 0
+	streak_changed.emit(0)
+	print("Game streak_changed streak=0")
 
 
 func _load_high_score() -> int:
