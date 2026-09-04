@@ -17,7 +17,7 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T5 | Bumpers, targets, scoring | 3 | merged 2026-09-03 (PR #8) | mid | T3, T4 |
 | T6 | HUD, game over, high score | 3 | merged 2026-09-03 (PR #7); Steve play-tested ✓ | mid | T4 |
 | T3.1 | Flipper-base trap pocket (V1 blocker) | 2 fix | merged 2026-09-03 (PR #9) | mid | T5 merged |
-| T7a | Streak scoring, screen shake, big-score moment | 4 | dispatched 2026-09-03 | mid-strong | T3.1 |
+| T7a | Streak scoring, screen shake, big-score moment | 4 | approved 2026-09-03; PR #10 (e601255) ready to merge | mid-strong | T3.1 |
 | T7b | Title screen + instructions | 4 | dispatched 2026-09-03 (start after T7a merges) | cheap | T7a |
 | T7c | Sound effects | 4 | dispatched 2026-09-03 (start after T7a merges) | mid | T7a |
 | T8 | Squishy art + theme pass | 4 | not started (Natasha: later) | strong | T7a–c |
@@ -177,3 +177,9 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   20 slow drops around both pivots all drain; cradle on raised flipper held 600 frames
   (nudge does not fire on holds); mashed game → GAME_OVER 8016 frames, score 5700, nudge
   condition 1 frame. Approved; V1 blocker cleared.
+- 2026-09-03: T7a (PR #10, e601255) reviewed in scratch clone. Scope ✓ (11 files; table.tscn
+  + Effects only; game.gd additive). 7 gates green; scoring_test change = strengthening.
+  Probes: camera centred (360,640) exactly; streak window 1.95 s continues / 2.05 s resets;
+  physical drain clears streak + label; big score once per game, again after restart;
+  shake moves no physics (0.000 drift, bumper fixed), offset returns to 0; mashed game
+  deltas all valid, label consistent every frame. Approved.
