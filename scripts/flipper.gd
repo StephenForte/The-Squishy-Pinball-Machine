@@ -27,6 +27,23 @@ func _ready() -> void:
 	up_rad = rest_rad + float(facing) * deg_to_rad(-SWING_DEG)
 	angle = rest_rad
 	rotation = angle
+	var theme_node := get_node_or_null("/root/Theme")
+	if theme_node != null:
+		if theme_node.has_signal("palette_changed"):
+			theme_node.palette_changed.connect(_apply_theme)
+		_apply_theme(String(theme_node.get("palette_id")))
+
+
+func _apply_theme(_id: String = "") -> void:
+	var theme_node := get_node_or_null("/root/Theme")
+	if theme_node == null or not theme_node.has_method("color"):
+		return
+	var visual := get_node_or_null("Visual") as Polygon2D
+	var hub := get_node_or_null("Hub") as Polygon2D
+	if visual != null:
+		visual.color = theme_node.color("object_orange")
+	if hub != null:
+		hub.color = theme_node.color("object_yellow")
 
 
 func _physics_process(delta: float) -> void:

@@ -16,6 +16,26 @@ func _ready() -> void:
 	_restart_button.pressed.connect(_on_restart_pressed)
 	_game.game_over.connect(_on_game_over)
 	_game.game_restarted.connect(_on_game_restarted)
+	var theme_node := get_node("/root/Theme")
+	theme_node.palette_changed.connect(_apply_theme)
+	_apply_theme(theme_node.palette_id)
+
+
+func _apply_theme(_id: String = "") -> void:
+	var theme_node := get_node("/root/Theme")
+	var primary: Color = theme_node.color("text_primary")
+	var shade := get_node_or_null("Shade") as ColorRect
+	if shade != null:
+		var bg: Color = theme_node.color("background")
+		bg.a = 0.72
+		shade.color = bg
+	$TitleLabel.add_theme_color_override("font_color", primary)
+	_final_score_label.add_theme_color_override("font_color", primary)
+	_high_score_label.add_theme_color_override("font_color", primary)
+	_new_high_score_label.add_theme_color_override("font_color", theme_node.color("glow_gold"))
+	$HintLabel.add_theme_color_override("font_color", primary)
+	_restart_button.add_theme_color_override("font_color", theme_node.color("text_on_color"))
+	_restart_button.add_theme_color_override("font_hover_color", theme_node.color("object_white"))
 
 
 func _on_game_over(final_score: int, is_high_score: bool) -> void:

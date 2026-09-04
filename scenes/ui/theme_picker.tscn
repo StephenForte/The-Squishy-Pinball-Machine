@@ -1,0 +1,62 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/theme_picker.gd" id="1_picker"]
+
+[node name="ThemePicker" type="Control"]
+layout_mode = 3
+anchors_preset = 0
+offset_left = 80.0
+offset_top = 800.0
+offset_right = 640.0
+offset_bottom = 980.0
+mouse_filter = 0
+script = ExtResource("1_picker")
+
+[node name="Caption" type="Label" parent="."]
+layout_mode = 0
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 560.0
+offset_bottom = 36.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 6
+theme_override_font_sizes/font_size = 22
+text = "THEME  ← / →"
+horizontal_alignment = 1
+
+[node name="PrevButton" type="Button" parent="."]
+layout_mode = 0
+offset_left = 40.0
+offset_top = 52.0
+offset_right = 140.0
+offset_bottom = 120.0
+focus_mode = 0
+theme_override_font_sizes/font_size = 36
+text = "←"
+
+[node name="NameLabel" type="Label" parent="."]
+layout_mode = 0
+offset_left = 150.0
+offset_top = 52.0
+offset_right = 410.0
+offset_bottom = 120.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 6
+theme_override_font_sizes/font_size = 28
+text = "Neon Candy Baseline"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="NextButton" type="Button" parent="."]
+layout_mode = 0
+offset_left = 420.0
+offset_top = 52.0
+offset_right = 520.0
+offset_bottom = 120.0
+focus_mode = 0
+theme_override_font_sizes/font_size = 36
+text = "→"
