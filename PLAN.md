@@ -19,12 +19,21 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T3.1 | Flipper-base trap pocket (V1 blocker) | 2 fix | merged 2026-09-03 (PR #9) | mid | T5 merged |
 | T7a | Streak scoring, screen shake, big-score moment | 4 | merged 2026-09-03 (PR #10); play-tested ✓ streak works | mid-strong | T3.1 |
 | T7b | Title screen + instructions | 4 | merged 2026-09-03 (PR #11) | cheap | T7a |
-| T7c | Sound effects | 4 | approved 2026-09-03; PR #13 (53ca139) ready to merge | mid | T7a |
+| T7c | Sound effects | 4 | merged 2026-09-03 (PR #13) | mid | T7a |
 | T7d | Tuning: stronger shake, more flipper power (D-019) | 4 | merged 2026-09-03 (PR #12) | cheap | T7a |
 | T8 | Squishy art + theme pass | 4 | not started (Natasha: later) | strong | T7a–c |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8.
 T5 and T6 are the only truly parallel pair; ownership below is drawn to keep them apart.
+
+## Running the game after a pull
+
+    godot --headless --import && godot --path .
+
+The import step is required whenever a merge adds assets (WAVs, images); `.import`
+metadata is gitignored (D-008) and `godot --path .` does not import on its own. Skipping
+it prints `No loader found for resource` for each new asset (seen 2026-09-03 after T7c).
+Opening the project in the editor imports implicitly.
 
 ## Blockers / open items
 
