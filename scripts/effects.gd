@@ -3,8 +3,8 @@ extends Node2D
 ## Display-only: camera-offset shake and placeholder fireworks.
 ## Never moves Table or any physics body (D-018).
 
-const SHAKE_DURATION := 0.18
-const SHAKE_AMPLITUDE := 4.0
+const SHAKE_DURATION := 0.26
+const SHAKE_AMPLITUDE := 9.0
 
 @onready var _camera: Camera2D = $Camera2D
 @onready var _fireworks: CPUParticles2D = $Fireworks
