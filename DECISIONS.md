@@ -174,3 +174,5 @@ Streak feels right (keep D-017). Shake too subtle: `SHAKE_AMPLITUDE` 4 → 9 px,
 720 → 830 (+15 %); `DOWN_SPEED_DEG`, angles, length unchanged (supersedes those two D-012
 values in place). Tip-tunnelling and REST/BASE invariants must still hold at the new
 speed; if `flipper_test` HIT vy threshold (−600) needs moving it moves *up* only.
+As built (T7d): HIT vy −1157.9 → −1382.6 (+19 %); TIP 20 flips 0 OOB and BASE 8/8 hold;
+`streak_test` shake wait 30 → 36 frames to cover 0.26 s (assertion unchanged).
