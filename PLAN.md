@@ -17,9 +17,10 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T5 | Bumpers, targets, scoring | 3 | merged 2026-09-03 (PR #8) | mid | T3, T4 |
 | T6 | HUD, game over, high score | 3 | merged 2026-09-03 (PR #7); Steve play-tested ✓ | mid | T4 |
 | T3.1 | Flipper-base trap pocket (V1 blocker) | 2 fix | merged 2026-09-03 (PR #9) | mid | T5 merged |
-| T7a | Streak scoring, screen shake, big-score moment | 4 | approved 2026-09-03; PR #10 (e601255) ready to merge | mid-strong | T3.1 |
+| T7a | Streak scoring, screen shake, big-score moment | 4 | merged 2026-09-03 (PR #10); play-tested ✓ streak works | mid-strong | T3.1 |
 | T7b | Title screen + instructions | 4 | dispatched 2026-09-03 (start after T7a merges) | cheap | T7a |
 | T7c | Sound effects | 4 | dispatched 2026-09-03 (start after T7a merges) | mid | T7a |
+| T7d | Tuning: stronger shake, more flipper power (D-019) | 4 | dispatched 2026-09-03 | cheap | T7a |
 | T8 | Squishy art + theme pass | 4 | not started (Natasha: later) | strong | T7a–c |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8.
@@ -86,6 +87,11 @@ Owns: `autoload/game.gd` (additive: streak state + signals, D-017/D-018), `scrip
 (additive: `hit` signal, streak call), `scenes/ui/hud.tscn` + `scripts/ui/hud.gd` (additive:
 `StreakLabel`), new `scenes/effects.tscn` + `scripts/effects.gd` instanced in `table.tscn`
 (additive), `tests/streak_test.gd`. Must not touch `main.tscn`/`main.gd` (T7b) or add audio (T7c).
+
+### T7d — Tuning from play-test (shake + flipper power)
+Owns: `scripts/effects.gd` (shake constants), `scripts/flipper.gd` (`UP_SPEED_DEG`),
+`tests/flipper_test.gd` only if a threshold must move (report before/after). Values in D-019.
+Parallel-safe with T7b/T7c (no shared files) but not in the same checkout.
 
 ### T7b — Title screen + instructions
 Owns: `scenes/ui/title.tscn`, `scripts/ui/title.gd`, `tests/title_test.gd`; additive edits to
