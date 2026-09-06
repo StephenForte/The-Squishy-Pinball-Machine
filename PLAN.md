@@ -23,8 +23,8 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T7d | Tuning: stronger shake, more flipper power (D-019) | 4 | merged 2026-09-03 (PR #12) | cheap | T7a |
 | T8.0 | Commit design catalogs (assets/design) | 4 | merged 2026-09-04 (PR #14) | — | — |
 | T8 | Squishy art + theme pass (data-driven, D-020) | 4 | merged 2026-09-04 (PR #15); Steve: art OK for now | strong | T8.0 |
-| T10 | Hit-surface fix: 5 round targets under sprites + flipper +10% (D-022/D-023) | 4 fix | approved 2026-09-05; PR #16 (ab6afa8) ready to merge | mid-strong | T8 |
-| T9 | Test isolation: tests must not touch the real user:// dir | hygiene | not started | cheap | — |
+| T10 | Hit-surface fix: 5 round targets under sprites + flipper +10% (D-022/D-023) | 4 fix | merged 2026-09-05 (PR #16) | mid-strong | T8 |
+| T9 | Test isolation: tests must not touch the real user:// dir (D-025) | hygiene | dispatched 2026-09-06 | cheap | — |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8.
 T5 and T6 are the only truly parallel pair; ownership below is drawn to keep them apart.
@@ -160,7 +160,8 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
 
 1. Branch from current `main`: `task/T<N>-<slug>`.
 2. One task per branch; no drive-by edits outside the task's ownership list.
-3. Gate before handoff: run the D-007 commands from repo root; both must pass clean.
+3. Gate before handoff: `tests/run_all.sh` (D-025) — D-007 commands + every `tests/*_test.gd`
+   under an isolated user dir; all must pass clean. Never run tests without the runner.
 4. Open a PR to `main`; hand off in the dispatch-worker format. CI (Semgrep SAST + Trivy,
    `.github/workflows/security-scans.yml`, PR #4) must be green. Planner reviews
    (review-handoff), Steve merges. Natasha play-tests before a phase is called done.
