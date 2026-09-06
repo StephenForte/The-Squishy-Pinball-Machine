@@ -2,16 +2,27 @@ extends SceneTree
 
 const BALL_SCENE := preload("res://scenes/ball.tscn")
 const DROP_ABOVE := 60.0
+const HIT_DROP_ABOVE := 90.0
+const HIT_PASS_BELOW := 40.0
 const CONTACT_WAIT := 180
 const KICK_CHECK_FRAMES := 10
 const TARGET_DRIVE_SPEED := 520.0
 const TARGET_STANDOFF := 52.0
 const BANK_RESET_FRAMES := 90
 const DRAIN_LIMIT := 3000
-## 1300 never leaves the lane (T2 fallback: min y≈459 at x=666). Exit
-## threshold is ~1600. 1750 covers a mid playfield arc; 1700 can rest on
-## an idle flipper (T3 paddle hold), which is not a bumper wedge.
-const LAUNCH_IMPULSES := [1600.0, 1750.0, 1850.0]
+const BASE_FLIP_FRAMES := 600
+const PIVOT_LEFT := Vector2(250, 1120)
+const PIVOT_RIGHT := Vector2(470, 1120)
+const NEW_TARGET_NAMES := ["TargetLeft2", "TargetRight2"]
+const CIRCLE_DROP_RADIUS := 50.0
+const CIRCLE_DROP_COUNT := 10
+const CIRCLE_WATCH_FRAMES := 400
+const REST_SPEED := 8.0
+## D-013/D-023: idle launches 1500–1850 step 50 must drain, stay in the
+## lane, or free with one flip. Below ~1600 never leaves the lane.
+const LAUNCH_IMPULSE_MIN := 1500
+const LAUNCH_IMPULSE_MAX := 1850
+const LAUNCH_IMPULSE_STEP := 50
 
 var _game: Node
 var _table: Node2D
@@ -49,8 +60,12 @@ func _run() -> void:
 		return
 	if not await _case_4_drains():
 		return
+	if not await _case_5_hit_where_drawn():
+		return
+	if not await _case_6_new_circle_drops():
+		return
 
-	print("SCORE PASS bumpers=3 targets=3 bonus=1 drains=3")
+	print("SCORE PASS bumpers=3 targets=5 bonus=1 drains=8 hit=8 drops=20")
 	quit(0)
 
 
@@ -127,15 +142,42 @@ func _case_2_targets() -> bool:
 	for target in _bank_targets():
 		target.reset()
 	var targets := _bank_targets()
-	if targets.size() != 3:
-		return _fail("case 2: expected 3 targets, got %d" % targets.size())
+	if targets.size() != 5:
+		return _fail("case 2: expected 5 targets, got %d" % targets.size())
 
 	var bonus_emits := [0]
 	var on_bonus := func() -> void:
 		bonus_emits[0] += 1
 	_bank.all_targets_hit.connect(on_bonus)
 
-	for i in targets.size():
+	for i in mini(3, targets.size()):
+		var partial: Node = targets[i]
+		var before_partial: int = _game.score
+		if not await _drive_into_target(partial):
+			_bank.all_targets_hit.disconnect(on_bonus)
+			return false
+		if not bool(partial.lit):
+			_bank.all_targets_hit.disconnect(on_bonus)
+			return _fail("case 2: target %d not lit after first hit" % i)
+		if _game.score - before_partial != 500:
+			_bank.all_targets_hit.disconnect(on_bonus)
+			return _fail(
+				"case 2: target %d expected +500, got +%d" % [i, _game.score - before_partial]
+			)
+		var mid_partial: int = _game.score
+		if not await _drive_into_target(partial):
+			_bank.all_targets_hit.disconnect(on_bonus)
+			return false
+		if _game.score != mid_partial:
+			_bank.all_targets_hit.disconnect(on_bonus)
+			return _fail(
+				"case 2: lit target %d scored +%d, expected 0" % [i, _game.score - mid_partial]
+			)
+	if bonus_emits[0] != 0:
+		_bank.all_targets_hit.disconnect(on_bonus)
+		return _fail("case 2: bonus fired after 3 lit, emits=%d" % bonus_emits[0])
+
+	for i in range(3, targets.size()):
 		var target: Node = targets[i]
 		var before: int = _game.score
 		if not await _drive_into_target(target):
@@ -144,7 +186,7 @@ func _case_2_targets() -> bool:
 		if not bool(target.lit):
 			_bank.all_targets_hit.disconnect(on_bonus)
 			return _fail("case 2: target %d not lit after first hit" % i)
-		if i < 2:
+		if i < 4:
 			if _game.score - before != 500:
 				_bank.all_targets_hit.disconnect(on_bonus)
 				return _fail(
@@ -173,7 +215,7 @@ func _case_2_targets() -> bool:
 			_bank.all_targets_hit.disconnect(on_bonus)
 			return _fail("case 2: target still lit after bank reset")
 	_bank.all_targets_hit.disconnect(on_bonus)
-	print("SCORE case 2 pass targets=3 bonus=1")
+	print("SCORE case 2 pass targets=5 bonus=1")
 	return true
 
 
@@ -228,13 +270,13 @@ func _case_4_drains() -> bool:
 	await process_frame
 	await physics_frame
 	var launcher: Node = _table.get_node("Launcher")
-	var drained := 0
-	for impulse in LAUNCH_IMPULSES:
+	var resolved := 0
+	for impulse in range(LAUNCH_IMPULSE_MIN, LAUNCH_IMPULSE_MAX + 1, LAUNCH_IMPULSE_STEP):
 		var ball := await _fresh_lane_ball()
 		if ball == null:
 			return _fail("case 4: no lane ball for impulse %s" % impulse)
 		var before: int = _game.balls_left
-		launcher.launch(impulse)
+		launcher.launch(float(impulse))
 		if not bool(ball.get("launched")):
 			return _fail("case 4: launch impulse %s did not fire" % impulse)
 		var got := false
@@ -243,10 +285,148 @@ func _case_4_drains() -> bool:
 			if _game.balls_left < before:
 				got = true
 				break
+			if not is_instance_valid(ball) or ball.is_queued_for_deletion():
+				got = true
+				break
 		if not got:
-			return _fail("case 4: impulse %s did not drain within %d frames" % [impulse, DRAIN_LIMIT])
-		drained += 1
-	print("SCORE case 4 pass drains=3")
+			if _in_launcher_lane(ball.global_position):
+				resolved += 1
+				continue
+			var action := _nearer_flipper_action(ball.global_position)
+			Input.action_press(action)
+			for _flip_watch in BASE_FLIP_FRAMES:
+				await physics_frame
+				if _game.balls_left < before:
+					got = true
+					break
+				if not is_instance_valid(ball) or ball.is_queued_for_deletion():
+					got = true
+					break
+			Input.action_release(action)
+			Input.action_release(&"flipper_left")
+			Input.action_release(&"flipper_right")
+		if not got:
+			var rest := Vector2.ZERO
+			if is_instance_valid(ball):
+				rest = ball.global_position
+			return _fail("case 4: impulse %s rest=%s within %d frames" % [impulse, rest, DRAIN_LIMIT])
+		resolved += 1
+	print("SCORE case 4 pass drains=%d" % resolved)
+	return true
+
+
+func _in_launcher_lane(pos: Vector2) -> bool:
+	return pos.x > 620.0 and pos.y > 1100.0
+
+
+func _nearer_flipper_action(pos: Vector2) -> StringName:
+	if pos.distance_to(PIVOT_LEFT) <= pos.distance_to(PIVOT_RIGHT):
+		return &"flipper_left"
+	return &"flipper_right"
+
+
+func _case_5_hit_where_drawn() -> bool:
+	var squishies := get_nodes_in_group("squishies")
+	if squishies.size() != 8:
+		return _fail("case 5: expected 8 squishies, got %d" % squishies.size())
+	var hits := 0
+	for node in squishies:
+		if not (node is Node2D):
+			continue
+		var host := (node as Node).get_parent()
+		if host == null:
+			return _fail("case 5: %s has no host" % node.name)
+		var expected := 500
+		if host.is_in_group("bumpers"):
+			expected = 100
+		elif not host.is_in_group("targets"):
+			return _fail("case 5: %s host %s is not Bumper/Target" % [node.name, host.name])
+		var sprite := node.get_node_or_null("Sprite") as Sprite2D
+		if sprite == null:
+			return _fail("case 5: %s missing Sprite" % host.name)
+		_game.restart()
+		await process_frame
+		await physics_frame
+		for target in _bank_targets():
+			target.reset()
+		await _free_balls()
+		var start_score: int = _game.score
+		var centre: Vector2 = sprite.global_position
+		var ball := await _spawn_ball(centre + Vector2(0, -HIT_DROP_ABOVE), Vector2.ZERO)
+		if ball == null:
+			return _fail("case 5: no ball above %s at %s" % [host.name, centre])
+		var scored := false
+		for _i in CONTACT_WAIT:
+			await physics_frame
+			if not is_instance_valid(ball):
+				return _fail("case 5: ball freed above %s" % host.name)
+			if _game.score != start_score:
+				scored = true
+				if ball.global_position.y > centre.y + HIT_PASS_BELOW:
+					return _fail(
+						"case 5: %s ball passed through to y=%.1f centre=%.1f"
+						% [host.name, ball.global_position.y, centre.y]
+					)
+				break
+			if ball.global_position.y > centre.y + HIT_PASS_BELOW:
+				return _fail(
+					"case 5: %s passed below sprite without scoring y=%.1f"
+					% [host.name, ball.global_position.y]
+				)
+		if not scored:
+			return _fail("case 5: %s at %s did not score" % [host.name, centre])
+		var delta: int = _game.score - start_score
+		if delta != expected:
+			return _fail("case 5: %s expected +%d, got +%d" % [host.name, expected, delta])
+		hits += 1
+	if hits != 8:
+		return _fail("case 5: hit %d sprites, need 8" % hits)
+	print("SCORE case 5 pass hit=8")
+	return true
+
+
+func _case_6_new_circle_drops() -> bool:
+	var drops := 0
+	for node_name in NEW_TARGET_NAMES:
+		var target := _bank.get_node_or_null(node_name) as Node2D
+		if target == null:
+			return _fail("case 6: missing %s" % node_name)
+		for i in CIRCLE_DROP_COUNT:
+			_game.restart()
+			await process_frame
+			await physics_frame
+			await _free_balls()
+			var angle := TAU * float(i) / float(CIRCLE_DROP_COUNT)
+			var pos: Vector2 = target.global_position + Vector2.from_angle(angle) * CIRCLE_DROP_RADIUS
+			pos.x = clampf(pos.x, 40.0, 588.0)
+			pos.y = clampf(pos.y, 40.0, 1080.0)
+			var ball := await _spawn_ball(pos, Vector2(0, 40))
+			if ball == null:
+				return _fail("case 6: no ball for %s drop %d" % [node_name, i])
+			var wedged := false
+			var still_frames := 0
+			for _f in CIRCLE_WATCH_FRAMES:
+				await physics_frame
+				if not is_instance_valid(ball) or ball.is_queued_for_deletion():
+					wedged = false
+					break
+				if ball.linear_velocity.length() < REST_SPEED:
+					still_frames += 1
+				else:
+					still_frames = 0
+				if still_frames >= 45:
+					var d_wall := minf(ball.global_position.x - 24.0, 612.0 - ball.global_position.x)
+					var d_target: float = ball.global_position.distance_to(target.global_position)
+					if d_target < 70.0 and d_wall < 40.0:
+						wedged = true
+						break
+			if wedged:
+				return _fail(
+					"case 6: wedge %s drop %d pos=%s ball=%s"
+					% [node_name, i, pos, ball.global_position]
+				)
+			drops += 1
+	print("SCORE case 6 pass drops=%d" % drops)
 	return true
 
 
