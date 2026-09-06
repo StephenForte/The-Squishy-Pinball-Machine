@@ -22,7 +22,8 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T7c | Sound effects | 4 | merged 2026-09-03 (PR #13) | mid | T7a |
 | T7d | Tuning: stronger shake, more flipper power (D-019) | 4 | merged 2026-09-03 (PR #12) | cheap | T7a |
 | T8.0 | Commit design catalogs (assets/design) | 4 | merged 2026-09-04 (PR #14) | — | — |
-| T8 | Squishy art + theme pass (data-driven, D-020) | 4 | approved 2026-09-04; PR #15 (54f247a) ready to merge | strong | T8.0 |
+| T8 | Squishy art + theme pass (data-driven, D-020) | 4 | merged 2026-09-04 (PR #15); Steve: art OK for now | strong | T8.0 |
+| T10 | Hit-surface fix: 5 round targets under sprites + flipper +10% (D-022/D-023) | 4 fix | dispatched 2026-09-05 | mid-strong | T8 |
 | T9 | Test isolation: tests must not touch the real user:// dir | hygiene | not started | cheap | — |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8.
@@ -120,6 +121,18 @@ Additive: `project.godot` (autoload line), `scenes/table.tscn` (swap placeholder
 Squishy instances at D-015 positions — collision shapes untouched), all `scenes/ui/*.tscn`
 (colours from Theme), `scenes/effects.tscn` (fireworks colours), `scenes/main.tscn` (picker).
 Input: assets/design catalogs per D-020. See Phase-3/4 feedback: vibrant, themed, squishy.
+
+### T10 — Squishies must be hittable where they are drawn (found in play 2026-09-05)
+Steve: "some squishies the ball glides straight through". Planner repro (drop a ball on each
+sprite): puppy_jax/peanut_pip are decor with no collider (0 pts, pass-through); frog_gus /
+cosmo / lion_rumpus sprites sit (25,26) / (-19,31) / (0,72) px away from their 70×12 target
+bars, so aiming at the squishy misses. T8 review missed this because physics was unchanged.
+Fix per D-023: decor → TargetLeft2/TargetRight2 in the bank; every target's collider becomes a
+circle centred on its sprite. Plus D-022 flipper +10 %. Owns: `scenes/table.tscn`,
+`scenes/target.tscn`, `scripts/target.gd` (shape only), `scripts/flipper.gd`,
+`assets/design/squishes/squishies_catalog.json` (`first_table_slots`, `v1_role` for the two),
+`tests/scoring_test.gd`, `tests/theme_test.gd` (+ alignment/hit cases), `tests/flipper_test.gd`
+only if a threshold must move. D-013 drain invariant and the BASE/TIP tests are the guards.
 
 ### T9 — Test isolation (found in T8 review)
 Every `-s tests/*.gd` run uses the app's real `user://` (macOS: ~/Library/Application
