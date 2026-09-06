@@ -1,7 +1,7 @@
 # Decisions — The Squishy Pinball Machine
 
 Numbered, append-only. Never renumber; supersede in place with date and reason.
-Workers cite these instead of re-deciding. Next free number: **D-025**.
+Workers cite these instead of re-deciding. Next free number: **D-026**.
 
 ## D-001 — Engine: Godot 4.x, GDScript (2026-09-02)
 Per PRD. Exact version to be pinned as D-006 once installed on the build machine.
@@ -237,3 +237,15 @@ Bank bonus needs all five lit (worker: "a full-table chore" — Natasha may retu
 Flipper UP_SPEED_DEG 915 → HIT vy −1557.8. Known measure-zero case: a ball arriving
 perfectly centred and vertical on a target apex balances; any 1 px / 3 px/s lateral
 component drains. If it ever shows in play, generalise the D-016 pivot nudge to targets.
+
+## D-025 — Test isolation: `tests/run_all.sh` + `override.cfg` (2026-09-06)
+Tests were writing the real `user://` (macOS: ~/Library/Application Support/Godot/app_userdata/
+The Squishy Pinball Machine/) and deleting `highscore.save`; planner review probes overwrote
+Steve's real high score (20 200 on 2026-09-05 was a probe score). Fix: a committed
+`tests/run_all.sh` writes `override.cfg` at the project root with
+`[application] config/use_custom_user_dir=true` and
+`config/custom_user_dir_name="SquishyPinballTest"`, runs import + quit-after-300 + every
+`tests/*_test.gd` (+ soak), and removes `override.cfg` on exit via `trap` (also on failure /
+Ctrl-C). `override.cfg` is gitignored. Verified 2026-09-06: with the override,
+`OS.get_user_data_dir()` = ~/Library/Application Support/SquishyPinballTest and the real
+save is untouched. All briefs from now on cite `tests/run_all.sh` as the gate.
