@@ -1,6 +1,6 @@
 extends Node2D
 
-## Catalog-driven sprite. Collision stays on the parent bumper/target (D-015).
+## Catalog-driven sprite. Collision stays on the parent bumper/target (D-015/D-023).
 
 @export var catalog_id: String = ""
 
@@ -116,17 +116,9 @@ func _apply_fit() -> void:
 
 
 func _place_art() -> void:
-	var parent := get_parent()
-	if parent == null or not parent.is_in_group("targets"):
-		return
-	var center := Vector2(360, 640)
-	var inward: Vector2 = center - parent.global_position
-	if inward.length_squared() < 0.001:
-		inward = Vector2.DOWN
-	var dist := 36.0
-	if absf(parent.rotation) < 0.2:
-		dist = 72.0
-	global_position = parent.global_position + inward.normalized() * dist
+	## D-023: sprite and collider share the host origin. The old inward
+	## offset (36 / 72 px) is why players aimed at art and hit nothing.
+	position = Vector2.ZERO
 
 
 func _apply_lit() -> void:

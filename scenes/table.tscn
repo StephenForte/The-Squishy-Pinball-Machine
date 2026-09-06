@@ -1,4 +1,4 @@
-[gd_scene load_steps=21 format=3]
+[gd_scene load_steps=20 format=3]
 
 [ext_resource type="Script" path="res://scripts/table.gd" id="1_table"]
 [ext_resource type="Script" path="res://scripts/launcher.gd" id="2_launcher"]
@@ -7,7 +7,6 @@
 [ext_resource type="Script" path="res://scripts/target_bank.gd" id="5_target_bank"]
 [ext_resource type="PackedScene" path="res://scenes/target.tscn" id="6_target"]
 [ext_resource type="PackedScene" path="res://scenes/effects.tscn" id="7_effects"]
-[ext_resource type="PackedScene" path="res://scenes/squishy.tscn" id="8_squishy"]
 
 [sub_resource type="PhysicsMaterial" id="PhysicsMaterial_walls"]
 friction = 0.25
@@ -183,22 +182,18 @@ position = Vector2(295, 530)
 script = ExtResource("5_target_bank")
 
 [node name="TargetLeft" parent="TargetBank" instance=ExtResource("6_target")]
-position = Vector2(30, 290)
-rotation = 1.5708
+position = Vector2(120, 320)
 
 [node name="TargetRight" parent="TargetBank" instance=ExtResource("6_target")]
-position = Vector2(560, 310)
-rotation = 1.5708
+position = Vector2(542, 310)
 
 [node name="TargetTop" parent="TargetBank" instance=ExtResource("6_target")]
-position = Vector2(360, 30)
+position = Vector2(360, 130)
+
+[node name="TargetLeft2" parent="TargetBank" instance=ExtResource("6_target")]
+position = Vector2(120, 700)
+
+[node name="TargetRight2" parent="TargetBank" instance=ExtResource("6_target")]
+position = Vector2(500, 700)
 
 [node name="Effects" parent="." instance=ExtResource("7_effects")]
-
-[node name="Decor0" parent="." instance=ExtResource("8_squishy")]
-position = Vector2(120, 700)
-catalog_id = "puppy_jax"
-
-[node name="Decor1" parent="." instance=ExtResource("8_squishy")]
-position = Vector2(500, 700)
-catalog_id = "peanut_pip"

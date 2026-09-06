@@ -14,7 +14,10 @@ const SLOT_EXPECT := {
 	"TargetLeft": "frog_gus",
 	"TargetRight": "cosmo",
 	"TargetTop": "lion_rumpus",
+	"TargetLeft2": "puppy_jax",
+	"TargetRight2": "peanut_pip",
 }
+const ALIGN_TOL_PX := 1.0
 
 var _cases_passed: int = 0
 var _theme: Node
@@ -57,8 +60,10 @@ func _run() -> void:
 		return
 	if not await _case_7_dance():
 		return
+	if not await _case_8_alignment():
+		return
 
-	print("THEME PASS cases=7")
+	print("THEME PASS cases=8")
 	quit(0)
 
 
@@ -179,13 +184,10 @@ func _case_5_slots() -> bool:
 		var got := String(squishy.get("catalog_id"))
 		if got != SLOT_EXPECT[node_name]:
 			return _fail("case 5: %s id=%s want=%s" % [node_name, got, SLOT_EXPECT[node_name]])
-	var decor: Array = SquishyCatalog.first_table_slots().get("decor", [])
-	var d0 := table.get_node_or_null("Decor0")
-	var d1 := table.get_node_or_null("Decor1")
-	if d0 == null or d1 == null:
-		return _fail("case 5: missing decor nodes")
-	if String(d0.get("catalog_id")) != String(decor[0]) or String(d1.get("catalog_id")) != String(decor[1]):
-		return _fail("case 5: decor ids %s,%s" % [d0.get("catalog_id"), d1.get("catalog_id")])
+	if SquishyCatalog.first_table_slots().has("decor"):
+		return _fail("case 5: first_table_slots still has decor")
+	if table.get_node_or_null("Decor0") != null or table.get_node_or_null("Decor1") != null:
+		return _fail("case 5: Decor0/Decor1 still on table")
 	_cases_passed += 1
 	print("THEME case 5 pass")
 	return true
@@ -261,6 +263,49 @@ func _case_7_dance() -> bool:
 		return _fail("case 7: dance did not stop within 3s")
 	_cases_passed += 1
 	print("THEME case 7 pass")
+	return true
+
+
+func _case_8_alignment() -> bool:
+	_theme.set_palette("neon_candy_baseline")
+	await process_frame
+	await process_frame
+	if not _alignment_holds("after palette"):
+		return false
+	_theme.set_palette("aqua_pool")
+	await process_frame
+	await process_frame
+	if not _alignment_holds("after palette switch"):
+		return false
+	_cases_passed += 1
+	print("THEME case 8 pass alignment")
+	return true
+
+
+func _alignment_holds(when: String) -> bool:
+	var squishies := get_nodes_in_group("squishies")
+	if squishies.is_empty():
+		return _fail("case 8: no squishies %s" % when)
+	for node in squishies:
+		if not (node is Node2D):
+			continue
+		var host := (node as Node).get_parent()
+		if host == null:
+			return _fail("case 8: %s has no host %s" % [node.name, when])
+		var is_bumper := host.is_in_group("bumpers")
+		var is_target := host.is_in_group("targets")
+		if not is_bumper and not is_target:
+			return _fail("case 8: %s host %s is not Bumper/Target %s" % [node.name, host.name, when])
+		var sprite := node.get_node_or_null("Sprite") as Sprite2D
+		var collider := host.get_node_or_null("CollisionShape2D") as CollisionShape2D
+		if sprite == null or collider == null:
+			return _fail("case 8: %s missing sprite/collider %s" % [host.name, when])
+		var delta: float = sprite.global_position.distance_to(collider.global_position)
+		if delta > ALIGN_TOL_PX:
+			return _fail(
+				"case 8: %s sprite %s collider %s d=%.2f %s"
+				% [host.name, sprite.global_position, collider.global_position, delta, when]
+			)
 	return true
 
 
