@@ -23,7 +23,7 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T7d | Tuning: stronger shake, more flipper power (D-019) | 4 | merged 2026-09-03 (PR #12) | cheap | T7a |
 | T8.0 | Commit design catalogs (assets/design) | 4 | merged 2026-09-04 (PR #14) | — | — |
 | T8 | Squishy art + theme pass (data-driven, D-020) | 4 | merged 2026-09-04 (PR #15); Steve: art OK for now | strong | T8.0 |
-| T10 | Hit-surface fix: 5 round targets under sprites + flipper +10% (D-022/D-023) | 4 fix | dispatched 2026-09-05 | mid-strong | T8 |
+| T10 | Hit-surface fix: 5 round targets under sprites + flipper +10% (D-022/D-023) | 4 fix | approved 2026-09-05; PR #16 (ab6afa8) ready to merge | mid-strong | T8 |
 | T9 | Test isolation: tests must not touch the real user:// dir | hygiene | not started | cheap | — |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8.
@@ -260,3 +260,9 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   slice tool reproducible. Probes: 16 RGBA sprites clean border; 4 palettes recolour live;
   settings persist; arrows cycle only on title; dance 8→0 on restart. Approved. Found T9
   (tests write real user://).
+- 2026-09-05: T10 (PR #16, ab6afa8) reviewed in scratch clone. 7 files, scope ✓ (squishy.gd
+  offset removal disclosed + required). 9 suites PASS. Probes: 8/8 sprites aligned ≤1 px,
+  score on drop, no pass-through (main failed 5/8); idle sweep step 25 no rests; mashed game
+  GAME_OVER 9182 frames / 20 200 pts / 0 OOB; 25 target-circle drops → 20 drain, 5 exact-apex
+  zero-velocity drops balance (1 px or 3 px/s lateral → drain; measure-zero, D-024). HIT vy
+  −1382.6 → −1557.8. Approved.
