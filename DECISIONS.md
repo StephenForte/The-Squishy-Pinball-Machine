@@ -1,7 +1,7 @@
 # Decisions — The Squishy Pinball Machine
 
 Numbered, append-only. Never renumber; supersede in place with date and reason.
-Workers cite these instead of re-deciding. Next free number: **D-024**.
+Workers cite these instead of re-deciding. Next free number: **D-025**.
 
 ## D-001 — Engine: Godot 4.x, GDScript (2026-09-02)
 Per PRD. Exact version to be pinned as D-006 once installed on the build machine.
@@ -228,3 +228,12 @@ flips, 0 OOB), BASE (8/8) and HIT (vy threshold may only tighten) must still pas
   unchanged). Natasha may retune to "any 3" later.
 - D-013 placement invariant holds: idle launches 1500–1850 step 50 all drain within 3 000
   frames or free with one flip; no rest within 30 px of a pivot.
+
+## D-024 — Target geometry as built by T10 (2026-09-05)
+Five Targets under `TargetBank`, circle body r=30 / sensor r=34, sprite at host origin:
+TargetLeft (120, 320) frog_gus · TargetRight (542, 310) cosmo · TargetTop (360, 130)
+lion_rumpus · TargetLeft2 (120, 700) puppy_jax · TargetRight2 (500, 700) peanut_pip.
+Bank bonus needs all five lit (worker: "a full-table chore" — Natasha may retune to any-3).
+Flipper UP_SPEED_DEG 915 → HIT vy −1557.8. Known measure-zero case: a ball arriving
+perfectly centred and vertical on a target apex balances; any 1 px / 3 px/s lateral
+component drains. If it ever shows in play, generalise the D-016 pivot nudge to targets.
