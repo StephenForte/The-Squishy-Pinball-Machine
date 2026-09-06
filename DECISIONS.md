@@ -1,7 +1,7 @@
 # Decisions — The Squishy Pinball Machine
 
 Numbered, append-only. Never renumber; supersede in place with date and reason.
-Workers cite these instead of re-deciding. Next free number: **D-022**.
+Workers cite these instead of re-deciding. Next free number: **D-024**.
 
 ## D-001 — Engine: Godot 4.x, GDScript (2026-09-02)
 Per PRD. Exact version to be pinned as D-006 once installed on the build machine.
@@ -212,3 +212,19 @@ group `"squishies"`, `catalog_id` export, squash tween on hit, `play_dance(sec)`
 `stop_dance()`); table slots per `first_table_slots`; decor at (120,700) and (500,700).
 Keying: edge-connected flood fill on near-black + blue-dominant indigo; residual faint indigo
 fringe at some feet (fade), eyes intact. Screenshots for each palette live in `playtest/`.
+
+## D-022 — Play-test tuning round 2 (Steve, 2026-09-05)
+Flipper `UP_SPEED_DEG` 830 → 915 (+10 %). Everything else in D-012/D-019 unchanged. TIP (20
+flips, 0 OOB), BASE (8/8) and HIT (vy threshold may only tighten) must still pass.
+
+## D-023 — Squishies are their own hit surface (Steve, 2026-09-05)
+- No decor squishies. `puppy_jax` → `TargetLeft2`, `peanut_pip` → `TargetRight2`, both children
+  of `TargetBank`; `v1_role: target`; `first_table_slots` updated, `decor` removed.
+- Every Target's collision (body + sensor) is a **circle centred on its Squishy sprite** (radius
+  ≈ sprite half-width, ~30 px; sensor +4), replacing the 70×12 bar. Targets may be placed a
+  few px off the wall so the circle does not overlap wall collision. Sprite and collider share
+  one origin — what the player sees is what scores.
+- Bank bonus (2 500) fires when **all five** targets are lit; then all reset (D-013 logic
+  unchanged). Natasha may retune to "any 3" later.
+- D-013 placement invariant holds: idle launches 1500–1850 step 50 all drain within 3 000
+  frames or free with one flip; no rest within 30 px of a pivot.
