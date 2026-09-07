@@ -1,7 +1,7 @@
 # Decisions — The Squishy Pinball Machine
 
 Numbered, append-only. Never renumber; supersede in place with date and reason.
-Workers cite these instead of re-deciding. Next free number: **D-026**.
+Workers cite these instead of re-deciding. Next free number: **D-029**.
 
 ## D-001 — Engine: Godot 4.x, GDScript (2026-09-02)
 Per PRD. Exact version to be pinned as D-006 once installed on the build machine.
@@ -251,3 +251,40 @@ removes `override.cfg` on exit via `trap` (also on failure / Ctrl-C; SIGINT to b
 defers cleanup until the current Godot child exits). `override.cfg` is gitignored. Verified 2026-09-06: with the override,
 `OS.get_user_data_dir()` = ~/Library/Application Support/SquishyPinballTest and the real
 save is untouched. All briefs from now on cite `tests/run_all.sh` as the gate.
+
+## D-026 — Leaderboard API contract (2026-09-07)
+Server: `server/` — Node 24, `node:http` + `pg`, no framework; `npm start` runs
+`src/index.js`; `npm test` runs `node --test`. Env: `PORT` (default 8787), `STORE`
+(`postgres` | `memory`), `DATABASE_URL` (postgres), `SQUISH_KEY` (shared write key). Schema is
+created on boot (`CREATE TABLE IF NOT EXISTS scores(id bigserial, player_id uuid, name text,
+score int, client text, created_at timestamptz default now())`, index on `(player_id, score desc)`).
+JSON everywhere; CORS not needed (Godot client).
+- `GET /healthz` → 200 `{"ok":true,"store":"postgres|memory"}`
+- `POST /v1/scores` header `X-Squish-Key: <SQUISH_KEY>`; body `{"player_id":"<uuid v4>",
+  "name":"<1–16 chars>","score":<int 0..9999999>,"client":"squish/<version>"}` →
+  201 `{"rank":<int>,"best":<int>,"is_personal_best":<bool>,"total_players":<int>}`.
+  400 invalid body/uuid/name/score · 401 missing/wrong key · 429 over 30 posts/min per player_id.
+  Name is trimmed, whitespace-collapsed, control chars stripped, ≤16 chars; the player's
+  latest name is what the board shows.
+- `GET /v1/leaderboard?limit=10` (1..50, default 10) → 200 `{"entries":[{"rank":1,
+  "player_id":"…","name":"…","score":12345,"at":"<iso8601>"}], "total_players":<int>}` —
+  one row per player (their best), ties broken by earlier `at`.
+- `GET /v1/leaderboard/me?player_id=<uuid>` → 200 `{"rank":<int>,"best":<int>,"name":"…"}`
+  or 404 `{"error":"unknown_player"}`.
+- Errors are `{"error":"<snake_case>"}`. Unknown routes 404. Body limit 4 KB.
+- Client base URL: `Leaderboard.BASE_URL` constant (filled from D-028), overridable by env
+  `SQUISH_LEADERBOARD_URL` (tests point it at a local memory-mode server). The write key
+  ships inside the client; this is obscurity, not security — accepted for a family game.
+
+## D-027 — Player profile (2026-09-07)
+Autoload `Profile` (`autoload/profile.gd`): `player_id` (UUID v4, generated once),
+`player_name` ("" until set), `signal name_changed(name)`, `func set_name(n)` (sanitised as in
+D-026), persisted as JSON at `user://profile.save` (separate from settings.save). Title screen:
+if `player_name == ""` a `NameEntry` (LineEdit, max 16) is shown and **must be completed before
+Space launches**; otherwise the title shows `Playing as <name> · N to change`. New input action
+`change_name` = N (D-004 superseded in place: it now has five actions). While the LineEdit has
+focus, flipper/launch/restart/theme-arrow input must not act.
+
+## D-028 — (reserved) Leaderboard deploy record
+Filled at T11.1: Render workspace, service id + URL, Postgres id/plan, region, env var names,
+smoke-test output, monthly cost as shown by Render at creation.
