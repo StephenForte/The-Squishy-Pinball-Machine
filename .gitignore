@@ -22,3 +22,6 @@ Thumbs.db
 .vscode/
 *.swp
 *~
+
+# Test runner isolation override (D-025)
+override.cfg
