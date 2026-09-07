@@ -27,7 +27,7 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T9 | Test isolation: tests must not touch the real user:// dir (D-025) | hygiene | merged 2026-09-06 (PR #17) | cheap | — |
 | T11 | Leaderboard server (`server/`, Node 24 + SQLite via node:sqlite, D-026) | 5 | dispatched 2026-09-07 (re-issued: SQLite) | mid | — |
 | T11.1 | Deploy to Render (Supa Workspace): Starter web service + 1 GB disk; record D-028 | 5 | planner + Steve, after T11 merges | — | T11 |
-| T12 | Player profile: name entry + device id (D-027) | 5 | dispatched 2026-09-07 (parallel with T11, separate checkout) | cheap-mid | — |
+| T12 | Player profile: name entry + device id (D-027) | 5 | approved 2026-09-07; PR #19 (2e0147c) ready to merge | cheap-mid | — |
 | T13 | Client leaderboard: post on game over, show on title + game over (D-026/D-027) | 5 | not started (after T11 + T12 merge) | mid-strong | T11, T12 |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8 → T10 → T9 →
@@ -308,3 +308,9 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   branch. Runner 12/12 PASS; real highscore/settings byte-identical before/after; override.cfg
   removed after run; bare isolation_test exit 1; SIGINT-to-bash-only delays cleanup until the
   Godot child exits (terminal Ctrl-C is immediate). Approved.
+- 2026-09-07: T12 (PR #19, 2e0147c) reviewed in scratch clone under the isolated runner.
+  Scope ✓ (10 files; project.godot = autoload + change_name). run_all 13/13 PASS. Planner
+  probe with real key events, 17/17: typing keys never launch/flip/restart/cycle; visible-but-
+  unfocused entry blocks Space; sanitising, persistence, N/Escape, no re-prompt after restart.
+  Harness note: name_entry.gd uses the `Profile` global → scripts preloading main.tscn in -s
+  tests fail to compile; tests must load() at runtime (CLAUDE.md convention added). Approved.
