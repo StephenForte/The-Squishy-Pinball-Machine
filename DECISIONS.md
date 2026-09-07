@@ -291,6 +291,11 @@ if `player_name == ""` a `NameEntry` (LineEdit, max 16) is shown and **must be c
 Space launches**; otherwise the title shows `Playing as <name> · N to change`. New input action
 `change_name` = N (D-004 superseded in place: it now has five actions). While the LineEdit has
 focus, flipper/launch/restart/theme-arrow input must not act.
+As built (T12): `Profile.set_name` shadows `Node.set_name` (call via `Profile.call("set_name",
+n)` or add an alias in T13 if it reads badly); flippers are gated with `set_physics_process(false)`
+while the entry captures; UUID via `Crypto.generate_random_bytes`; entry visible-but-unfocused
+still blocks launch (verified). Convention: reference autoloads with `get_node("/root/Name")`,
+not the global identifier — the global is unavailable when a `-s` test preloads a scene.
 
 ## D-028 — (reserved) Leaderboard deploy record
 Filled at T11.1: Render workspace, service id + URL, instance plan, disk size/mount, region, env var names,
