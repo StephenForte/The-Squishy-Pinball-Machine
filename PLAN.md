@@ -24,9 +24,14 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T8.0 | Commit design catalogs (assets/design) | 4 | merged 2026-09-04 (PR #14) | — | — |
 | T8 | Squishy art + theme pass (data-driven, D-020) | 4 | merged 2026-09-04 (PR #15); Steve: art OK for now | strong | T8.0 |
 | T10 | Hit-surface fix: 5 round targets under sprites + flipper +10% (D-022/D-023) | 4 fix | merged 2026-09-05 (PR #16) | mid-strong | T8 |
-| T9 | Test isolation: tests must not touch the real user:// dir (D-025) | hygiene | approved 2026-09-06; PR #17 ready to merge | cheap | — |
+| T9 | Test isolation: tests must not touch the real user:// dir (D-025) | hygiene | merged 2026-09-06 (PR #17) | cheap | — |
+| T11 | Leaderboard server (`server/`, Node 24 + Postgres, D-026) | 5 | dispatched 2026-09-07 | mid | — |
+| T11.1 | Deploy to Render (Supa Workspace): Postgres + web service; record D-028 | 5 | planner + Steve, after T11 merges | — | T11 |
+| T12 | Player profile: name entry + device id (D-027) | 5 | dispatched 2026-09-07 (parallel with T11, separate checkout) | cheap-mid | — |
+| T13 | Client leaderboard: post on game over, show on title + game over (D-026/D-027) | 5 | not started (after T11 + T12 merge) | mid-strong | T11, T12 |
 
-**Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8.
+**Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8 → T10 → T9 →
+**Phase 5:** T11 ∥ T12 → T11.1 (deploy) → T13.
 T5 and T6 are the only truly parallel pair; ownership below is drawn to keep them apart.
 
 ## Running the game after a pull
@@ -138,6 +143,31 @@ circle centred on its sprite. Plus D-022 flipper +10 %. Owns: `scenes/table.tscn
 `assets/design/squishes/squishies_catalog.json` (`first_table_slots`, `v1_role` for the two),
 `tests/scoring_test.gd`, `tests/theme_test.gd` (+ alignment/hit cases), `tests/flipper_test.gd`
 only if a threshold must move. D-013 drain invariant and the BASE/TIP tests are the guards.
+
+## Phase 5 — Shared leaderboard (decisions 2026-09-07)
+Hosting: Render, Supa Workspace (`tea-d98533l7vvec738vva90`), web service + Postgres (Steve
+accepted ~$6–7/mo for Postgres; exact plans confirmed at T11.1). Identity: name entered in-game,
+saved locally, plus a random per-device id; no login (spoofable, accepted for family/friends).
+Display: top 10 + own rank on the game-over panel, top 5 on the title. Server lives in `server/`
+in this repo. Contracts: D-026 (API), D-027 (Profile), D-028 (deploy record, filled at T11.1).
+
+### T11 — Leaderboard server
+Owns: everything under `server/` (Node 24, `node:http` + `pg`, `node --test`), plus
+`.github/workflows/security-scans.yml` untouched (it already scans the repo). Nothing outside
+`server/` except `.gitignore` (additive: `server/node_modules`, `server/.env`).
+
+### T12 — Player profile
+Owns: `autoload/profile.gd` (autoload `Profile`), `scenes/ui/name_entry.tscn` +
+`scripts/ui/name_entry.gd`, `tests/profile_test.gd`; additive: `project.godot` (autoload line +
+`change_name` action N, D-004 superseded), `scenes/ui/title.tscn`/`scripts/ui/title.gd`
+(name line + entry), `.gitignore` none. Must not touch `server/`, game_over, HUD, gameplay.
+
+### T13 — Client leaderboard integration
+Owns: `autoload/leaderboard.gd` (autoload `Leaderboard`), `tests/leaderboard_test.gd`;
+additive: `project.godot` (autoload line), `scenes/ui/game_over.tscn`/`scripts/ui/game_over.gd`
+(`LeaderboardList`, `YourRankLabel`), `scenes/ui/title.tscn`/`scripts/ui/title.gd`
+(`TopFiveLabel`), `tests/run_all.sh` (start/stop local server in memory mode). Nothing in
+`server/` beyond reading its README for the run command.
 
 ### T9 — Test isolation (found in T8 review)
 Every `-s tests/*.gd` run uses the app's real `user://` (macOS: ~/Library/Application
