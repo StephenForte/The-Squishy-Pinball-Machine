@@ -24,7 +24,7 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T8.0 | Commit design catalogs (assets/design) | 4 | merged 2026-09-04 (PR #14) | — | — |
 | T8 | Squishy art + theme pass (data-driven, D-020) | 4 | merged 2026-09-04 (PR #15); Steve: art OK for now | strong | T8.0 |
 | T10 | Hit-surface fix: 5 round targets under sprites + flipper +10% (D-022/D-023) | 4 fix | merged 2026-09-05 (PR #16) | mid-strong | T8 |
-| T9 | Test isolation: tests must not touch the real user:// dir (D-025) | hygiene | dispatched 2026-09-06 | cheap | — |
+| T9 | Test isolation: tests must not touch the real user:// dir (D-025) | hygiene | approved 2026-09-06; PR #17 ready to merge | cheap | — |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8.
 T5 and T6 are the only truly parallel pair; ownership below is drawn to keep them apart.
@@ -32,6 +32,11 @@ T5 and T6 are the only truly parallel pair; ownership below is drawn to keep the
 ## Running the game after a pull
 
     godot --headless --import && godot --path .
+
+Running the tests (never invoke `godot -s tests/...` directly — it hits your real saves):
+
+    ./tests/run_all.sh            # everything, isolated user dir (D-025)
+    ./tests/run_all.sh game_flow  # one suite
 
 The import step is required whenever a merge adds assets (WAVs, images); `.import`
 metadata is gitignored (D-008) and `godot --path .` does not import on its own. Skipping
@@ -267,3 +272,8 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   GAME_OVER 9182 frames / 20 200 pts / 0 OOB; 25 target-circle drops → 20 drain, 5 exact-apex
   zero-velocity drops balance (1 px or 3 px/s lateral → drain; measure-zero, D-024). HIT vy
   −1382.6 → −1557.8. Approved.
+- 2026-09-06: T9 (PR #17) reviewed in scratch clone. Scope ✓. Worker flagged game_flow.gd
+  skipped by the `*_test.gd` glob (D-025 wording — planner error); planner added it on the
+  branch. Runner 12/12 PASS; real highscore/settings byte-identical before/after; override.cfg
+  removed after run; bare isolation_test exit 1; SIGINT-to-bash-only delays cleanup until the
+  Godot child exits (terminal Ctrl-C is immediate). Approved.
