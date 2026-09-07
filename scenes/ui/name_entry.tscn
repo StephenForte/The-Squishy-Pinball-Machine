@@ -1,0 +1,43 @@
+[gd_scene load_steps=2 format=3 uid="uid://d8nameentry3scene"]
+
+[ext_resource type="Script" path="res://scripts/ui/name_entry.gd" id="1_name"]
+
+[node name="NameEntry" type="Control"]
+layout_mode = 3
+anchors_preset = 0
+offset_left = 80.0
+offset_top = 600.0
+offset_right = 640.0
+offset_bottom = 760.0
+mouse_filter = 0
+script = ExtResource("1_name")
+
+[node name="PromptLabel" type="Label" parent="."]
+layout_mode = 0
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 560.0
+offset_bottom = 40.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 0.92, 0.35, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 6
+theme_override_font_sizes/font_size = 26
+text = "WHAT SHOULD WE CALL YOU?"
+horizontal_alignment = 1
+
+[node name="NameEdit" type="LineEdit" parent="."]
+layout_mode = 0
+offset_left = 40.0
+offset_top = 52.0
+offset_right = 520.0
+offset_bottom = 124.0
+theme_override_colors/font_color = Color(1, 1, 0.88, 1)
+theme_override_colors/font_placeholder_color = Color(1, 1, 0.88, 0.45)
+theme_override_font_sizes/font_size = 32
+alignment = 1
+max_length = 16
+placeholder_text = "Name (Enter to confirm)"
+caret_blink = true
+context_menu_enabled = false
+select_all_on_focus = true
