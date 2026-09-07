@@ -1,0 +1,12 @@
+{
+  "name": "squish-leaderboard",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "start": "node --no-warnings=ExperimentalWarning src/index.js",
+    "test": "node --test test/*.test.js"
+  }
+}
