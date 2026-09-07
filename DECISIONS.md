@@ -252,13 +252,20 @@ defers cleanup until the current Godot child exits). `override.cfg` is gitignore
 `OS.get_user_data_dir()` = ~/Library/Application Support/SquishyPinballTest and the real
 save is untouched. All briefs from now on cite `tests/run_all.sh` as the gate.
 
-## D-026 — Leaderboard API contract (2026-09-07)
-Server: `server/` — Node 24, `node:http` + `pg`, no framework; `npm start` runs
-`src/index.js`; `npm test` runs `node --test`. Env: `PORT` (default 8787), `STORE`
-(`postgres` | `memory`), `DATABASE_URL` (postgres), `SQUISH_KEY` (shared write key). Schema is
-created on boot (`CREATE TABLE IF NOT EXISTS scores(id bigserial, player_id uuid, name text,
-score int, client text, created_at timestamptz default now())`, index on `(player_id, score desc)`).
+## D-026 — Leaderboard API contract (2026-09-07; storage superseded in place 2026-09-07)
+Server: `server/` — Node 24, `node:http` + built-in `node:sqlite` (`DatabaseSync`), **zero npm
+dependencies**, no framework; `npm start` runs `node --no-warnings=ExperimentalWarning
+src/index.js`; `npm test` runs `node --test`. Env: `PORT` (default 8787), `DB_PATH`
+(SQLite file; `:memory:` for tests/dev; production `/var/data/squish.db` on the Render disk),
+`SQUISH_KEY` (shared write key). Schema is created on boot (`CREATE TABLE IF NOT EXISTS
+scores(id integer primary key, player_id text not null, name text not null, score integer not
+null, client text, created_at text not null)`, index on `(player_id, score desc)`; WAL mode).
 JSON everywhere; CORS not needed (Godot client).
+Superseded: Postgres (`pg`, `DATABASE_URL`, `STORE=postgres|memory`) replaced by SQLite on
+Steve's call — right-sized, same money, identical engine in dev and prod. Verified 2026-09-07:
+`node:sqlite` works unflagged on Node v24.4.1 (prints an ExperimentalWarning, hence the flag).
+Rule to get right: the board shows each player's **best score** but their **latest name** —
+these come from different rows.
 - `GET /healthz` → 200 `{"ok":true,"store":"postgres|memory"}`
 - `POST /v1/scores` header `X-Squish-Key: <SQUISH_KEY>`; body `{"player_id":"<uuid v4>",
   "name":"<1–16 chars>","score":<int 0..9999999>,"client":"squish/<version>"}` →
@@ -286,5 +293,5 @@ Space launches**; otherwise the title shows `Playing as <name> · N to change`. 
 focus, flipper/launch/restart/theme-arrow input must not act.
 
 ## D-028 — (reserved) Leaderboard deploy record
-Filled at T11.1: Render workspace, service id + URL, Postgres id/plan, region, env var names,
+Filled at T11.1: Render workspace, service id + URL, instance plan, disk size/mount, region, env var names,
 smoke-test output, monthly cost as shown by Render at creation.
