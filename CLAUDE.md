@@ -26,6 +26,15 @@ other worker noticed. Stashing or resetting someone else's work is silent data l
 Run tests only via `./tests/run_all.sh` (D-025). Direct `godot -s tests/…` runs write to the
 real save directory and wipe the player's high score.
 
+## Code conventions that tests depend on
+
+- Reference autoloads as `get_node("/root/Game")` / `get_node_or_null("/root/Theme")`, **not**
+  the bare global (`Game.`, `Theme.`). Headless `-s` tests that `preload()` a scene compile
+  its scripts before autoload globals exist; the bare global then fails to compile.
+- Tests load scenes at runtime (`load(...)`), never `preload(...)`, for the same reason.
+- A test script that hits a runtime error mid-coroutine never reaches `quit()` and hangs the
+  runner; keep `_run()` defensive and print progress lines.
+
 ## Scope
 
 Edit only the files your brief lists. If the task seems to need another file, stop and
