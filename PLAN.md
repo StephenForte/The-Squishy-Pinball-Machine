@@ -25,8 +25,8 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T8 | Squishy art + theme pass (data-driven, D-020) | 4 | merged 2026-09-04 (PR #15); Steve: art OK for now | strong | T8.0 |
 | T10 | Hit-surface fix: 5 round targets under sprites + flipper +10% (D-022/D-023) | 4 fix | merged 2026-09-05 (PR #16) | mid-strong | T8 |
 | T9 | Test isolation: tests must not touch the real user:// dir (D-025) | hygiene | merged 2026-09-06 (PR #17) | cheap | — |
-| T11 | Leaderboard server (`server/`, Node 24 + Postgres, D-026) | 5 | dispatched 2026-09-07 | mid | — |
-| T11.1 | Deploy to Render (Supa Workspace): Postgres + web service; record D-028 | 5 | planner + Steve, after T11 merges | — | T11 |
+| T11 | Leaderboard server (`server/`, Node 24 + SQLite via node:sqlite, D-026) | 5 | dispatched 2026-09-07 (re-issued: SQLite) | mid | — |
+| T11.1 | Deploy to Render (Supa Workspace): Starter web service + 1 GB disk; record D-028 | 5 | planner + Steve, after T11 merges | — | T11 |
 | T12 | Player profile: name entry + device id (D-027) | 5 | dispatched 2026-09-07 (parallel with T11, separate checkout) | cheap-mid | — |
 | T13 | Client leaderboard: post on game over, show on title + game over (D-026/D-027) | 5 | not started (after T11 + T12 merge) | mid-strong | T11, T12 |
 
@@ -145,14 +145,15 @@ circle centred on its sprite. Plus D-022 flipper +10 %. Owns: `scenes/table.tscn
 only if a threshold must move. D-013 drain invariant and the BASE/TIP tests are the guards.
 
 ## Phase 5 — Shared leaderboard (decisions 2026-09-07)
-Hosting: Render, Supa Workspace (`tea-d98533l7vvec738vva90`), web service + Postgres (Steve
-accepted ~$6–7/mo for Postgres; exact plans confirmed at T11.1). Identity: name entered in-game,
+Hosting: Render, Supa Workspace (`tea-d98533l7vvec738vva90`), one web service with a persistent
+disk holding a SQLite file (Steve chose SQLite over Postgres 2026-09-07; ~$7/mo Starter instance +
+~$0.25/mo disk, prices to be confirmed at T11.1). Identity: name entered in-game,
 saved locally, plus a random per-device id; no login (spoofable, accepted for family/friends).
 Display: top 10 + own rank on the game-over panel, top 5 on the title. Server lives in `server/`
 in this repo. Contracts: D-026 (API), D-027 (Profile), D-028 (deploy record, filled at T11.1).
 
 ### T11 — Leaderboard server
-Owns: everything under `server/` (Node 24, `node:http` + `pg`, `node --test`), plus
+Owns: everything under `server/` (Node 24, `node:http` + `node:sqlite`, zero deps, `node --test`), plus
 `.github/workflows/security-scans.yml` untouched (it already scans the repo). Nothing outside
 `server/` except `.gitignore` (additive: `server/node_modules`, `server/.env`).
 
