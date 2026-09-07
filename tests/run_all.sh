@@ -87,6 +87,7 @@ TESTS=(
 while IFS= read -r test; do
 	TESTS+=("$test")
 done < <(find tests -maxdepth 1 -name '*_test.gd' ! -name 'isolation_test.gd' | sort)
+TESTS+=(tests/game_flow.gd)
 TESTS+=(tests/soak_launch.gd)
 
 for script in "${TESTS[@]}"; do
