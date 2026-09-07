@@ -244,8 +244,10 @@ The Squishy Pinball Machine/) and deleting `highscore.save`; planner review prob
 Steve's real high score (20 200 on 2026-09-05 was a probe score). Fix: a committed
 `tests/run_all.sh` writes `override.cfg` at the project root with
 `[application] config/use_custom_user_dir=true` and
-`config/custom_user_dir_name="SquishyPinballTest"`, runs import + quit-after-300 + every
-`tests/*_test.gd` (+ soak), and removes `override.cfg` on exit via `trap` (also on failure /
-Ctrl-C). `override.cfg` is gitignored. Verified 2026-09-06: with the override,
+`config/custom_user_dir_name="SquishyPinballTest"`, runs import + quit-after-300 + every test
+script in `tests/` — `isolation_test` first, all `*_test.gd`, **`game_flow.gd`** and
+`soak_launch.gd` explicitly (corrected at T9 review: the glob alone skipped game_flow) — and
+removes `override.cfg` on exit via `trap` (also on failure / Ctrl-C; SIGINT to bash alone
+defers cleanup until the current Godot child exits). `override.cfg` is gitignored. Verified 2026-09-06: with the override,
 `OS.get_user_data_dir()` = ~/Library/Application Support/SquishyPinballTest and the real
 save is untouched. All briefs from now on cite `tests/run_all.sh` as the gate.
