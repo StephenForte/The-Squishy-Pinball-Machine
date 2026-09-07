@@ -54,25 +54,12 @@ func _apply_theme(_id: String = "") -> void:
 func _input(event: InputEvent) -> void:
 	if not visible or not is_visible_in_tree():
 		return
+	# Escape is not a name character. Do not mark A/D/R/Space/arrows handled
+	# here — `_input` runs before GUI, and the LineEdit needs those keys.
 	if event is InputEventKey and event.pressed and not event.echo:
 		var key := event as InputEventKey
 		if key.keycode == KEY_ESCAPE or key.physical_keycode == KEY_ESCAPE:
 			_cancel()
-			get_viewport().set_input_as_handled()
-			return
-	if not is_capturing():
-		return
-	if (
-		event.is_action_pressed("launch_ball")
-		or event.is_action_pressed("restart")
-		or event.is_action_pressed("flipper_left")
-		or event.is_action_pressed("flipper_right")
-	):
-		get_viewport().set_input_as_handled()
-		return
-	if event is InputEventKey and event.pressed:
-		var key := event as InputEventKey
-		if key.physical_keycode == KEY_LEFT or key.physical_keycode == KEY_RIGHT:
 			get_viewport().set_input_as_handled()
 
 

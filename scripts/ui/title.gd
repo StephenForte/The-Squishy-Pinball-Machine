@@ -78,19 +78,16 @@ func _set_flippers_enabled(enabled: bool) -> void:
 func _input(event: InputEvent) -> void:
 	if _dismissed:
 		return
+	# Swallow only synthetic actions. Real keys must reach NameEdit as text
+	# (`_input` runs before GUI). Flippers are gated in `_process`.
+	if not (event is InputEventAction):
+		return
 	var capturing := _is_capturing_name()
-	if capturing or _needs_name():
-		if event.is_action_pressed("launch_ball"):
-			get_viewport().set_input_as_handled()
-			return
-	if capturing:
-		if event.is_action_pressed("restart"):
-			get_viewport().set_input_as_handled()
-			return
-		if event is InputEventKey and event.pressed:
-			var key := event as InputEventKey
-			if key.physical_keycode == KEY_LEFT or key.physical_keycode == KEY_RIGHT:
-				get_viewport().set_input_as_handled()
+	if (capturing or _needs_name()) and event.is_action_pressed("launch_ball"):
+		get_viewport().set_input_as_handled()
+		return
+	if capturing and event.is_action_pressed("restart"):
+		get_viewport().set_input_as_handled()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -99,6 +96,12 @@ func _unhandled_input(event: InputEvent) -> void:
 	if _is_capturing_name() or _needs_name():
 		if event.is_action_pressed("launch_ball"):
 			get_viewport().set_input_as_handled()
+		if _is_capturing_name() and event.is_action_pressed("restart"):
+			get_viewport().set_input_as_handled()
+		if _is_capturing_name() and event is InputEventKey and event.pressed:
+			var key := event as InputEventKey
+			if key.physical_keycode == KEY_LEFT or key.physical_keycode == KEY_RIGHT:
+				get_viewport().set_input_as_handled()
 		return
 	if event.is_action_pressed("change_name"):
 		_name_entry.open()

@@ -137,6 +137,22 @@ func _case_3_focus_gates(main: Node) -> bool:
 	if String(_theme.palette_id) != palette_before:
 		return _fail("case 3: Right arrow changed palette while NameEntry focused")
 
+	var edit := entry.get_node_or_null("NameEdit") as LineEdit
+	if edit == null:
+		return _fail("case 3: missing NameEdit")
+	edit.text = ""
+	edit.caret_column = 0
+	edit.grab_focus()
+	await process_frame
+	_type_char(main, KEY_A, 97)
+	_type_char(main, KEY_SPACE, 32)
+	_type_char(main, KEY_R, 114)
+	_type_char(main, KEY_D, 100)
+	await process_frame
+	if edit.text != "a rd":
+		return _fail("case 3: LineEdit should accept A/Space/R/D, got '%s'" % edit.text)
+	edit.text = ""
+
 	_cases_passed += 1
 	print("PROFILE case 3 pass")
 	return true
@@ -268,6 +284,18 @@ func _wait_entry_focused(entry: Node) -> void:
 		if entry.has_method("grab_name_focus"):
 			entry.grab_name_focus()
 		await process_frame
+
+
+func _type_char(main: Node, keycode: Key, unicode: int) -> void:
+	var ev := InputEventKey.new()
+	ev.pressed = true
+	ev.echo = false
+	ev.keycode = keycode
+	ev.physical_keycode = keycode
+	ev.unicode = unicode
+	main.get_viewport().push_input(ev)
+	ev.pressed = false
+	main.get_viewport().push_input(ev)
 
 
 func _push_action(main: Node, action: StringName, pressed: bool = true) -> void:
