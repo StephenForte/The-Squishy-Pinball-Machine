@@ -300,9 +300,20 @@ while the entry captures; UUID via `Crypto.generate_random_bytes`; entry visible
 still blocks launch (verified). Convention: reference autoloads with `get_node("/root/Name")`,
 not the global identifier — the global is unavailable when a `-s` test preloads a scene.
 
-## D-028 — (reserved) Leaderboard deploy record
-Filled at T11.1: Render workspace, service id + URL, instance plan, disk size/mount, region, env var names,
-smoke-test output, monthly cost as shown by Render at creation.
+## D-028 — Leaderboard deploy record (T11.1, started 2026-09-08)
+- Render workspace **Supa Workspace** (`tea-d98533l7vvec738vva90`), region **Oregon** (Steve's choice).
+- Web service **squish-leaderboard**, id `srv-dag8rnrl550s73a9unm0`, plan **starter**, runtime node,
+  repo `StephenForte/The-Squishy-Pinball-Machine` branch `main`, auto-deploy on commit.
+  Build `cd server && npm ci` · start `cd server && npm start` (connector cannot set rootDir).
+  Dashboard: https://dashboard.render.com/web/srv-dag8rnrl550s73a9unm0
+- Public URL: **https://squish-leaderboard.onrender.com** → `Leaderboard.BASE_URL` for T13.
+- Env: `DB_PATH=/var/data/squish.db`, `SQUISH_KEY=a419f5979f6891504b3af89a20e13125` (repo is
+  public and the key ships in the client — obscurity only, per D-026).
+- Disk: **1 GB at `/var/data`**, added by Steve in the dashboard (connector cannot create disks).
+  Until it exists the service fails at boot with `DB_PATH directory does not exist: /var/data`.
+- Cost: not verified by the planner — read from the dashboard at creation (starter ≈ $7/mo and
+  disk ≈ $0.25/GB/mo from memory).
+- Smoke test + first-deploy result: pending (appended below when live).
 
 ## D-029 — Back to menu (Natasha QA, 2026-09-08)
 - New input action `menu` = Escape (D-004). `scripts/main.gd` handles it in any state except
