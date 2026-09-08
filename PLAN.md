@@ -29,7 +29,7 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T11.1 | Deploy to Render (Supa Workspace): Starter web service + 1 GB disk; record D-028 | 5 | planner + Steve, after T11 merges | — | T11 |
 | T12 | Player profile: name entry + device id (D-027) | 5 | merged 2026-09-07 (PR #19) | cheap-mid | — |
 | T14 | QA round (Natasha): Back-to-menu + squishy texture self-heal (D-029) | 5 | merged 2026-09-08 (PR #20) | mid | T12 |
-| T15 | Squishies never set up on real boot (D-030) + real-boot regression check | 4 fix | dispatched 2026-09-08 | cheap-mid | T14 |
+| T15 | Squishies never set up on real boot (D-030) + real-boot regression check | 4 fix | approved 2026-09-08; PR #21 (2916354) ready to merge | cheap-mid | T14 |
 | T13 | Client leaderboard: post on game over, show on title + game over (D-026/D-027) | 5 | not started (after T14 + T11.1) | mid-strong | T11, T12 |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8 → T10 → T9 →
@@ -353,3 +353,7 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   shows catalog_id='' on all 8. Theme relies on node_added(Table) → never fires at boot.
   One-line fix proven (plain launch 8/8 textures; suite green). Dispatched as T15 with a
   real-boot regression step in the runner. Planner miss at T8 review recorded.
+- 2026-09-08: T15 (PR #21, 2916354) reviewed in scratch clone. Scope ✓ (3 files). Suite PASS
+  incl. new boot-check. Falsified: removing the one-line fix → BOOT FAIL, exit 1; override.cfg
+  cleaned up after failure. Windowed plain launch on the branch → 8/8 textures. Bugbot timer
+  race fixed with a frame wait. Approved. Natasha's invisible-squishies item closes on merge.
