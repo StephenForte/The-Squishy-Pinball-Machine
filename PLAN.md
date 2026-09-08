@@ -28,7 +28,8 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T11 | Leaderboard server (`server/`, Node 24 + SQLite via node:sqlite, D-026) | 5 | merged 2026-09-08 (PR #18) | mid | — |
 | T11.1 | Deploy to Render (Supa Workspace): Starter web service + 1 GB disk; record D-028 | 5 | planner + Steve, after T11 merges | — | T11 |
 | T12 | Player profile: name entry + device id (D-027) | 5 | merged 2026-09-07 (PR #19) | cheap-mid | — |
-| T14 | QA round (Natasha): Back-to-menu + squishy texture self-heal (D-029) | 5 | approved 2026-09-08; PR #20 (d1402c8) ready to merge | mid | T12 |
+| T14 | QA round (Natasha): Back-to-menu + squishy texture self-heal (D-029) | 5 | merged 2026-09-08 (PR #20) | mid | T12 |
+| T15 | Squishies never set up on real boot (D-030) + real-boot regression check | 4 fix | dispatched 2026-09-08 | cheap-mid | T14 |
 | T13 | Client leaderboard: post on game over, show on title + game over (D-026/D-027) | 5 | not started (after T14 + T11.1) | mid-strong | T11, T12 |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8 → T10 → T9 →
@@ -51,13 +52,7 @@ Opening the project in the editor imports implicitly.
 
 ## Blockers / open items
 
-- **Invisible squishies on first load (Natasha; Steve: "happens all the time").** Not reproduced
-  in 5 planner attempts (headless + windowed screenshots, fresh and Steve's exact saves, manual
-  instance and real `change_scene_to_file`, palettes neon/grape/sherbet): all 8 sprites have
-  textures and render. Remaining variable: Steve's launch environment (editor Play vs
-  `godot --path .`; project lives in Dropbox → possible reimport on every editor open). T14's
-  1 s texture retry masks the symptom either way. Next: Steve runs the planner's diagnostic
-  script from his own checkout and reports the PNG + printed squishy state.
+- None open. (Invisible-squishies root-caused 2026-09-08 → T15.)
 
 ## Task details
 
@@ -182,6 +177,16 @@ Owns: `autoload/profile.gd` (autoload `Profile`), `scenes/ui/name_entry.tscn` +
 Owns: `scripts/main.gd`, `scripts/ui/title.gd` + `title.tscn`, `scripts/ui/game_over.gd` +
 `game_over.tscn`, `scripts/squishy.gd`, `project.godot` (one action), `tests/title_test.gd`
 (case 3 changes: title *does* return via Menu), `tests/menu_test.gd`, `tests/theme_test.gd` (+retry case).
+
+### T15 — Squishies invisible on real boot (Natasha's bug, root-caused 2026-09-08)
+Reproduced only with the literal `godot --path .` launch and an observer autoload injected via
+`override.cfg`: all 8 squishies have `catalog_id=''`, no texture; table colours fine; score works.
+`Theme._apply_slots()` runs only from `node_added(Table)`, which never fires because the main
+scene is already in the tree when `Theme._ready()` connects. Every test/probe adds the scene
+later, so all harnesses (and the T8 review) missed it. Fix proven in scratch: add
+`call_deferred("_apply_slots_in_tree")` to `Theme._ready()`; plain launch → 8/8 textures;
+suite green. Owns: `autoload/theme.gd` (that line), `tests/boot_check.gd` (new autoload-style
+check), `tests/run_all.sh` (a real-boot step), `.gitignore` if needed.
 
 ### T13 — Client leaderboard integration
 Owns: `autoload/leaderboard.gd` (autoload `Leaderboard`), `tests/leaderboard_test.gd`;
@@ -343,3 +348,8 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   files; project.godot = menu action). 14/14 PASS. Probe with real keys 13/13: Esc mid-game →
   menu (READY/0/3/1 ball), rename from menu, Space relaunch, Esc-while-typing cancels only, R
   keeps title hidden, MenuButton, hint text, squishy bad-id → retry restores in 1 s. Approved.
+- 2026-09-08: Invisible squishies ROOT-CAUSED. 5 harness attempts passed because they add the
+  scene after autoloads; the real `godot --path .` boot (observer autoload via override.cfg)
+  shows catalog_id='' on all 8. Theme relies on node_added(Table) → never fires at boot.
+  One-line fix proven (plain launch 8/8 textures; suite green). Dispatched as T15 with a
+  real-boot regression step in the runner. Planner miss at T8 review recorded.
