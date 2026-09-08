@@ -15,12 +15,18 @@ var _dancing := false
 var _dance_gen: int = 0
 var _hit_tween: Tween
 var _dance_tween: Tween
+var _warned_missing := false
+var _retry_accum := 0.0
 
 @onready var _sprite: Sprite2D = $Sprite
 
 
 func _ready() -> void:
 	add_to_group("squishies")
+	var theme_node := get_node_or_null("/root/Theme")
+	if theme_node != null and theme_node.has_signal("palette_changed"):
+		if not theme_node.palette_changed.is_connected(_on_palette_changed):
+			theme_node.palette_changed.connect(_on_palette_changed)
 	if not catalog_id.is_empty():
 		setup(catalog_id)
 	var parent := get_parent()
@@ -28,10 +34,26 @@ func _ready() -> void:
 		parent.hit.connect(play_hit)
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	global_rotation = 0.0
 	_place_art()
 	_apply_lit()
+	if catalog_id.is_empty():
+		return
+	if _sprite != null and _sprite.texture != null:
+		return
+	_retry_accum += delta
+	if _retry_accum >= 1.0:
+		_retry_accum = 0.0
+		setup(catalog_id)
+
+
+func _on_palette_changed(_id: String = "") -> void:
+	if catalog_id.is_empty():
+		return
+	if _sprite != null and _sprite.texture != null:
+		return
+	setup(catalog_id)
 
 
 func setup(id: String) -> void:
@@ -42,10 +64,25 @@ func setup(id: String) -> void:
 		return
 	var path := SquishyCatalog.sprite_path(id)
 	if path.is_empty() or not ResourceLoader.exists(path):
+		_sprite.texture = null
+		_warn_missing_once(id, path)
 		return
-	_sprite.texture = load(path)
+	var tex := load(path) as Texture2D
+	if tex == null:
+		_sprite.texture = null
+		_warn_missing_once(id, path)
+		return
+	_sprite.texture = tex
 	_sprite.centered = true
+	_retry_accum = 0.0
 	_apply_fit()
+
+
+func _warn_missing_once(id: String, path: String) -> void:
+	if _warned_missing:
+		return
+	_warned_missing = true
+	push_warning("Squishy '%s': texture not ready at %s; will retry" % [id, path])
 
 
 func play_hit() -> void:

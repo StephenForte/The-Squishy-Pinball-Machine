@@ -12,9 +12,12 @@ func _initialize() -> void:
 func _run() -> void:
 	_delete_save()
 	var game := root.get_node_or_null("Game")
+	var profile := root.get_node_or_null("Profile")
 	if game == null:
 		_fail("could not acquire Game autoload")
 		return
+	if profile != null and String(profile.player_name).is_empty():
+		profile.call("set_name", "Dad")
 	game.high_score = 0
 	game.restart()
 	await process_frame
@@ -34,7 +37,7 @@ func _run() -> void:
 		return
 	if not await _case_2_launch(main):
 		return
-	if not await _case_3_restart_title_stays_hidden(main, game):
+	if not await _case_3_menu_returns_r_stays_hidden(main, game):
 		return
 
 	change_scene_to_file("res://scenes/main.tscn")
@@ -96,7 +99,9 @@ func _case_2_launch(main: Node) -> bool:
 	return true
 
 
-func _case_3_restart_title_stays_hidden(main: Node, game: Node) -> bool:
+func _case_3_menu_returns_r_stays_hidden(main: Node, game: Node) -> bool:
+	# D-029 spec change: title used to never return. It now returns via Menu,
+	# and still stays hidden on plain R (unchanged restart behaviour).
 	var title := _require_node(main, "Title")
 	if title == null:
 		return false
@@ -108,7 +113,17 @@ func _case_3_restart_title_stays_hidden(main: Node, game: Node) -> bool:
 	await process_frame
 	await process_frame
 	if title.visible:
-		return _fail("case 3: Title should stay hidden after restart")
+		return _fail("case 3: Title should stay hidden after restart (R)")
+	var ev := InputEventAction.new()
+	ev.action = "menu"
+	ev.pressed = true
+	main.get_viewport().push_input(ev)
+	await process_frame
+	await process_frame
+	ev.pressed = false
+	main.get_viewport().push_input(ev)
+	if not title.visible:
+		return _fail("case 3: Title should return after menu")
 	_cases_passed += 1
 	print("TITLE case 3 pass")
 	return true

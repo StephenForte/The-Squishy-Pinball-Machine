@@ -44,7 +44,8 @@ theme_override_font_sizes/font_size = 30
 text = "A / ←   Left flipper
 D / →   Right flipper
 Space   Launch
-R       Restart"
+R       Restart
+Esc     Menu"
 horizontal_alignment = 1
 vertical_alignment = 1
 

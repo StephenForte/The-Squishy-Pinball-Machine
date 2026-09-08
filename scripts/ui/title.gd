@@ -40,6 +40,20 @@ func _on_name_changed(new_name: String) -> void:
 	_refresh_name_ui(new_name)
 
 
+func show_menu() -> void:
+	_dismissed = false
+	visible = true
+	var profile := get_node_or_null("/root/Profile")
+	if profile != null:
+		_refresh_name_ui(String(profile.player_name))
+	else:
+		_refresh_name_ui("")
+
+
+func is_capturing_name() -> bool:
+	return _is_capturing_name()
+
+
 func _refresh_name_ui(player_name: String) -> void:
 	var named := not player_name.is_empty()
 	_player_name_label.text = "Playing as %s · N to change" % player_name if named else ""
@@ -88,6 +102,8 @@ func _input(event: InputEvent) -> void:
 		return
 	if capturing and event.is_action_pressed("restart"):
 		get_viewport().set_input_as_handled()
+	if capturing and event.is_action_pressed("menu"):
+		get_viewport().set_input_as_handled()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -97,6 +113,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		if event.is_action_pressed("launch_ball"):
 			get_viewport().set_input_as_handled()
 		if _is_capturing_name() and event.is_action_pressed("restart"):
+			get_viewport().set_input_as_handled()
+		if _is_capturing_name() and event.is_action_pressed("menu"):
 			get_viewport().set_input_as_handled()
 		if _is_capturing_name() and event is InputEventKey and event.pressed:
 			var key := event as InputEventKey
