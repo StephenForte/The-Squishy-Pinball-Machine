@@ -25,9 +25,9 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T8 | Squishy art + theme pass (data-driven, D-020) | 4 | merged 2026-09-04 (PR #15); Steve: art OK for now | strong | T8.0 |
 | T10 | Hit-surface fix: 5 round targets under sprites + flipper +10% (D-022/D-023) | 4 fix | merged 2026-09-05 (PR #16) | mid-strong | T8 |
 | T9 | Test isolation: tests must not touch the real user:// dir (D-025) | hygiene | merged 2026-09-06 (PR #17) | cheap | — |
-| T11 | Leaderboard server (`server/`, Node 24 + SQLite via node:sqlite, D-026) | 5 | dispatched 2026-09-07 (re-issued: SQLite) | mid | — |
+| T11 | Leaderboard server (`server/`, Node 24 + SQLite via node:sqlite, D-026) | 5 | approved 2026-09-08; PR #18 (45911b9) ready to merge | mid | — |
 | T11.1 | Deploy to Render (Supa Workspace): Starter web service + 1 GB disk; record D-028 | 5 | planner + Steve, after T11 merges | — | T11 |
-| T12 | Player profile: name entry + device id (D-027) | 5 | approved 2026-09-07; PR #19 (2e0147c) ready to merge | cheap-mid | — |
+| T12 | Player profile: name entry + device id (D-027) | 5 | merged 2026-09-07 (PR #19) | cheap-mid | — |
 | T13 | Client leaderboard: post on game over, show on title + game over (D-026/D-027) | 5 | not started (after T11 + T12 merge) | mid-strong | T11, T12 |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8 → T10 → T9 →
@@ -314,3 +314,8 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   unfocused entry blocks Space; sanitising, persistence, N/Escape, no re-prompt after restart.
   Harness note: name_entry.gd uses the `Profile` global → scripts preloading main.tscn in -s
   tests fail to compile; tests must load() at runtime (CLAUDE.md convention added). Approved.
+- 2026-09-08: T11 (PR #18, 45911b9) reviewed in scratch clone + merge with main. Scope ✓, 0 deps,
+  npm test 24/24 memory and file DB, clear boot error on missing DB dir. Live probes via Node:
+  latest-name/best-score rule, stable ties, limit clamp, /me, 401/400 matrix incl. 5 KB + bad JSON,
+  17→16 chars, 30/min limiter (12×429 in 40), 404s. Approved. T11.1 deploy deferred by Steve
+  pending QA fixes.
