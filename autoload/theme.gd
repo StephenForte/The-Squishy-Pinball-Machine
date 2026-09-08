@@ -22,6 +22,7 @@ func _ready() -> void:
 	if not get_tree().node_added.is_connected(_on_node_added):
 		get_tree().node_added.connect(_on_node_added)
 	call_deferred("_apply_table_in_tree")
+	call_deferred("_apply_slots_in_tree")
 
 
 func color(role: String) -> Color:
