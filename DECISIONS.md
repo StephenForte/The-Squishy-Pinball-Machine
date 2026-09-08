@@ -313,7 +313,20 @@ not the global identifier — the global is unavailable when a `-s` test preload
   Until it exists the service fails at boot with `DB_PATH directory does not exist: /var/data`.
 - Cost: not verified by the planner — read from the dashboard at creation (starter ≈ $7/mo and
   disk ≈ $0.25/GB/mo from memory).
-- Smoke test + first-deploy result: pending (appended below when live).
+- Node: Render defaulted to 26.8.1 (`.node-version` is under `server/`, not read at rootDir "");
+  pinned with env `NODE_VERSION=24` → build log "Using Node.js version 24.20.0".
+- First deploy (dep-dag8ro3l550s73a9upag) failed at boot with the D-026 guard message until the
+  disk existed — the guard works in production. Disk added by Steve 2026-09-08; live at 15:40 PT.
+- Smoke test 2026-09-08 (live): `/healthz` → `{"ok":true,"store":"sqlite"}`; POST without/with
+  wrong key → 401; invalid body → 400; POST `Smoke Test` 1 pt → 201 rank 1 in 76 ms; `/me` → 200;
+  board lists it. Redeploy triggered via connector: ~30 s of 502 (single instance with a disk,
+  no zero-downtime), then 200 and the entry **survived** — persistence proven.
+- Known: one permanent `Smoke Test` / 1-point entry (player_id deadbeef-0000-4000-8000-000000000001)
+  exists on the real board; there is no delete endpoint (D-026 scope). Remove via SSH/sqlite if it
+  ever bothers anyone.
+- Ops notes: deploys cause ~30 s downtime; the client (T13) must treat 5xx/timeouts as
+  "offline" and retry later. Auto-deploy fires on every push to `main` that touches anything —
+  including docs commits.
 
 ## D-029 — Back to menu (Natasha QA, 2026-09-08)
 - New input action `menu` = Escape (D-004). `scripts/main.gd` handles it in any state except
