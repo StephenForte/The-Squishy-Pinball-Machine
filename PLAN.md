@@ -26,11 +26,11 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T10 | Hit-surface fix: 5 round targets under sprites + flipper +10% (D-022/D-023) | 4 fix | merged 2026-09-05 (PR #16) | mid-strong | T8 |
 | T9 | Test isolation: tests must not touch the real user:// dir (D-025) | hygiene | merged 2026-09-06 (PR #17) | cheap | — |
 | T11 | Leaderboard server (`server/`, Node 24 + SQLite via node:sqlite, D-026) | 5 | merged 2026-09-08 (PR #18) | mid | — |
-| T11.1 | Deploy to Render (Supa Workspace): Starter web service + 1 GB disk; record D-028 | 5 | in progress 2026-09-08: service created, disk pending (Steve, dashboard) | — | T11 |
+| T11.1 | Deploy to Render (Supa Workspace): Starter web service + 1 GB disk; record D-028 | 5 | done 2026-09-08 — live at https://squish-leaderboard.onrender.com | — | T11 |
 | T12 | Player profile: name entry + device id (D-027) | 5 | merged 2026-09-07 (PR #19) | cheap-mid | — |
 | T14 | QA round (Natasha): Back-to-menu + squishy texture self-heal (D-029) | 5 | merged 2026-09-08 (PR #20) | mid | T12 |
 | T15 | Squishies never set up on real boot (D-030) + real-boot regression check | 4 fix | merged 2026-09-08 (PR #21) | cheap-mid | T14 |
-| T13 | Client leaderboard: post on game over, show on title + game over (D-026/D-027) | 5 | not started (after T14 + T11.1) | mid-strong | T11, T12 |
+| T13 | Client leaderboard: post on game over, show on title + game over (D-026/D-027/D-028) | 5 | dispatched 2026-09-08 | mid-strong | T11.1, T12, T14 |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8 → T10 → T9 →
 **Phase 5:** T11 ∥ T12 → T11.1 (deploy) → T13.
@@ -357,3 +357,10 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   incl. new boot-check. Falsified: removing the one-line fix → BOOT FAIL, exit 1; override.cfg
   cleaned up after failure. Windowed plain launch on the branch → 8/8 textures. Bugbot timer
   race fixed with a frame wait. Approved. Natasha's invisible-squishies item closes on merge.
+- 2026-09-08: T11.1 deploy. Service created via Render connector (starter, Oregon); first deploy
+  failed at boot with the server's own `DB_PATH directory does not exist` guard (expected, no
+  disk yet); Steve added 1 GB disk at /var/data; NODE_VERSION=24 env set after logs showed
+  Render defaulted to Node 26. Live smoke: healthz store=sqlite; 401 no/wrong key; 400 bad
+  body; POST 201 rank 1 (76 ms); /me 200; board lists it. Triggered a redeploy: ~30 s 502
+  (disk services have no zero-downtime), then 200, board still holds the entry (persistence
+  proven). Build log: "Using Node.js version 24.20.0 via NODE_VERSION". D-028 complete.
