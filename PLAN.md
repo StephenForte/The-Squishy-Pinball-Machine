@@ -26,10 +26,10 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T10 | Hit-surface fix: 5 round targets under sprites + flipper +10% (D-022/D-023) | 4 fix | merged 2026-09-05 (PR #16) | mid-strong | T8 |
 | T9 | Test isolation: tests must not touch the real user:// dir (D-025) | hygiene | merged 2026-09-06 (PR #17) | cheap | — |
 | T11 | Leaderboard server (`server/`, Node 24 + SQLite via node:sqlite, D-026) | 5 | merged 2026-09-08 (PR #18) | mid | — |
-| T11.1 | Deploy to Render (Supa Workspace): Starter web service + 1 GB disk; record D-028 | 5 | planner + Steve, after T11 merges | — | T11 |
+| T11.1 | Deploy to Render (Supa Workspace): Starter web service + 1 GB disk; record D-028 | 5 | in progress 2026-09-08: service created, disk pending (Steve, dashboard) | — | T11 |
 | T12 | Player profile: name entry + device id (D-027) | 5 | merged 2026-09-07 (PR #19) | cheap-mid | — |
 | T14 | QA round (Natasha): Back-to-menu + squishy texture self-heal (D-029) | 5 | merged 2026-09-08 (PR #20) | mid | T12 |
-| T15 | Squishies never set up on real boot (D-030) + real-boot regression check | 4 fix | approved 2026-09-08; PR #21 (2916354) ready to merge | cheap-mid | T14 |
+| T15 | Squishies never set up on real boot (D-030) + real-boot regression check | 4 fix | merged 2026-09-08 (PR #21) | cheap-mid | T14 |
 | T13 | Client leaderboard: post on game over, show on title + game over (D-026/D-027) | 5 | not started (after T14 + T11.1) | mid-strong | T11, T12 |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8 → T10 → T9 →
