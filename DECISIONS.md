@@ -255,7 +255,7 @@ save is untouched. All briefs from now on cite `tests/run_all.sh` as the gate.
 ## D-026 — Leaderboard API contract (2026-09-07; storage superseded in place 2026-09-07)
 Server: `server/` — Node 24, `node:http` + built-in `node:sqlite` (`DatabaseSync`), **zero npm
 dependencies**, no framework; `npm start` runs `node --no-warnings=ExperimentalWarning
-src/index.js`; `npm test` runs `node --test`. Env: `PORT` (default 8787), `DB_PATH`
+src/index.js`; `npm test` runs `node --test test/*.test.js` (the directory form fails on 24.4.1). Env: `PORT` (default 8787), `DB_PATH`
 (SQLite file; `:memory:` for tests/dev; production `/var/data/squish.db` on the Render disk),
 `SQUISH_KEY` (shared write key). Schema is created on boot (`CREATE TABLE IF NOT EXISTS
 scores(id integer primary key, player_id text not null, name text not null, score integer not
@@ -266,7 +266,7 @@ Steve's call — right-sized, same money, identical engine in dev and prod. Veri
 `node:sqlite` works unflagged on Node v24.4.1 (prints an ExperimentalWarning, hence the flag).
 Rule to get right: the board shows each player's **best score** but their **latest name** —
 these come from different rows.
-- `GET /healthz` → 200 `{"ok":true,"store":"postgres|memory"}`
+- `GET /healthz` → 200 `{"ok":true,"store":"memory|sqlite"}` (label from `DB_PATH`)
 - `POST /v1/scores` header `X-Squish-Key: <SQUISH_KEY>`; body `{"player_id":"<uuid v4>",
   "name":"<1–16 chars>","score":<int 0..9999999>,"client":"squish/<version>"}` →
   201 `{"rank":<int>,"best":<int>,"is_personal_best":<bool>,"total_players":<int>}`.
