@@ -35,6 +35,15 @@ real save directory and wipe the player's high score.
 - A test script that hits a runtime error mid-coroutine never reaches `quit()` and hangs the
   runner; keep `_run()` defensive and print progress lines.
 
+## Boot order (D-030)
+
+- Autoloads must not depend on `node_added` to find scene nodes: in a real `godot --path .`
+  boot the main scene is already in the tree when autoload `_ready()` runs. Apply to the
+  existing tree (deferred `find_child`) *and* listen for later additions.
+- Tests that instantiate `main.tscn` themselves do not exercise real boot order; the runner's
+  real-boot step does. If you touch autoload wiring, run `godot --path . --headless --quit-after 300`
+  and check the output, not just `-s` tests.
+
 ## Scope
 
 Edit only the files your brief lists. If the task seems to need another file, stop and
