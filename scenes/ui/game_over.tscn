@@ -74,13 +74,22 @@ horizontal_alignment = 1
 vertical_alignment = 1
 
 [node name="RestartButton" type="Button" parent="."]
-offset_left = 200.0
+offset_left = 80.0
 offset_top = 680.0
-offset_right = 520.0
+offset_right = 340.0
 offset_bottom = 770.0
 focus_mode = 0
 theme_override_font_sizes/font_size = 36
 text = "Restart"
+
+[node name="MenuButton" type="Button" parent="."]
+offset_left = 380.0
+offset_top = 680.0
+offset_right = 640.0
+offset_bottom = 770.0
+focus_mode = 0
+theme_override_font_sizes/font_size = 36
+text = "Menu"
 
 [node name="HintLabel" type="Label" parent="."]
 offset_left = 40.0
@@ -92,6 +101,6 @@ theme_override_colors/font_color = Color(0.92, 0.92, 0.92, 1)
 theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
 theme_override_constants/outline_size = 6
 theme_override_font_sizes/font_size = 28
-text = "Press R to restart"
+text = "R restart · Esc menu"
 horizontal_alignment = 1
 vertical_alignment = 1

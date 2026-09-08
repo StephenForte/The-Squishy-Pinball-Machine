@@ -6,6 +6,7 @@ var _game: Node
 @onready var _high_score_label: Label = $GameOverHighScoreLabel
 @onready var _new_high_score_label: Label = $NewHighScoreLabel
 @onready var _restart_button: Button = $RestartButton
+@onready var _menu_button: Button = $MenuButton
 
 
 func _ready() -> void:
@@ -14,6 +15,8 @@ func _ready() -> void:
 	_new_high_score_label.visible = false
 	_restart_button.focus_mode = Control.FOCUS_NONE
 	_restart_button.pressed.connect(_on_restart_pressed)
+	_menu_button.focus_mode = Control.FOCUS_NONE
+	_menu_button.pressed.connect(_on_menu_pressed)
 	_game.game_over.connect(_on_game_over)
 	_game.game_restarted.connect(_on_game_restarted)
 	var theme_node := get_node("/root/Theme")
@@ -36,6 +39,8 @@ func _apply_theme(_id: String = "") -> void:
 	$HintLabel.add_theme_color_override("font_color", primary)
 	_restart_button.add_theme_color_override("font_color", theme_node.color("text_on_color"))
 	_restart_button.add_theme_color_override("font_hover_color", theme_node.color("object_white"))
+	_menu_button.add_theme_color_override("font_color", theme_node.color("text_on_color"))
+	_menu_button.add_theme_color_override("font_hover_color", theme_node.color("object_white"))
 
 
 func _on_game_over(final_score: int, is_high_score: bool) -> void:
@@ -52,3 +57,9 @@ func _on_game_restarted() -> void:
 
 func _on_restart_pressed() -> void:
 	_game.restart()
+
+
+func _on_menu_pressed() -> void:
+	var main := get_parent()
+	if main != null and main.has_method("return_to_menu"):
+		main.return_to_menu()

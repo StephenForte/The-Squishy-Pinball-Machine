@@ -62,8 +62,10 @@ func _run() -> void:
 		return
 	if not await _case_8_alignment():
 		return
+	if not await _case_9_texture_retry():
+		return
 
-	print("THEME PASS cases=8")
+	print("THEME PASS cases=9")
 	quit(0)
 
 
@@ -279,6 +281,41 @@ func _case_8_alignment() -> bool:
 		return false
 	_cases_passed += 1
 	print("THEME case 8 pass alignment")
+	return true
+
+
+func _case_9_texture_retry() -> bool:
+	var table := current_scene.get_node_or_null("Table")
+	if table == null:
+		return _fail("case 9: missing Table")
+	var bumper := table.get_node_or_null("Bumper1")
+	if bumper == null:
+		return _fail("case 9: missing Bumper1")
+	var squishy := bumper.get_node_or_null("Squishy")
+	if squishy == null:
+		return _fail("case 9: Bumper1 has no Squishy")
+	var sprite := squishy.get_node_or_null("Sprite") as Sprite2D
+	if sprite == null:
+		return _fail("case 9: missing Sprite")
+	var catalog_id := String(squishy.get("catalog_id"))
+	var item: Dictionary = SquishyCatalog.entry(catalog_id)
+	if item.is_empty() or not item.has("assets"):
+		return _fail("case 9: catalog entry missing for %s" % catalog_id)
+	var assets: Dictionary = item["assets"]
+	var original_path := String(assets.get("sprite", ""))
+	assets["sprite"] = "res://assets/design/squishes/art/__missing_t14__.png"
+	squishy.call("setup", catalog_id)
+	if sprite.texture != null:
+		assets["sprite"] = original_path
+		return _fail("case 9: texture should be null after a missing sprite path")
+	assets["sprite"] = original_path
+	_theme.palette_changed.emit(String(_theme.palette_id))
+	await process_frame
+	await process_frame
+	if sprite.texture == null:
+		return _fail("case 9: texture should load after palette_changed once the path is fixed")
+	_cases_passed += 1
+	print("THEME case 9 pass")
 	return true
 
 

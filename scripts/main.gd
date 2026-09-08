@@ -17,6 +17,24 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("restart"):
 		_game.restart()
 		get_viewport().set_input_as_handled()
+		return
+	if event.is_action_pressed("menu"):
+		if _is_name_capturing():
+			return
+		return_to_menu()
+		get_viewport().set_input_as_handled()
+
+
+func return_to_menu() -> void:
+	_game.restart()
+	var title := get_node_or_null("Title")
+	if title != null and title.has_method("show_menu"):
+		title.show_menu()
+
+
+func _is_name_capturing() -> bool:
+	var title := get_node_or_null("Title")
+	return title != null and title.has_method("is_capturing_name") and title.is_capturing_name()
 
 
 func _on_ball_count_changed(balls_left: int) -> void:
