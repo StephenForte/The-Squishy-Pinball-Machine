@@ -1,8 +1,9 @@
 extends Node
 
 ## Real-boot regression autoload (D-030). Injected by tests/run_all.sh only —
-## not registered in project.godot. Waits ~1 s so the main scene can finish
-## ready, then asserts boot-time invariants and quits.
+## not registered in project.godot. Waits ≥60 process frames so deferred
+## Theme applies finish, then asserts boot-time invariants and quits.
+## Frame wait (not a 1 s timer) so `--quit-after 600` cannot win the race.
 
 const UUID_RE := "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
 
@@ -16,7 +17,14 @@ func _run() -> void:
 	if tree == null:
 		await _finish(false, "no tree")
 		return
-	await tree.create_timer(1.0).timeout
+	var frames := 0
+	while frames < 60:
+		await tree.process_frame
+		frames += 1
+		tree = get_tree()
+		if tree == null:
+			await _finish(false, "no tree during wait")
+			return
 	await _assert_boot()
 
 
