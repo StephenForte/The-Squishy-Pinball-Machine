@@ -1,7 +1,7 @@
 # Decisions — The Squishy Pinball Machine
 
 Numbered, append-only. Never renumber; supersede in place with date and reason.
-Workers cite these instead of re-deciding. Next free number: **D-030**.
+Workers cite these instead of re-deciding. Next free number: **D-031**.
 
 ## D-001 — Engine: Godot 4.x, GDScript (2026-09-02)
 Per PRD. Exact version to be pinned as D-006 once installed on the build machine.
@@ -320,3 +320,17 @@ smoke-test output, monthly cost as shown by Render at creation.
   while NameEntry captures (Escape then cancels the entry). `title_test` case 3 now asserts
   R-stays-hidden and Menu-returns. Copy: game-over hint "R restart · Esc menu", title lists
   "Esc Menu". `ResourceLoader.exists()` guards the retry so a missing import stays quiet.
+
+## D-030 — Boot-order rule: never rely on `node_added` for nodes present at boot (2026-09-08)
+Root cause of "squishies invisible until a theme cycle": `Theme._on_node_added` (connected in
+`_ready`) never sees `Table`, because in a real `godot --path .` boot the main scene is already
+in the tree when autoload `_ready` runs. `-s` test scripts and planner probes instantiate the
+scene *after* autoloads, so every harness passed. Rules from now on:
+- An autoload that must configure scene nodes applies to whatever is already in the tree at
+  `_ready` (deferred `find_child`) **and** listens for later additions. Both, always.
+- `tests/run_all.sh` includes one **real-boot** step: `godot --path . --headless --quit-after N`
+  (no `-s`) with a `BootCheck` autoload injected through the runner's `override.cfg`, asserting
+  the boot-time invariants (8 squishies with ids and textures, palette applied, Title visible,
+  Profile loaded). It must fail on the pre-T15 code.
+- Reviews of anything touching autoload/boot wiring include a plain-launch check.
+Fix: `call_deferred("_apply_slots_in_tree")` in `Theme._ready()` (T15).
