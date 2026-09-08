@@ -28,7 +28,8 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T11 | Leaderboard server (`server/`, Node 24 + SQLite via node:sqlite, D-026) | 5 | approved 2026-09-08; PR #18 (45911b9) ready to merge | mid | — |
 | T11.1 | Deploy to Render (Supa Workspace): Starter web service + 1 GB disk; record D-028 | 5 | planner + Steve, after T11 merges | — | T11 |
 | T12 | Player profile: name entry + device id (D-027) | 5 | merged 2026-09-07 (PR #19) | cheap-mid | — |
-| T13 | Client leaderboard: post on game over, show on title + game over (D-026/D-027) | 5 | not started (after T11 + T12 merge) | mid-strong | T11, T12 |
+| T14 | QA round (Natasha): Back-to-menu + squishy texture self-heal (D-029) | 5 | dispatched 2026-09-08 | mid | T12 |
+| T13 | Client leaderboard: post on game over, show on title + game over (D-026/D-027) | 5 | not started (after T14 + T11.1) | mid-strong | T11, T12 |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8 → T10 → T9 →
 **Phase 5:** T11 ∥ T12 → T11.1 (deploy) → T13.
@@ -162,6 +163,19 @@ Owns: `autoload/profile.gd` (autoload `Profile`), `scenes/ui/name_entry.tscn` +
 `scripts/ui/name_entry.gd`, `tests/profile_test.gd`; additive: `project.godot` (autoload line +
 `change_name` action N, D-004 superseded), `scenes/ui/title.tscn`/`scripts/ui/title.gd`
 (name line + entry), `.gitignore` none. Must not touch `server/`, game_over, HUD, gameplay.
+
+### T14 — QA round 1 (Natasha, 2026-09-08)
+1. No way back to the title: after a game (or mid-game) the player could not change the name
+   from "Dad" to "Natasha" — only Restart existed. Fix per D-029: a Menu action (Escape) and a
+   `MenuButton` on the game-over panel return to the title (title contract D-018 superseded).
+2. "Squishies invisible on first load, appear after cycling themes." Not reproducible on a clean
+   imported checkout (planner: windowed screenshots on fresh and saved profiles both show all 8).
+   Most likely launched before the PNG import finished after a pull. Fix: `Squishy.setup()`
+   retries a failed texture load on `palette_changed` and once per second until it succeeds,
+   so the symptom self-heals; PLAN "Running the game" already says import first.
+Owns: `scripts/main.gd`, `scripts/ui/title.gd` + `title.tscn`, `scripts/ui/game_over.gd` +
+`game_over.tscn`, `scripts/squishy.gd`, `project.godot` (one action), `tests/title_test.gd`
+(case 3 changes: title *does* return via Menu), `tests/menu_test.gd`, `tests/theme_test.gd` (+retry case).
 
 ### T13 — Client leaderboard integration
 Owns: `autoload/leaderboard.gd` (autoload `Leaderboard`), `tests/leaderboard_test.gd`;
