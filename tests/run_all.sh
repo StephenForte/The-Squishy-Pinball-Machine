@@ -15,11 +15,15 @@ trap cleanup EXIT INT TERM
 
 rm -rf "$TEST_USER_DIR"
 
-cat > override.cfg <<'EOF'
+write_isolation_override() {
+	cat > override.cfg <<'EOF'
 [application]
 config/use_custom_user_dir=true
 config/custom_user_dir_name="SquishyPinballTest"
 EOF
+}
+
+write_isolation_override
 
 run_step() {
 	local label="$1"
@@ -64,8 +68,43 @@ run_test_script() {
 	return 1
 }
 
+run_boot_check() {
+	# Godot reads override.cfg once at startup; append BootCheck only for this step.
+	cat >> override.cfg <<'EOF'
+
+[autoload]
+BootCheck="*res://tests/boot_check.gd"
+EOF
+
+	local output=""
+	local rc=0
+	set +e
+	output="$("$GODOT" --path . --headless --quit-after 600 2>&1)"
+	rc=$?
+	set -e
+
+	# Rewrite even if the boot step failed — set -e would otherwise skip this.
+	write_isolation_override
+
+	echo "$output"
+
+	if echo "$output" | grep -q 'BOOT PASS' && [ "$rc" -eq 0 ]; then
+		local pass_line
+		pass_line="$(echo "$output" | grep -m1 'BOOT PASS')"
+		echo "boot-check: PASS (${pass_line})"
+		return 0
+	fi
+	echo "boot-check: FAIL"
+	return 1
+}
+
 if [ -n "$SINGLE_TEST" ]; then
 	case "$SINGLE_TEST" in
+		boot_check|boot_check.gd)
+			run_boot_check
+			echo "SUMMARY: boot_check PASS"
+			exit 0
+			;;
 		*.gd) script="tests/${SINGLE_TEST}" ;;
 		*) script="tests/${SINGLE_TEST}.gd" ;;
 	esac
@@ -80,6 +119,11 @@ fi
 
 run_step "import" "$GODOT" --headless --import
 run_step "quit-after-300" "$GODOT" --headless --quit-after 300
+
+echo "=== boot-check ==="
+if ! run_boot_check; then
+	exit 1
+fi
 
 TESTS=(
 	tests/isolation_test.gd
