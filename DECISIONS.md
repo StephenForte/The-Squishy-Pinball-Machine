@@ -316,3 +316,7 @@ smoke-test output, monthly cost as shown by Render at creation.
 - Squishy self-heal: if `Squishy.setup()` cannot load its texture, it keeps `catalog_id`, retries
   on `Theme.palette_changed` and every 1.0 s in `_process` until a texture loads; no error spam
   (one `push_warning` per squishy).
+- As built (T14): `main.gd` `return_to_menu()` = `Game.restart()` + `Title.show_menu()`, skipped
+  while NameEntry captures (Escape then cancels the entry). `title_test` case 3 now asserts
+  R-stays-hidden and Menu-returns. Copy: game-over hint "R restart · Esc menu", title lists
+  "Esc Menu". `ResourceLoader.exists()` guards the retry so a missing import stays quiet.
