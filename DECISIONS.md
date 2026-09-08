@@ -1,7 +1,7 @@
 # Decisions — The Squishy Pinball Machine
 
 Numbered, append-only. Never renumber; supersede in place with date and reason.
-Workers cite these instead of re-deciding. Next free number: **D-029**.
+Workers cite these instead of re-deciding. Next free number: **D-030**.
 
 ## D-001 — Engine: Godot 4.x, GDScript (2026-09-02)
 Per PRD. Exact version to be pinned as D-006 once installed on the build machine.
@@ -21,6 +21,8 @@ Defined once in T1's `project.godot`; every later task uses these exact names, a
 - `flipper_right`: D, Right Arrow
 - `launch_ball`: Space
 - `restart`: R
+- `change_name`: N (added T12, 2026-09-07)
+- `menu`: Escape (added T14, 2026-09-08) — D-004 superseded in place twice; six actions now.
 
 ## D-005 — Game contract: autoload, signals, scoring, save file (2026-09-02)
 Autoload `Game` → `res://autoload/game.gd`.
@@ -167,7 +169,8 @@ unchanged and do not affect the streak. Natasha may retune numbers after play.
   the 2.0 s streak clock; `register_bumper_hit()` returns 0 in GAME_OVER. Natasha to judge
   shake/fireworks intensity; worker suspects the shake is too subtle.
 - Title (`scenes/ui/title.tscn`, root `Title` CanvasLayer): visible at app start; hidden on
-  the first `launch_ball` press; never shown again until the app restarts.
+  the first `launch_ball` press. **Superseded by D-029 (2026-09-08):** the title returns via
+  the Menu action / MenuButton; while the title is showing, Space starts a fresh game.
 
 ## D-019 — Play-test tuning round 1 (Natasha/Steve, 2026-09-03)
 Streak feels right (keep D-017). Shake too subtle: `SHAKE_AMPLITUDE` 4 → 9 px,
@@ -300,3 +303,16 @@ not the global identifier — the global is unavailable when a `-s` test preload
 ## D-028 — (reserved) Leaderboard deploy record
 Filled at T11.1: Render workspace, service id + URL, instance plan, disk size/mount, region, env var names,
 smoke-test output, monthly cost as shown by Render at creation.
+
+## D-029 — Back to menu (Natasha QA, 2026-09-08)
+- New input action `menu` = Escape (D-004). `scripts/main.gd` handles it in any state except
+  while the NameEntry is capturing: calls `Game.restart()` (fresh score/balls, frees balls,
+  spawns a lane ball) and then `Title.show_menu()`.
+- `Title.show_menu()` makes the title visible again with `_dismissed = false`; the next
+  `launch_ball` hides it and launches as on first boot. Name (N), theme (←/→), and the
+  leaderboard top-5 (T13) all work there. `GameOver` hides when the title shows.
+- `GameOver` gains a `MenuButton` ("Menu") next to `RestartButton` (focus_mode NONE), and the
+  hint reads "R restart · Esc menu".
+- Squishy self-heal: if `Squishy.setup()` cannot load its texture, it keeps `catalog_id`, retries
+  on `Theme.palette_changed` and every 1.0 s in `_process` until a texture loads; no error spam
+  (one `push_warning` per squishy).
