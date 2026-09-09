@@ -30,7 +30,8 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T12 | Player profile: name entry + device id (D-027) | 5 | merged 2026-09-07 (PR #19) | cheap-mid | — |
 | T14 | QA round (Natasha): Back-to-menu + squishy texture self-heal (D-029) | 5 | merged 2026-09-08 (PR #20) | mid | T12 |
 | T15 | Squishies never set up on real boot (D-030) + real-boot regression check | 4 fix | merged 2026-09-08 (PR #21) | cheap-mid | T14 |
-| T13 | Client leaderboard: post on game over, show on title + game over (D-026/D-027/D-028) | 5 | dispatched 2026-09-08 | mid-strong | T11.1, T12, T14 |
+| T13 | Client leaderboard: post on game over, show on title + game over (D-026/D-027/D-028) | 5 | approved 2026-09-08; PR #22 (04d713d) ready to merge | mid-strong | T11.1, T12, T14 |
+| T13b | Backlog: submit retry with backoff to ~60 s (survive a deploy window) | 5 | not started — only if scores get lost during deploys | cheap | T13 |
 | T13a | Server: friendly HTML board at `/` (D-026 amended) | 5 | dispatched 2026-09-08 (parallel with T13; separate clone) | cheap | T11.1 |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8 → T10 → T9 →
@@ -372,3 +373,9 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   body; POST 201 rank 1 (76 ms); /me 200; board lists it. Triggered a redeploy: ~30 s 502
   (disk services have no zero-downtime), then 200, board still holds the entry (persistence
   proven). Build log: "Using Node.js version 24.20.0 via NODE_VERSION". D-028 complete.
+- 2026-09-08: T13 (PR #22, 04d713d) reviewed in scratch clone merged with main. Scope ✓. Suite
+  PASS incl. boot-check + LEADERBOARD 6/6 (runner runs a local memory server; other suites use a
+  closed port). Probes on a file-backed server: offline in 21 ms, label shown, restart fine;
+  single retry lands at 5.2 s (1 row); online submit once, rows +1 exactly after the retry
+  window; zero score / empty name → no post; stale fetch dropped. Live board shows the worker's
+  T13/1313 entry. Approved. Backlog T13b: retry cannot outlast a 30 s deploy.
