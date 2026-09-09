@@ -285,6 +285,8 @@ these come from different rows.
   CSS, no scripts, no external assets) listing the top 10 — rank, name (HTML-escaped), score,
   relative time — plus `total_players` and a link to `/v1/leaderboard`. Read-only; same data as
   the JSON route. `Cache-Control: no-store`.
+  As built (T13a): `server/src/page.js` (`escapeHtml`, `relativeTime`, `renderBoard`), neon_candy hex
+  hard-coded, "just now" under a minute then minutes/hours/days, byte-length `Content-Length`.
 - Errors are `{"error":"<snake_case>"}`. Unknown routes 404. Body limit 4 KB.
 - Client base URL: `Leaderboard.BASE_URL` constant (filled from D-028), overridable by env
   `SQUISH_LEADERBOARD_URL` (tests point it at a local memory-mode server). The write key
