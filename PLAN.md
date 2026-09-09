@@ -34,9 +34,12 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T13b | Backlog: submit retry with backoff to ~60 s (survive a deploy window) | 5 | not started — only if scores get lost during deploys | cheap | T13 |
 | T13a | Server: friendly HTML board at `/` (D-026 amended) | 5 | merged + deployed 2026-09-09 (PR #23); live | cheap | T11.1 |
 | T16 | Per-name identity + per-player high score (D-031; fixes "Dad's score gone") | 5 fix | merged 2026-09-09 (PR #24); Steve: HIGH follows the name ✓ | mid | T13 |
+| T17 | App icon: glitter-drop default, icon catalog + `AppIcon` autoload (D-032) | 6 | brief written 2026-09-09; not yet dispatched | mid | — |
+| T17b | Backlog: title-screen icon picker (choose among the 4 icons; D-032 API) | 6 | not started — after T17 merges and Steve confirms the dock icon | cheap-mid | T17 |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8 → T10 → T9 →
 **Phase 5:** T11 ∥ T12 → T11.1 (deploy) → T13.
+**Phase 6:** T17 → T17b (T17b touches `title.tscn`; run it alone).
 T5 and T6 are the only truly parallel pair; ownership below is drawn to keep them apart.
 
 ## Running the game after a pull
@@ -208,6 +211,24 @@ additive: `project.godot` (autoload line), `scenes/ui/game_over.tscn`/`scripts/u
 (`TopFiveLabel`), `tests/run_all.sh` (start/stop local server in memory mode). Nothing in
 `server/` beyond reading its README for the run command.
 
+### T17 — Application icon (Steve, 2026-09-09)
+Steve delivered four icon renders as a 2×2 sheet (`~/Downloads/icons.png`, 1254×1254). Default =
+bottom-left glitter drop; the other three become selectable in T17b. Verified before design:
+`project.godot` still has `config/icon="res://icon.svg"` (Godot's stock icon), no export presets,
+no `set_icon` anywhere in `*.gd`. Contract: D-032.
+Owns: `assets/design/icons/**` (sheet + catalog), `assets/icons/*.png` (generated),
+`tools/slice_icons.gd`, `autoload/app_icon.gd`, `tests/app_icon_test.gd`; deletes `icon.svg`.
+Additive: `project.godot` (`config/icon` value + one autoload line after `Theme`). Must not
+touch: any `scenes/**`, `scripts/**`, other autoloads, `tests/run_all.sh`.
+Gate adds a suite (15 total) and re-runs the real-boot step because autoload wiring changes.
+Hand-verified (not automatable headless): the dock icon of a `godot --path .` run shows the drop.
+
+### T17b — Icon picker on the title screen (backlog)
+Owns: `scenes/ui/icon_picker.tscn`, `scripts/ui/icon_picker.gd`; additive: `scenes/ui/title.tscn`
+/ `scripts/ui/title.gd` (one node next to `ThemePicker`), `tests/title_test.gd`. Mirrors
+`theme_picker.gd`. Uses only the D-032 `AppIcon` API. Dispatch after T17 is merged and Steve
+has seen the default icon in the dock.
+
 ### T9 — Test isolation (found in T8 review)
 Every `-s tests/*.gd` run uses the app's real `user://` (macOS: ~/Library/Application
 Support/Godot/app_userdata/The Squishy Pinball Machine/). `game_flow.gd` and `ui_test.gd`
@@ -250,6 +271,9 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
 - `scenes/main.tscn`: T2 and T6 both edit it; T4 edits `main.gd`. Sequenced (T2 → T4 → T6).
 - Godot .tscn files merge badly in general: never run two tasks that touch the same
   scene file, even "append-only" edits.
+- `scenes/ui/title.tscn`: T17b will edit it; do not run T17b alongside any other title-screen task.
+- `project.godot` `[autoload]` block: T17 appends `AppIcon`; any concurrent task adding an
+  autoload collides at the same line.
 
 ## Verification log
 
@@ -396,3 +420,9 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   boot-check. Probe with Steve's real saves: migration keeps Natasha id + 8600; Dad new id/0;
   per-player bests independent; case-insensitive restore; HUD follows the name without restart;
   two extra boots leave saves byte-identical. Approved.
+- 2026-09-09: T17 design check. `grep icon project.godot` → `config/icon="res://icon.svg"`; no
+  `export_presets.cfg`; `grep -rn set_icon --include=*.gd` → nothing. Icon sheet measured with a
+  scratch Godot script (white-run scan): border 0-5/1248-1253, gutter 623-630 → 617 px cells at
+  (6,6) (631,6) (6,630) (631,630). `Theme._save_settings` rewrites `settings.save` wholesale →
+  D-032 gives `AppIcon` its own save file. Dock-icon behaviour of `DisplayServer.set_icon` on
+  macOS is documented, not yet observed here — T17 gate requires the worker to look.
