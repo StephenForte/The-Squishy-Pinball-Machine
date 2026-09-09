@@ -347,6 +347,12 @@ not the global identifier — the global is unavailable when a `-s` test preload
   GitHub App to be connected to the repository. Until Steve connects it in the dashboard, deploys
   are manual (planner via connector `trigger_deploy`, or the dashboard's Manual Deploy). The
   earlier note that docs commits redeploy the server was wrong.
+- **Decision 2026-09-09 (Steve): deploys are manual.** Verified twice that pushes inside the
+  `server/**` build filter produce no deploy (probes 08150a6 and 2e49dc0), before and after Steve
+  reconnected the repo; GitHub App access and Render settings look identical to his other,
+  working services. Most likely an artefact of API-created services. Not worth recreating the
+  service (new disk, data copy). Operating rule: merge server change → planner `trigger_deploy`
+  → wait for `/healthz` 200 → check `/`. ~30 s of 502 during each deploy.
 
 ## D-029 — Back to menu (Natasha QA, 2026-09-08)
 - New input action `menu` = Escape (D-004). `scripts/main.gd` handles it in any state except
