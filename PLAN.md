@@ -33,7 +33,7 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T13 | Client leaderboard: post on game over, show on title + game over (D-026/D-027/D-028) | 5 | merged 2026-09-09 (PR #22); Steve: score posted, works | mid-strong | T11.1, T12, T14 |
 | T13b | Backlog: submit retry with backoff to ~60 s (survive a deploy window) | 5 | not started — only if scores get lost during deploys | cheap | T13 |
 | T13a | Server: friendly HTML board at `/` (D-026 amended) | 5 | merged + deployed 2026-09-09 (PR #23); live | cheap | T11.1 |
-| T16 | Per-name identity + per-player high score (D-031; fixes "Dad's score gone") | 5 fix | approved 2026-09-09; PR #24 (e7359b7) ready to merge | mid | T13 |
+| T16 | Per-name identity + per-player high score (D-031; fixes "Dad's score gone") | 5 fix | merged 2026-09-09 (PR #24); Steve: HIGH follows the name ✓ | mid | T13 |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8 → T10 → T9 →
 **Phase 5:** T11 ∥ T12 → T11.1 (deploy) → T13.
@@ -64,6 +64,11 @@ Opening the project in the editor imports implicitly.
   deploys. Steve to check dashboard → service → Settings → Repository: if it offers "Connect
   GitHub account"/"Configure GitHub App", do that and include this repo. Until confirmed working,
   the planner triggers deploys after server merges (connector `trigger_deploy`).
+  Update 2026-09-09 18:55Z: Steve reconnected the repo in the Render dashboard (two `manual`
+  deploys at 05:24/05:25 followed). Probe commit 2 inside the filter (2e49dc0) still produced no
+  automatic deploy after 3 min. Remaining checks are outside the planner's reach: (a) GitHub →
+  Settings → Applications → Render app → Repository access must include this repo; (b) the
+  service's Events tab in Render for webhook/"deploy skipped" entries. Manual deploys continue.
 
 ### T16 — One device, several players (Natasha QA, 2026-09-09)
 Symptom: Dad set a high score; Natasha renamed via N and played; Dad's entry disappeared from
