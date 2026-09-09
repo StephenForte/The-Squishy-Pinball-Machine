@@ -33,7 +33,7 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T13 | Client leaderboard: post on game over, show on title + game over (D-026/D-027/D-028) | 5 | merged 2026-09-09 (PR #22); Steve: score posted, works | mid-strong | T11.1, T12, T14 |
 | T13b | Backlog: submit retry with backoff to ~60 s (survive a deploy window) | 5 | not started — only if scores get lost during deploys | cheap | T13 |
 | T13a | Server: friendly HTML board at `/` (D-026 amended) | 5 | merged + deployed 2026-09-09 (PR #23); live | cheap | T11.1 |
-| T16 | Per-name identity + per-player high score (D-031; fixes "Dad's score gone") | 5 fix | dispatched 2026-09-09 | mid | T13 |
+| T16 | Per-name identity + per-player high score (D-031; fixes "Dad's score gone") | 5 fix | approved 2026-09-09; PR #24 (e7359b7) ready to merge | mid | T13 |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8 → T10 → T9 →
 **Phase 5:** T11 ∥ T12 → T11.1 (deploy) → T13.
@@ -405,3 +405,8 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
 - 2026-09-09: T13a merged; `/` still 404 live → list_deploys showed no deploy since creation
   (auto-deploy never fired; GitHub App not connected). Manual trigger_deploy of 8e87f87 → live in
   ~70 s; `/` 200 text/html no-store, lists Dad / T13 / Smoke Test. D-028 corrected.
+- 2026-09-09: T16 (PR #24, e7359b7) reviewed in scratch clone. Scope ✓ (+hud.gd, justified:
+  D-031's "UI already redraws on name_changed" was false — planner error). Suite PASS incl.
+  boot-check. Probe with Steve's real saves: migration keeps Natasha id + 8600; Dad new id/0;
+  per-player bests independent; case-insensitive restore; HUD follows the name without restart;
+  two extra boots leave saves byte-identical. Approved.
