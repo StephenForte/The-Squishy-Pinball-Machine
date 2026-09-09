@@ -281,6 +281,10 @@ these come from different rows.
   one row per player (their best), ties broken by earlier `at`.
 - `GET /v1/leaderboard/me?player_id=<uuid>` → 200 `{"rank":<int>,"best":<int>,"name":"…"}`
   or 404 `{"error":"unknown_player"}`.
+- `GET /` → 200 `text/html; charset=utf-8` (added T13a, 2026-09-08): a self-contained page (inline
+  CSS, no scripts, no external assets) listing the top 10 — rank, name (HTML-escaped), score,
+  relative time — plus `total_players` and a link to `/v1/leaderboard`. Read-only; same data as
+  the JSON route. `Cache-Control: no-store`.
 - Errors are `{"error":"<snake_case>"}`. Unknown routes 404. Body limit 4 KB.
 - Client base URL: `Leaderboard.BASE_URL` constant (filled from D-028), overridable by env
   `SQUISH_LEADERBOARD_URL` (tests point it at a local memory-mode server). The write key
