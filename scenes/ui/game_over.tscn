@@ -18,42 +18,42 @@ color = Color(0, 0, 0, 0.72)
 
 [node name="TitleLabel" type="Label" parent="."]
 offset_left = 40.0
-offset_top = 280.0
+offset_top = 80.0
 offset_right = 680.0
-offset_bottom = 380.0
+offset_bottom = 170.0
 mouse_filter = 2
 theme_override_colors/font_color = Color(1, 1, 1, 1)
 theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
 theme_override_constants/outline_size = 10
-theme_override_font_sizes/font_size = 72
+theme_override_font_sizes/font_size = 64
 text = "GAME OVER"
 horizontal_alignment = 1
 vertical_alignment = 1
 
 [node name="FinalScoreLabel" type="Label" parent="."]
 offset_left = 40.0
-offset_top = 400.0
+offset_top = 170.0
 offset_right = 680.0
-offset_bottom = 470.0
+offset_bottom = 230.0
 mouse_filter = 2
 theme_override_colors/font_color = Color(1, 1, 0.88, 1)
 theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
 theme_override_constants/outline_size = 8
-theme_override_font_sizes/font_size = 44
+theme_override_font_sizes/font_size = 40
 text = "FINAL  0"
 horizontal_alignment = 1
 vertical_alignment = 1
 
 [node name="GameOverHighScoreLabel" type="Label" parent="."]
 offset_left = 40.0
-offset_top = 470.0
+offset_top = 230.0
 offset_right = 680.0
-offset_bottom = 530.0
+offset_bottom = 280.0
 mouse_filter = 2
 theme_override_colors/font_color = Color(1, 1, 0.88, 1)
 theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
 theme_override_constants/outline_size = 8
-theme_override_font_sizes/font_size = 36
+theme_override_font_sizes/font_size = 32
 text = "HIGH  0"
 horizontal_alignment = 1
 vertical_alignment = 1
@@ -61,41 +61,79 @@ vertical_alignment = 1
 [node name="NewHighScoreLabel" type="Label" parent="."]
 visible = false
 offset_left = 40.0
-offset_top = 540.0
+offset_top = 280.0
 offset_right = 680.0
-offset_bottom = 620.0
+offset_bottom = 330.0
 mouse_filter = 2
 theme_override_colors/font_color = Color(1, 0.92, 0.2, 1)
 theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
 theme_override_constants/outline_size = 8
-theme_override_font_sizes/font_size = 40
+theme_override_font_sizes/font_size = 32
 text = "NEW HIGH SCORE!"
 horizontal_alignment = 1
 vertical_alignment = 1
 
+[node name="YourRankLabel" type="Label" parent="."]
+offset_left = 40.0
+offset_top = 330.0
+offset_right = 680.0
+offset_bottom = 380.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 0.92, 0.2, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 6
+theme_override_font_sizes/font_size = 28
+text = ""
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="OfflineLabel" type="Label" parent="."]
+visible = false
+offset_left = 40.0
+offset_top = 380.0
+offset_right = 680.0
+offset_bottom = 420.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.92, 0.92, 0.92, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 6
+theme_override_font_sizes/font_size = 22
+text = "Leaderboard offline"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="LeaderboardList" type="VBoxContainer" parent="."]
+offset_left = 80.0
+offset_top = 420.0
+offset_right = 640.0
+offset_bottom = 860.0
+mouse_filter = 2
+theme_override_constants/separation = 2
+alignment = 1
+
 [node name="RestartButton" type="Button" parent="."]
 offset_left = 80.0
-offset_top = 680.0
+offset_top = 880.0
 offset_right = 340.0
-offset_bottom = 770.0
+offset_bottom = 960.0
 focus_mode = 0
 theme_override_font_sizes/font_size = 36
 text = "Restart"
 
 [node name="MenuButton" type="Button" parent="."]
 offset_left = 380.0
-offset_top = 680.0
+offset_top = 880.0
 offset_right = 640.0
-offset_bottom = 770.0
+offset_bottom = 960.0
 focus_mode = 0
 theme_override_font_sizes/font_size = 36
 text = "Menu"
 
 [node name="HintLabel" type="Label" parent="."]
 offset_left = 40.0
-offset_top = 790.0
+offset_top = 970.0
 offset_right = 680.0
-offset_bottom = 850.0
+offset_bottom = 1030.0
 mouse_filter = 2
 theme_override_colors/font_color = Color(0.92, 0.92, 0.92, 1)
 theme_override_colors/font_outline_color = Color(0, 0, 0, 1)

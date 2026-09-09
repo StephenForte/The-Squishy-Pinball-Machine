@@ -79,4 +79,20 @@ vertical_alignment = 1
 
 [node name="NameEntry" parent="." instance=ExtResource("3_name")]
 
+[node name="TopFiveLabel" type="Label" parent="."]
+offset_left = 80.0
+offset_top = 770.0
+offset_right = 640.0
+offset_bottom = 930.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 1, 0.88, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 6
+theme_override_font_sizes/font_size = 22
+text = ""
+horizontal_alignment = 1
+vertical_alignment = 0
+
 [node name="ThemePicker" parent="." instance=ExtResource("2_picker")]
+offset_top = 960.0
+offset_bottom = 1140.0

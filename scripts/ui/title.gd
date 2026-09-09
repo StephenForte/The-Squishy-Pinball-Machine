@@ -5,10 +5,15 @@ var _flippers_enabled := true
 
 @onready var _name_entry: Control = $NameEntry
 @onready var _player_name_label: Label = $PlayerNameLabel
+@onready var _top_five_label: Label = $TopFiveLabel
+
+var _leaderboard: Node
+var _title_offline := false
 
 
 func _ready() -> void:
 	visible = true
+	_leaderboard = get_node_or_null("/root/Leaderboard")
 	var theme_node := get_node("/root/Theme")
 	theme_node.palette_changed.connect(_apply_theme)
 	_apply_theme(theme_node.palette_id)
@@ -16,6 +21,15 @@ func _ready() -> void:
 	if not profile.name_changed.is_connected(_on_name_changed):
 		profile.name_changed.connect(_on_name_changed)
 	_refresh_name_ui(String(profile.player_name))
+	if _leaderboard != null:
+		if _leaderboard.has_signal("board_updated") and not _leaderboard.board_updated.is_connected(_on_board_updated):
+			_leaderboard.board_updated.connect(_on_board_updated)
+		if _leaderboard.has_signal("offline") and not _leaderboard.offline.is_connected(_on_offline):
+			_leaderboard.offline.connect(_on_offline)
+		if (_leaderboard.last_entries as Array).size() > 0:
+			_render_top_five(_leaderboard.last_entries)
+		else:
+			_top_five_label.text = ""
 
 
 func _process(_delta: float) -> void:
@@ -34,6 +48,7 @@ func _apply_theme(_id: String = "") -> void:
 	$ControlsLabel.add_theme_color_override("font_color", primary)
 	$PlayHintLabel.add_theme_color_override("font_color", primary)
 	_player_name_label.add_theme_color_override("font_color", primary)
+	_top_five_label.add_theme_color_override("font_color", primary)
 
 
 func _on_name_changed(new_name: String) -> void:
@@ -48,10 +63,48 @@ func show_menu() -> void:
 		_refresh_name_ui(String(profile.player_name))
 	else:
 		_refresh_name_ui("")
+	if _leaderboard != null and _leaderboard.has_method("fetch_top"):
+		_leaderboard.fetch_top(5)
 
 
 func is_capturing_name() -> bool:
 	return _is_capturing_name()
+
+
+func _on_board_updated(entries: Array, _total_players: int) -> void:
+	_title_offline = false
+	_render_top_five(entries)
+
+
+func _on_offline(_reason: String) -> void:
+	_title_offline = true
+	var cached: Array = []
+	if _leaderboard != null:
+		cached = _leaderboard.last_entries
+	_render_top_five(cached)
+
+
+func _render_top_five(entries: Array) -> void:
+	var lines: PackedStringArray = PackedStringArray()
+	var shown := 0
+	for entry_variant in entries:
+		if shown >= 5:
+			break
+		if typeof(entry_variant) != TYPE_DICTIONARY:
+			continue
+		var entry: Dictionary = entry_variant
+		var rank := int(entry.get("rank", shown + 1))
+		var player_name := String(entry.get("name", ""))
+		var score := int(entry.get("score", 0))
+		lines.append("%d. %s  %d" % [rank, player_name, score])
+		shown += 1
+	if _title_offline:
+		if lines.is_empty():
+			_top_five_label.text = "Leaderboard offline"
+		else:
+			_top_five_label.text = "\n".join(lines) + "\nLeaderboard offline"
+	else:
+		_top_five_label.text = "\n".join(lines)
 
 
 func _refresh_name_ui(player_name: String) -> void:
