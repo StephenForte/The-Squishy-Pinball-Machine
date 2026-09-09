@@ -289,6 +289,15 @@ these come from different rows.
 - Client base URL: `Leaderboard.BASE_URL` constant (filled from D-028), overridable by env
   `SQUISH_LEADERBOARD_URL` (tests point it at a local memory-mode server). The write key
   ships inside the client; this is obscurity, not security — accepted for a family game.
+- As built (T13): autoload `Leaderboard` — `fetch_top(limit)`, `submit(score)`, signals
+  `board_updated(entries, total_players)`, `submitted(result)`, `offline(reason)`; env overrides
+  `SQUISH_LEADERBOARD_URL` and `SQUISH_LEADERBOARD_KEY`; 3.0 s `HTTPRequest.timeout` plus a
+  3.25 s watchdog; one retry 5 s after a failed POST, token per game so a game never posts
+  twice; fetch generation counter drops stale responses. Posts only when the name is set and
+  score > 0. UI: game-over `YourRankLabel` ("Rank 6 of 13 · Personal best!"), `LeaderboardList`
+  (top 10, own row ▸), `OfflineLabel` ("Leaderboard offline"); title `TopFiveLabel`.
+  `tests/run_all.sh` runs the leaderboard suite against a local memory server and points every
+  other suite at `http://127.0.0.1:1` so tests never touch the live board.
 
 ## D-027 — Player profile (2026-09-07)
 Autoload `Profile` (`autoload/profile.gd`): `player_id` (UUID v4, generated once),
