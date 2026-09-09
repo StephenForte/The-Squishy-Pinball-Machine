@@ -52,3 +52,4 @@ See `.env.example`. Do not commit `.env`.
 - `GET /v1/leaderboard/me?player_id=<uuid>` → `{ rank, best, name }` or `404`
 
 <!-- deploy probe 2026-09-09T03:10Z: this line exists to test Render auto-deploy on server/** -->
+<!-- deploy probe 2 2026-09-09T18:53Z: after repo reconnect -->
