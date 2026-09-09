@@ -54,12 +54,15 @@ Opening the project in the editor imports implicitly.
 
 ## Blockers / open items
 
-- **Render auto-deploy is not firing** (found 2026-09-09 when the merged `/` page 404'd). No push
-  has deployed since service creation; T13a went live only via a manual `trigger_deploy`. Cause:
-  service created via API with a repo URL; Render's GitHub App is not connected to the repo.
-  Steve: dashboard → service Settings → connect the GitHub repository (install the Render GitHub
-  App on StephenForte/The-Squishy-Pinball-Machine), then set Build Filter `server/**`. Until then,
-  the planner triggers deploys after server merges.
+- **Render push-triggered deploys do not happen.** Verified 2026-09-09: `get_service` shows
+  autoDeploy=yes, trigger=commit, repo set, build filter `server/**` (Steve added it), yet a probe
+  commit touching `server/README.md` (08150a6) produced no deploy after 3+ minutes, and no push
+  since creation ever has. Cause not confirmed from here (my token cannot list GitHub App
+  installations; Render uses an App, not a repo webhook). Leading hypothesis: service created via
+  API from a public repo URL → Render's "public repo, no account link" mode, which has no push
+  deploys. Steve to check dashboard → service → Settings → Repository: if it offers "Connect
+  GitHub account"/"Configure GitHub App", do that and include this repo. Until confirmed working,
+  the planner triggers deploys after server merges (connector `trigger_deploy`).
 
 ## Task details
 
