@@ -2,6 +2,7 @@ import { timingSafeEqual } from 'node:crypto';
 import http from 'node:http';
 import { pathToFileURL } from 'node:url';
 import { closeDb, getLeaderboard, getMe, insertScore, openDb, storeLabel } from './db.js';
+import { renderBoard } from './page.js';
 import { isUuidV4, normalizePlayerId, parseLimit, parseScoreBody } from './validate.js';
 
 const BODY_LIMIT = 4096;
@@ -44,6 +45,15 @@ function send(res, status, body) {
     'content-length': Buffer.byteLength(payload),
   });
   res.end(payload);
+}
+
+function sendHtml(res, status, html) {
+  res.writeHead(status, {
+    'content-type': 'text/html; charset=utf-8',
+    'cache-control': 'no-store',
+    'content-length': Buffer.byteLength(html),
+  });
+  res.end(html);
 }
 
 function readBody(req, limit = BODY_LIMIT) {
@@ -94,6 +104,11 @@ function readBody(req, limit = BODY_LIMIT) {
 async function handle(req, res, ctx) {
   const url = new URL(req.url, 'http://localhost');
   const path = url.pathname;
+
+  if (req.method === 'GET' && path === '/') {
+    sendHtml(res, 200, renderBoard(getLeaderboard(ctx.db, 10)));
+    return;
+  }
 
   if (req.method === 'GET' && path === '/healthz') {
     send(res, 200, { ok: true, store: ctx.store });

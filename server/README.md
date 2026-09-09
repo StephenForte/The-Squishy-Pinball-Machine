@@ -45,6 +45,7 @@ See `.env.example`. Do not commit `.env`.
 
 ## Routes (D-026)
 
+- `GET /` → HTML top-10 board (same data as `/v1/leaderboard`; `Cache-Control: no-store`)
 - `GET /healthz` → `{ ok, store }` (`memory` when `DB_PATH=:memory:`, otherwise `sqlite`)
 - `POST /v1/scores` → `201` `{ rank, best, is_personal_best, total_players }`
 - `GET /v1/leaderboard?limit=10` → `{ entries, total_players }` (limit 1..50)
