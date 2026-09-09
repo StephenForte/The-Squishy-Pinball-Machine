@@ -340,8 +340,13 @@ not the global identifier — the global is unavailable when a `-s` test preload
   exists on the real board; there is no delete endpoint (D-026 scope). Remove via SSH/sqlite if it
   ever bothers anyone.
 - Ops notes: deploys cause ~30 s downtime; the client (T13) must treat 5xx/timeouts as
-  "offline" and retry later. Auto-deploy fires on every push to `main` that touches anything —
-  including docs commits.
+  "offline" and retry later.
+- **Correction 2026-09-09:** auto-deploy has NOT fired for any push since creation (last deploy
+  = commit 3fb5624 at creation time; T13/T13a merges did not deploy). The service was created via
+  the API with a repo URL and `autoDeploy: yes`, but push-triggered deploys require Render's
+  GitHub App to be connected to the repository. Until Steve connects it in the dashboard, deploys
+  are manual (planner via connector `trigger_deploy`, or the dashboard's Manual Deploy). The
+  earlier note that docs commits redeploy the server was wrong.
 
 ## D-029 — Back to menu (Natasha QA, 2026-09-08)
 - New input action `menu` = Escape (D-004). `scripts/main.gd` handles it in any state except
