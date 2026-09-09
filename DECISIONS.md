@@ -388,11 +388,15 @@ Supersedes D-027's single `player_id` and D-005/D-011's single local high score.
 - `Game` stores `high_scores: Dictionary` (UUID → int) in `highscore.save`; migration maps the
   old `{"high_score": N}` to the current player's UUID at first load. `Game.high_score` (read by
   HUD/GameOver, D-014) now means *the current player's* best; it changes on `Profile.name_changed`
-  and `Game` re-emits nothing — UI already redraws on `game_restarted`/`name_changed`.
+  and `Game` re-emits nothing. **Correction (T16 review):** the HUD did *not* listen to
+  `name_changed`; T16 added that listener in `hud.gd` so `HIGH` follows a title-screen rename.
   `game_over.is_high_score` compares against the current player's best.
 - `Game` may reference the `Profile` autoload (still no scene nodes). `Profile` must be ready
   before `Game` reads the id: order autoloads Profile before Game in `project.godot`, or have
   `Game` resolve the id lazily on first use — the worker chooses and records it.
+  As built: autoload order is now Profile, Game, Sfx, Theme, Leaderboard (Profile before Game);
+  `Game.high_score` is a property backed by `high_scores[Profile.player_id]`; `profile.save`
+  gains `players` (lowercase name → UUID); display name is the sanitised text as last typed.
 - Server (D-026) needs no change: distinct UUIDs are distinct players; each keeps its own latest
   name. The pre-fix row(s) under `6c107d4d…` stay labelled with whichever name posted last —
   Steve/Natasha replay or ask the planner to rename the row via SSH.
