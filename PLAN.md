@@ -31,6 +31,7 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T14 | QA round (Natasha): Back-to-menu + squishy texture self-heal (D-029) | 5 | merged 2026-09-08 (PR #20) | mid | T12 |
 | T15 | Squishies never set up on real boot (D-030) + real-boot regression check | 4 fix | merged 2026-09-08 (PR #21) | cheap-mid | T14 |
 | T13 | Client leaderboard: post on game over, show on title + game over (D-026/D-027/D-028) | 5 | dispatched 2026-09-08 | mid-strong | T11.1, T12, T14 |
+| T13a | Server: friendly HTML board at `/` (D-026 amended) | 5 | dispatched 2026-09-08 (parallel with T13; separate clone) | cheap | T11.1 |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8 → T10 → T9 →
 **Phase 5:** T11 ∥ T12 → T11.1 (deploy) → T13.
@@ -187,6 +188,13 @@ later, so all harnesses (and the T8 review) missed it. Fix proven in scratch: ad
 `call_deferred("_apply_slots_in_tree")` to `Theme._ready()`; plain launch → 8/8 textures;
 suite green. Owns: `autoload/theme.gd` (that line), `tests/boot_check.gd` (new autoload-style
 check), `tests/run_all.sh` (a real-boot step), `.gitignore` if needed.
+
+### T13a — Friendly page at `/` (Steve, 2026-09-08)
+Opening the service root in a browser returned `{"error":"not_found"}`. Add `GET /` → a small
+self-contained HTML page (no external assets, no JS needed) showing the top 10 with rank, name,
+score and relative time, plus total players and a link to `/v1/leaderboard`. Owns: `server/src/`
+(one new handler + template string), `server/test/` (route test), `server/README.md`. Nothing
+outside `server/`. Auto-deploys on merge (~30 s downtime).
 
 ### T13 — Client leaderboard integration
 Owns: `autoload/leaderboard.gd` (autoload `Leaderboard`), `tests/leaderboard_test.gd`;
