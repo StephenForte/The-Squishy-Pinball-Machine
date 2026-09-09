@@ -15,6 +15,10 @@ func _ready() -> void:
 	_game.game_over.connect(_on_game_over)
 	_game.game_restarted.connect(_on_game_restarted)
 	_game.streak_changed.connect(_on_streak_changed)
+	var profile := get_node_or_null("/root/Profile")
+	if profile != null and profile.has_signal("name_changed"):
+		if not profile.name_changed.is_connected(_on_name_changed):
+			profile.name_changed.connect(_on_name_changed)
 	var theme_node := get_node("/root/Theme")
 	theme_node.palette_changed.connect(_apply_theme)
 	_apply_theme(theme_node.palette_id)
@@ -48,6 +52,10 @@ func _on_game_restarted() -> void:
 
 func _on_streak_changed(streak: int) -> void:
 	_set_streak(streak)
+
+
+func _on_name_changed(_name: String) -> void:
+	_set_high(_game.high_score)
 
 
 func _sync_from_game() -> void:

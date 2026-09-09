@@ -308,10 +308,6 @@ func _case_6_two_players(game: Node) -> bool:
 	await process_frame
 	if game.high_score != 700:
 		return _fail("case 6: switching back to Dad should restore 700, got %s" % game.high_score)
-	# HUD does not subscribe to Profile.name_changed (verified). Restart is
-	# the existing signal that redraws HIGH from Game.high_score.
-	game.restart()
-	await process_frame
 	if not high_label.text.contains("700"):
 		return _fail("case 6: HUD HIGH should show 700 after switching back to Dad, got '%s'" % high_label.text)
 
