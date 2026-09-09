@@ -55,29 +55,10 @@ Opening the project in the editor imports implicitly.
 
 ## Blockers / open items
 
-- **Render push-triggered deploys do not happen.** Verified 2026-09-09: `get_service` shows
-  autoDeploy=yes, trigger=commit, repo set, build filter `server/**` (Steve added it), yet a probe
-  commit touching `server/README.md` (08150a6) produced no deploy after 3+ minutes, and no push
-  since creation ever has. Cause not confirmed from here (my token cannot list GitHub App
-  installations; Render uses an App, not a repo webhook). Leading hypothesis: service created via
-  API from a public repo URL → Render's "public repo, no account link" mode, which has no push
-  deploys. Steve to check dashboard → service → Settings → Repository: if it offers "Connect
-  GitHub account"/"Configure GitHub App", do that and include this repo. Until confirmed working,
-  the planner triggers deploys after server merges (connector `trigger_deploy`).
-  Update 2026-09-09 18:55Z: Steve reconnected the repo in the Render dashboard (two `manual`
-  deploys at 05:24/05:25 followed). Probe commit 2 inside the filter (2e49dc0) still produced no
-  automatic deploy after 3 min. Remaining checks are outside the planner's reach: (a) GitHub →
-  Settings → Applications → Render app → Repository access must include this repo; (b) the
-  service's Events tab in Render for webhook/"deploy skipped" entries. Manual deploys continue.
-
-### T16 — One device, several players (Natasha QA, 2026-09-09)
-Symptom: Dad set a high score; Natasha renamed via N and played; Dad's entry disappeared from
-the shared board and the local HIGH showed her score. Cause (planner design, D-027/D-005): one
-`player_id` per device, name is a label, server shows an id's latest name; local high score is a
-single device value. Fix per D-031: identity = (device, name) → a UUID per name; local high score
-per player id. Owns: `autoload/profile.gd`, `autoload/game.gd` (high-score storage + `high_score`
-semantics), `project.godot` (autoload order if needed), `tests/profile_test.gd`,
-`tests/game_flow.gd`, `tests/leaderboard_test.gd` (+cases). UI reads `Game.high_score` unchanged.
+- None open. Render deploys are **manual by decision** (Steve, 2026-09-09; see D-028): after any
+  merge that touches `server/**`, the planner runs `trigger_deploy` (or Steve clicks Manual
+  Deploy) and verifies `/healthz` + `/`. The two README probe comments (08150a6, 2e49dc0) are
+  harmless and can be removed in any later server PR.
 
 ## Task details
 
