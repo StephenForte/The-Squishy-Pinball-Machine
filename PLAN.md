@@ -32,7 +32,7 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T15 | Squishies never set up on real boot (D-030) + real-boot regression check | 4 fix | merged 2026-09-08 (PR #21) | cheap-mid | T14 |
 | T13 | Client leaderboard: post on game over, show on title + game over (D-026/D-027/D-028) | 5 | merged 2026-09-09 (PR #22); Steve: score posted, works | mid-strong | T11.1, T12, T14 |
 | T13b | Backlog: submit retry with backoff to ~60 s (survive a deploy window) | 5 | not started — only if scores get lost during deploys | cheap | T13 |
-| T13a | Server: friendly HTML board at `/` (D-026 amended) | 5 | approved 2026-09-09; PR #23 (c36aa9d) ready to merge | cheap | T11.1 |
+| T13a | Server: friendly HTML board at `/` (D-026 amended) | 5 | merged + deployed 2026-09-09 (PR #23); live | cheap | T11.1 |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8 → T10 → T9 →
 **Phase 5:** T11 ∥ T12 → T11.1 (deploy) → T13.
@@ -54,7 +54,12 @@ Opening the project in the editor imports implicitly.
 
 ## Blockers / open items
 
-- None open. (Invisible-squishies root-caused 2026-09-08 → T15.)
+- **Render auto-deploy is not firing** (found 2026-09-09 when the merged `/` page 404'd). No push
+  has deployed since service creation; T13a went live only via a manual `trigger_deploy`. Cause:
+  service created via API with a repo URL; Render's GitHub App is not connected to the repo.
+  Steve: dashboard → service Settings → connect the GitHub repository (install the Render GitHub
+  App on StephenForte/The-Squishy-Pinball-Machine), then set Build Filter `server/**`. Until then,
+  the planner triggers deploys after server merges.
 
 ## Task details
 
@@ -384,3 +389,6 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   10-row cap with latest names, XSS vectors escaped (no raw <script/<img), no external refs,
   JSON routes unchanged. Worker disclosed a brief checkout of the shared folder; verified clean.
   Approved. Phase 5 shared leaderboard complete once merged.
+- 2026-09-09: T13a merged; `/` still 404 live → list_deploys showed no deploy since creation
+  (auto-deploy never fired; GitHub App not connected). Manual trigger_deploy of 8e87f87 → live in
+  ~70 s; `/` 200 text/html no-store, lists Dad / T13 / Smoke Test. D-028 corrected.
