@@ -32,6 +32,12 @@ func _run() -> void:
 		return
 	if not await _case_5_persistence(game):
 		return
+	if not await _case_6_two_players(game):
+		return
+	if not await _case_7_migrate_old_highscore(game):
+		return
+	if not await _case_8_title_rename_starts_play_without_restart(game):
+		return
 
 	print("FLOW PASS cases=%d game_over_emits=1" % _cases_passed)
 	print("FLOW autoload_used=%s" % _autoload_used)
@@ -216,8 +222,18 @@ func _case_5_persistence(_game: Node) -> bool:
 	var json := JSON.new()
 	if json.parse(file.get_as_text()) != OK:
 		return _fail("case 5: save did not parse")
-	if typeof(json.data) != TYPE_DICTIONARY or int(json.data.get("high_score", -1)) != 300:
-		return _fail("case 5: expected {\"high_score\": 300}, got %s" % [json.data])
+	if typeof(json.data) != TYPE_DICTIONARY:
+		return _fail("case 5: save is not a dictionary, got %s" % [json.data])
+	var stored: Variant = json.data.get("high_scores", null)
+	if typeof(stored) != TYPE_DICTIONARY:
+		return _fail("case 5: expected high_scores map, got %s" % [json.data])
+	var found_300 := false
+	for key in (stored as Dictionary).keys():
+		if int((stored as Dictionary)[key]) == 300:
+			found_300 = true
+			break
+	if not found_300:
+		return _fail("case 5: expected a 300 under high_scores, got %s" % [json.data])
 
 	var write := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if write == null:
@@ -236,6 +252,229 @@ func _case_5_persistence(_game: Node) -> bool:
 	_cases_passed += 1
 	print("FLOW case 5 pass")
 	return true
+
+
+func _case_6_two_players(game: Node) -> bool:
+	print("FLOW case 6 two players")
+	var profile := root.get_node_or_null("Profile")
+	if profile == null:
+		return _fail("case 6: Profile autoload missing")
+	# Earlier cases (and leftover profile.save from prior suites) may already
+	# have a Natasha slot with a best. Isolate this case to the two new games.
+	game.high_scores = {}
+	profile.call("set_name", "Dad")
+	await process_frame
+	var dad_id := String(profile.player_id)
+	game.high_score = 0
+	game.restart()
+	await process_frame
+	if not await _play_score(game, 700, true):
+		return false
+	if game.high_score != 700:
+		return _fail("case 6: Dad high should be 700, got %s" % game.high_score)
+	if int(game.high_scores.get(dad_id, -1)) != 700:
+		return _fail("case 6: Dad slot missing 700: %s" % game.high_scores)
+
+	profile.call("set_name", "Natasha")
+	await process_frame
+	var natasha_id := String(profile.player_id)
+	if natasha_id == dad_id:
+		return _fail("case 6: Natasha should have a different player_id")
+	if game.high_score != 0:
+		return _fail("case 6: Natasha should start at 0, got %s" % game.high_score)
+	game.restart()
+	await process_frame
+	if not await _play_score(game, 500, true):
+		return false
+	if game.high_score != 500:
+		return _fail("case 6: Natasha high should be 500, got %s" % game.high_score)
+	if int(game.high_scores.get(dad_id, -1)) != 700:
+		return _fail("case 6: Dad best should stay 700, got %s" % game.high_scores)
+
+	if change_scene_to_file("res://scenes/main.tscn") != OK:
+		return _fail("case 6: could not load main.tscn")
+	await process_frame
+	await process_frame
+	await process_frame
+	var main := current_scene
+	if main == null:
+		return _fail("case 6: main scene did not load")
+	_silence_table_drain(main)
+	var high_label := main.find_child("HighScoreLabel", true, false) as Label
+	if high_label == null:
+		return _fail("case 6: HighScoreLabel missing")
+	if not high_label.text.contains("500"):
+		return _fail("case 6: HUD HIGH should show 500 after Natasha, got '%s'" % high_label.text)
+
+	profile.call("set_name", "Dad")
+	await process_frame
+	if game.high_score != 700:
+		return _fail("case 6: switching back to Dad should restore 700, got %s" % game.high_score)
+	if not high_label.text.contains("700"):
+		return _fail("case 6: HUD HIGH should show 700 after switching back to Dad, got '%s'" % high_label.text)
+
+	_cases_passed += 1
+	print("FLOW case 6 pass")
+	return true
+
+
+func _case_7_migrate_old_highscore(game: Node) -> bool:
+	print("FLOW case 7 migrate old highscore")
+	const PLANNER_ID := "6c107d4d-64d7-49f3-9e09-8db3a4ba9e3b"
+	var profile := root.get_node_or_null("Profile")
+	if profile == null:
+		return _fail("case 7: Profile autoload missing")
+	_write_text("user://profile.save", '{"player_id":"%s","player_name":"Natasha"}' % PLANNER_ID)
+	profile._load_or_create()
+	await process_frame
+	if String(profile.player_id) != PLANNER_ID:
+		return _fail("case 7: profile migrate should keep %s" % PLANNER_ID)
+	_write_text(SAVE_PATH, '{"high_score":8600}')
+	game._load_high_scores()
+	if game.high_score != 8600:
+		return _fail("case 7: Natasha should keep 8600, got %s" % game.high_score)
+	if int(game.high_scores.get(PLANNER_ID, -1)) != 8600:
+		return _fail("case 7: migrated slot missing: %s" % game.high_scores)
+	var first := _read_highscore_save()
+	if typeof(first.get("high_scores", null)) != TYPE_DICTIONARY:
+		return _fail("case 7: first boot should rewrite high_scores, got %s" % first)
+	if int((first["high_scores"] as Dictionary).get(PLANNER_ID, -1)) != 8600:
+		return _fail("case 7: first boot dropped 8600: %s" % first)
+	if first.has("high_score"):
+		return _fail("case 7: old high_score key should be gone after migrate: %s" % first)
+	game._load_high_scores()
+	var second := _read_highscore_save()
+	if int((second.get("high_scores", {}) as Dictionary).get(PLANNER_ID, -1)) != 8600:
+		return _fail("case 7: second boot dropped 8600: %s" % second)
+	if game.high_score != 8600:
+		return _fail("case 7: second boot high_score=%s" % game.high_score)
+	profile.call("set_name", "Dad")
+	await process_frame
+	if game.high_score != 0:
+		return _fail("case 7: Dad should start at 0, got %s" % game.high_score)
+	if int(game.high_scores.get(PLANNER_ID, -1)) != 8600:
+		return _fail("case 7: adding Dad must not drop Natasha's 8600")
+	_cases_passed += 1
+	print("FLOW case 7 pass")
+	return true
+
+
+func _case_8_title_rename_starts_play_without_restart(game: Node) -> bool:
+	print("FLOW case 8 title rename without restart")
+	var profile := root.get_node_or_null("Profile")
+	if profile == null:
+		return _fail("case 8: Profile autoload missing")
+	game.high_scores = {}
+	profile.call("set_name", "Dad")
+	await process_frame
+	var dad_id := String(profile.player_id)
+	game.high_score = 8600
+	game.restart()
+	await process_frame
+	if change_scene_to_file("res://scenes/main.tscn") != OK:
+		return _fail("case 8: could not load main.tscn")
+	await process_frame
+	await process_frame
+	await process_frame
+	var main := current_scene
+	if main == null:
+		return _fail("case 8: main scene did not load")
+	_silence_table_drain(main)
+	var title := main.find_child("Title", true, false)
+	var high_label := main.find_child("HighScoreLabel", true, false) as Label
+	var new_high := main.find_child("NewHighScoreLabel", true, false) as Label
+	if title == null or high_label == null:
+		return _fail("case 8: Title or HighScoreLabel missing")
+	if not title.visible:
+		return _fail("case 8: Title should be visible at the start")
+	if high_label.text != "HIGH  8600":
+		return _fail("case 8: HUD HIGH should show Dad's 8600, got '%s'" % high_label.text)
+
+	# Title-screen rename, then Space — no Game.restart() (D-018 launch path).
+	profile.call("set_name", "Natasha")
+	await process_frame
+	if String(profile.player_id) == dad_id:
+		return _fail("case 8: Natasha should have a different player_id")
+	if game.high_score != 0:
+		return _fail("case 8: Natasha high should be 0, got %s" % game.high_score)
+	if high_label.text != "HIGH  0":
+		return _fail("case 8: HUD HIGH leftover after rename: '%s'" % high_label.text)
+
+	var ev := InputEventAction.new()
+	ev.action = "launch_ball"
+	ev.pressed = true
+	main.get_viewport().push_input(ev)
+	await process_frame
+	await process_frame
+	ev.pressed = false
+	main.get_viewport().push_input(ev)
+	if title.visible:
+		return _fail("case 8: Title should hide after Space")
+	if game.state == game.GAME_OVER:
+		return _fail("case 8: Space must start play without a restart; state=%s" % game.state)
+	if high_label.text != "HIGH  0":
+		return _fail("case 8: HUD HIGH leftover after Space: '%s'" % high_label.text)
+
+	game.add_score(500)
+	await process_frame
+	if high_label.text != "HIGH  0":
+		return _fail("case 8: HUD HIGH leftover during play: '%s'" % high_label.text)
+	for _i in 3:
+		game.on_ball_drained()
+		await physics_frame
+		await process_frame
+	if high_label.text != "HIGH  500":
+		return _fail("case 8: HUD HIGH should become 500 at game over, got '%s'" % high_label.text)
+	if new_high != null and not new_high.visible:
+		return _fail("case 8: NewHigh should flash for Natasha's 500 under her own HIGH")
+	if int(game.high_scores.get(dad_id, -1)) != 8600:
+		return _fail("case 8: Dad's 8600 must stay: %s" % game.high_scores)
+
+	_cases_passed += 1
+	print("FLOW case 8 pass")
+	return true
+
+
+func _play_score(game: Node, points: int, expect_high: bool) -> bool:
+	var overs: Array = []
+	var on_over := func(final_score: int, is_high: bool) -> void:
+		overs.append({"final_score": final_score, "is_high_score": is_high})
+	game.game_over.connect(on_over)
+	game.add_score(points)
+	game.on_ball_drained()
+	await physics_frame
+	game.on_ball_drained()
+	await physics_frame
+	game.on_ball_drained()
+	await physics_frame
+	game.game_over.disconnect(on_over)
+	if overs.size() != 1 or overs[0]["final_score"] != points or overs[0]["is_high_score"] != expect_high:
+		return _fail("play %d: expected game_over(%d, %s), got %s" % [points, points, expect_high, overs])
+	return true
+
+
+func _silence_table_drain(main: Node) -> void:
+	var table := main.get_node_or_null("Table")
+	if table == null:
+		return
+	var drain := table.get_node_or_null("Drain")
+	if drain != null and drain is Area2D:
+		(drain as Area2D).monitoring = false
+
+
+func _read_highscore_save() -> Dictionary:
+	if not FileAccess.file_exists(SAVE_PATH):
+		return {}
+	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(SAVE_PATH))
+	if typeof(parsed) != TYPE_DICTIONARY:
+		return {}
+	return parsed
+
+
+func _write_text(path: String, text: String) -> void:
+	var file := FileAccess.open(path, FileAccess.WRITE)
+	if file != null:
+		file.store_string(text)
 
 
 func _delete_save() -> void:

@@ -50,6 +50,12 @@ func _run() -> void:
 		return
 	if not await _case_6_launch(main):
 		return
+	if not await _case_7_per_name_identity():
+		return
+	if not await _case_8_name_case():
+		return
+	if not await _case_9_migrate_planner_save():
+		return
 
 	print("PROFILE PASS cases=%d" % _cases_passed)
 	quit(0)
@@ -275,6 +281,115 @@ func _case_6_launch(main: Node) -> bool:
 	_cases_passed += 1
 	print("PROFILE case 6 pass")
 	return true
+
+
+func _case_7_per_name_identity() -> bool:
+	print("PROFILE case 7 per-name identity")
+	_name_changed_count = 0
+	_profile.call("set_name", "Dad")
+	await process_frame
+	var dad_id := String(_profile.player_id)
+	if not _is_uuid_v4(dad_id):
+		return _fail("case 7: Dad player_id is not a v4 UUID: %s" % dad_id)
+	if String(_profile.player_name) != "Dad":
+		return _fail("case 7: expected name Dad, got '%s'" % _profile.player_name)
+	_profile.call("set_name", "Natasha")
+	await process_frame
+	var natasha_id := String(_profile.player_id)
+	if not _is_uuid_v4(natasha_id):
+		return _fail("case 7: Natasha player_id is not a v4 UUID")
+	if natasha_id == dad_id:
+		return _fail("case 7: new name must mint a new UUID")
+	if String(_profile.player_name) != "Natasha":
+		return _fail("case 7: expected name Natasha, got '%s'" % _profile.player_name)
+	_profile.call("set_name", "Dad")
+	await process_frame
+	if String(_profile.player_id) != dad_id:
+		return _fail("case 7: switching back to Dad should restore %s, got %s" % [dad_id, _profile.player_id])
+	if String(_profile.player_name) != "Dad":
+		return _fail("case 7: display name should be Dad, got '%s'" % _profile.player_name)
+	var data := _read_profile_save()
+	if data.is_empty():
+		return _fail("case 7: profile.save missing or invalid")
+	var saved_players: Variant = data.get("players", {})
+	if typeof(saved_players) != TYPE_DICTIONARY:
+		return _fail("case 7: players map missing")
+	if String(saved_players.get("dad", "")) != dad_id:
+		return _fail("case 7: players.dad should be %s" % dad_id)
+	if String(saved_players.get("natasha", "")) != natasha_id:
+		return _fail("case 7: players.natasha should be %s" % natasha_id)
+	_cases_passed += 1
+	print("PROFILE case 7 pass dad=%s natasha=%s" % [dad_id, natasha_id])
+	return true
+
+
+func _case_8_name_case() -> bool:
+	print("PROFILE case 8 case-insensitive")
+	_profile.call("set_name", "Natasha")
+	await process_frame
+	var natasha_id := String(_profile.player_id)
+	_profile.call("set_name", "NATASHA")
+	await process_frame
+	if String(_profile.player_id) != natasha_id:
+		return _fail("case 8: NATASHA should be the same player as Natasha")
+	if String(_profile.player_name) != "Natasha":
+		return _fail("case 8: display should stay Natasha, got '%s'" % _profile.player_name)
+	_cases_passed += 1
+	print("PROFILE case 8 pass")
+	return true
+
+
+func _case_9_migrate_planner_save() -> bool:
+	print("PROFILE case 9 migrate planner save")
+	const PLANNER_ID := "6c107d4d-64d7-49f3-9e09-8db3a4ba9e3b"
+	_write_profile_text('{"player_id":"%s","player_name":"Natasha"}' % PLANNER_ID)
+	_profile._load_or_create()
+	await process_frame
+	if String(_profile.player_id) != PLANNER_ID:
+		return _fail("case 9: Natasha should keep %s, got %s" % [PLANNER_ID, _profile.player_id])
+	if String(_profile.player_name) != "Natasha":
+		return _fail("case 9: name should be Natasha, got '%s'" % _profile.player_name)
+	var first := _read_profile_save()
+	if String(first.get("player_id", "")) != PLANNER_ID:
+		return _fail("case 9: migrated save player_id mismatch")
+	if String((first.get("players", {}) as Dictionary).get("natasha", "")) != PLANNER_ID:
+		return _fail("case 9: players.natasha missing after migrate: %s" % first)
+	_profile._load_or_create()
+	await process_frame
+	var second := _read_profile_save()
+	if String(second.get("player_id", "")) != PLANNER_ID:
+		return _fail("case 9: second boot dropped player_id")
+	if String((second.get("players", {}) as Dictionary).get("natasha", "")) != PLANNER_ID:
+		return _fail("case 9: second boot dropped players.natasha")
+	if String(_profile.player_id) != PLANNER_ID:
+		return _fail("case 9: second boot changed in-memory id")
+	_profile.call("set_name", "Dad")
+	await process_frame
+	var dad_id := String(_profile.player_id)
+	if dad_id == PLANNER_ID or not _is_uuid_v4(dad_id):
+		return _fail("case 9: Dad should mint a new UUID, got %s" % dad_id)
+	_profile.call("set_name", "Natasha")
+	await process_frame
+	if String(_profile.player_id) != PLANNER_ID:
+		return _fail("case 9: Natasha should still be %s after Dad" % PLANNER_ID)
+	_cases_passed += 1
+	print("PROFILE case 9 pass")
+	return true
+
+
+func _read_profile_save() -> Dictionary:
+	if not FileAccess.file_exists(SAVE_PATH):
+		return {}
+	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(SAVE_PATH))
+	if typeof(parsed) != TYPE_DICTIONARY:
+		return {}
+	return parsed
+
+
+func _write_profile_text(text: String) -> void:
+	var file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
+	if file != null:
+		file.store_string(text)
 
 
 func _wait_entry_focused(entry: Node) -> void:
