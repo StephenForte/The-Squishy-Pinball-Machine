@@ -69,4 +69,5 @@ Game="*res://autoload/game.gd"
 Sfx="*res://autoload/sfx.gd"
 Theme="*res://autoload/theme.gd"
 Profile="*res://autoload/profile.gd"
+Leaderboard="*res://autoload/leaderboard.gd"
 
