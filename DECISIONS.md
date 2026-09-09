@@ -1,7 +1,7 @@
 # Decisions — The Squishy Pinball Machine
 
 Numbered, append-only. Never renumber; supersede in place with date and reason.
-Workers cite these instead of re-deciding. Next free number: **D-031**.
+Workers cite these instead of re-deciding. Next free number: **D-032**.
 
 ## D-001 — Engine: Godot 4.x, GDScript (2026-09-02)
 Per PRD. Exact version to be pinned as D-006 once installed on the build machine.
@@ -378,3 +378,21 @@ scene *after* autoloads, so every harness passed. Rules from now on:
   Profile loaded). It must fail on the pre-T15 code.
 - Reviews of anything touching autoload/boot wiring include a plain-launch check.
 Fix: `call_deferred("_apply_slots_in_tree")` in `Theme._ready()` (T15).
+
+## D-031 — Identity is per name on a device; high score is per player (2026-09-09)
+Supersedes D-027's single `player_id` and D-005/D-011's single local high score.
+- `Profile` keeps `players: Dictionary` (sanitised-name-lowercase → UUID v4) in `profile.save`.
+  `player_id` is the UUID of the current `player_name`. Entering a **new** name mints a new
+  UUID; switching back to a known name restores its UUID. Existing save migrates: the old
+  `player_id` is assigned to the old `player_name` (or discarded if the name was empty).
+- `Game` stores `high_scores: Dictionary` (UUID → int) in `highscore.save`; migration maps the
+  old `{"high_score": N}` to the current player's UUID at first load. `Game.high_score` (read by
+  HUD/GameOver, D-014) now means *the current player's* best; it changes on `Profile.name_changed`
+  and `Game` re-emits nothing — UI already redraws on `game_restarted`/`name_changed`.
+  `game_over.is_high_score` compares against the current player's best.
+- `Game` may reference the `Profile` autoload (still no scene nodes). `Profile` must be ready
+  before `Game` reads the id: order autoloads Profile before Game in `project.godot`, or have
+  `Game` resolve the id lazily on first use — the worker chooses and records it.
+- Server (D-026) needs no change: distinct UUIDs are distinct players; each keeps its own latest
+  name. The pre-fix row(s) under `6c107d4d…` stay labelled with whichever name posted last —
+  Steve/Natasha replay or ask the planner to rename the row via SSH.
