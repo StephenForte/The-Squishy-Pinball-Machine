@@ -36,6 +36,8 @@ func _run() -> void:
 		return
 	if not await _case_7_migrate_old_highscore(game):
 		return
+	if not await _case_8_title_rename_starts_play_without_restart(game):
+		return
 
 	print("FLOW PASS cases=%d game_over_emits=1" % _cases_passed)
 	print("FLOW autoload_used=%s" % _autoload_used)
@@ -354,6 +356,82 @@ func _case_7_migrate_old_highscore(game: Node) -> bool:
 		return _fail("case 7: adding Dad must not drop Natasha's 8600")
 	_cases_passed += 1
 	print("FLOW case 7 pass")
+	return true
+
+
+func _case_8_title_rename_starts_play_without_restart(game: Node) -> bool:
+	print("FLOW case 8 title rename without restart")
+	var profile := root.get_node_or_null("Profile")
+	if profile == null:
+		return _fail("case 8: Profile autoload missing")
+	game.high_scores = {}
+	profile.call("set_name", "Dad")
+	await process_frame
+	var dad_id := String(profile.player_id)
+	game.high_score = 8600
+	game.restart()
+	await process_frame
+	if change_scene_to_file("res://scenes/main.tscn") != OK:
+		return _fail("case 8: could not load main.tscn")
+	await process_frame
+	await process_frame
+	await process_frame
+	var main := current_scene
+	if main == null:
+		return _fail("case 8: main scene did not load")
+	_silence_table_drain(main)
+	var title := main.find_child("Title", true, false)
+	var high_label := main.find_child("HighScoreLabel", true, false) as Label
+	var new_high := main.find_child("NewHighScoreLabel", true, false) as Label
+	if title == null or high_label == null:
+		return _fail("case 8: Title or HighScoreLabel missing")
+	if not title.visible:
+		return _fail("case 8: Title should be visible at the start")
+	if high_label.text != "HIGH  8600":
+		return _fail("case 8: HUD HIGH should show Dad's 8600, got '%s'" % high_label.text)
+
+	# Title-screen rename, then Space — no Game.restart() (D-018 launch path).
+	profile.call("set_name", "Natasha")
+	await process_frame
+	if String(profile.player_id) == dad_id:
+		return _fail("case 8: Natasha should have a different player_id")
+	if game.high_score != 0:
+		return _fail("case 8: Natasha high should be 0, got %s" % game.high_score)
+	if high_label.text != "HIGH  0":
+		return _fail("case 8: HUD HIGH leftover after rename: '%s'" % high_label.text)
+
+	var ev := InputEventAction.new()
+	ev.action = "launch_ball"
+	ev.pressed = true
+	main.get_viewport().push_input(ev)
+	await process_frame
+	await process_frame
+	ev.pressed = false
+	main.get_viewport().push_input(ev)
+	if title.visible:
+		return _fail("case 8: Title should hide after Space")
+	if game.state == game.GAME_OVER:
+		return _fail("case 8: Space must start play without a restart; state=%s" % game.state)
+	if high_label.text != "HIGH  0":
+		return _fail("case 8: HUD HIGH leftover after Space: '%s'" % high_label.text)
+
+	game.add_score(500)
+	await process_frame
+	if high_label.text != "HIGH  0":
+		return _fail("case 8: HUD HIGH leftover during play: '%s'" % high_label.text)
+	for _i in 3:
+		game.on_ball_drained()
+		await physics_frame
+		await process_frame
+	if high_label.text != "HIGH  500":
+		return _fail("case 8: HUD HIGH should become 500 at game over, got '%s'" % high_label.text)
+	if new_high != null and not new_high.visible:
+		return _fail("case 8: NewHigh should flash for Natasha's 500 under her own HIGH")
+	if int(game.high_scores.get(dad_id, -1)) != 8600:
+		return _fail("case 8: Dad's 8600 must stay: %s" % game.high_scores)
+
+	_cases_passed += 1
+	print("FLOW case 8 pass")
 	return true
 
 
