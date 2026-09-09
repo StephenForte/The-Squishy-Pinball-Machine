@@ -50,3 +50,5 @@ See `.env.example`. Do not commit `.env`.
 - `POST /v1/scores` → `201` `{ rank, best, is_personal_best, total_players }`
 - `GET /v1/leaderboard?limit=10` → `{ entries, total_players }` (limit 1..50)
 - `GET /v1/leaderboard/me?player_id=<uuid>` → `{ rank, best, name }` or `404`
+
+<!-- deploy probe 2026-09-09T03:10Z: this line exists to test Render auto-deploy on server/** -->
