@@ -21,6 +21,7 @@ var _submitted_tokens: Dictionary = {}
 var _inflight_token: int = -1
 var _retry_scheduled: Dictionary = {}
 var _hooked_titles: Dictionary = {}
+var _fetch_gen: int = 0
 
 
 func _ready() -> void:
@@ -32,9 +33,11 @@ func _ready() -> void:
 
 
 func fetch_top(limit: int) -> void:
+	_fetch_gen += 1
+	var gen := _fetch_gen
 	var clamped := clampi(limit, 1, 50)
 	var url := "%s/v1/leaderboard?limit=%d" % [_base_url(), clamped]
-	_http_request(HTTPClient.METHOD_GET, url, "", _on_fetch_finished)
+	_http_request(HTTPClient.METHOD_GET, url, "", _on_fetch_finished.bind(gen))
 
 
 func submit(score: int) -> void:
@@ -149,7 +152,9 @@ func _on_retry_timeout(score: int, token: int) -> void:
 	_begin_submit(score, true, token)
 
 
-func _on_fetch_finished(ok: bool, code: int, parsed: Variant, reason: String) -> void:
+func _on_fetch_finished(ok: bool, code: int, parsed: Variant, reason: String, gen: int) -> void:
+	if gen != _fetch_gen:
+		return
 	if not ok:
 		offline.emit(reason)
 		return
@@ -169,6 +174,8 @@ func _on_fetch_finished(ok: bool, code: int, parsed: Variant, reason: String) ->
 func _on_submit_finished(ok: bool, code: int, parsed: Variant, reason: String, score: int, token: int, is_retry: bool) -> void:
 	if _inflight_token == token:
 		_inflight_token = -1
+	if token != _submit_token:
+		return
 	if not ok:
 		offline.emit(reason)
 		if not is_retry:
