@@ -18,9 +18,15 @@ enum { READY, PLAYING, GAME_OVER }
 
 var score: int = 0
 var balls_left: int = BALLS_PER_GAME
-var high_score: int = 0
+var high_scores: Dictionary = {}
 var state: int = READY
 var streak: int = 0
+
+var high_score: int:
+	get:
+		return _high_for(_current_player_id())
+	set(value):
+		_set_high_for(_current_player_id(), value)
 
 var _drain_frame: int = -1
 var _streak_remaining: float = 0.0
@@ -28,7 +34,7 @@ var _big_score_emitted: bool = false
 
 
 func _ready() -> void:
-	high_score = _load_high_score()
+	_load_high_scores()
 	_reset_run()
 	print("Game ready high_score=%d balls_left=%d state=%s" % [high_score, balls_left, _state_name()])
 
@@ -83,7 +89,6 @@ func on_ball_drained() -> void:
 	var is_high := score > high_score
 	if is_high:
 		high_score = score
-		_save_high_score()
 	game_over.emit(score, is_high)
 	print("Game game_over final_score=%d is_high_score=%s high_score=%d" % [score, is_high, high_score])
 
@@ -120,30 +125,60 @@ func _clear_streak() -> void:
 	print("Game streak_changed streak=0")
 
 
-func _load_high_score() -> int:
-	if not FileAccess.file_exists(SAVE_PATH):
+func _current_player_id() -> String:
+	var profile := get_node_or_null("/root/Profile")
+	if profile == null:
+		return ""
+	return String(profile.get("player_id"))
+
+
+func _high_for(player_id: String) -> int:
+	if player_id.is_empty():
 		return 0
+	return int(high_scores.get(player_id, 0))
+
+
+func _set_high_for(player_id: String, value: int) -> void:
+	if player_id.is_empty():
+		return
+	high_scores[player_id] = int(value)
+	_save_high_scores()
+
+
+func _load_high_scores() -> void:
+	high_scores = {}
+	if not FileAccess.file_exists(SAVE_PATH):
+		return
 	var file := FileAccess.open(SAVE_PATH, FileAccess.READ)
 	if file == null:
-		return 0
+		return
 	var text := file.get_as_text()
 	var json := JSON.new()
 	if json.parse(text) != OK:
-		return 0
+		return
 	var data: Variant = json.data
 	if typeof(data) != TYPE_DICTIONARY:
-		return 0
-	if not (data as Dictionary).has("high_score"):
-		return 0
-	return int((data as Dictionary)["high_score"])
+		return
+	var parsed: Dictionary = data
+	if parsed.has("high_scores") and typeof(parsed["high_scores"]) == TYPE_DICTIONARY:
+		var src: Dictionary = parsed["high_scores"]
+		for key_variant in src.keys():
+			high_scores[String(key_variant)] = int(src[key_variant])
+		return
+	if parsed.has("high_score"):
+		var id := _current_player_id()
+		if id.is_empty():
+			return
+		high_scores[id] = int(parsed["high_score"])
+		_save_high_scores()
 
 
-func _save_high_score() -> void:
+func _save_high_scores() -> void:
 	var file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if file == null:
 		push_warning("Game: could not write %s" % SAVE_PATH)
 		return
-	file.store_string(JSON.stringify({"high_score": high_score}))
+	file.store_string(JSON.stringify({"high_scores": high_scores}))
 
 
 func _state_name() -> String:

@@ -73,6 +73,8 @@ func _run() -> void:
 		return
 	if not await _case_6_deploy_restart(main):
 		return
+	if not await _case_7_two_device_players(main):
+		return
 
 	print("LEADERBOARD PASS cases=%d" % _cases_passed)
 	quit(0)
@@ -317,6 +319,72 @@ func _case_6_deploy_restart(main: Node) -> bool:
 		return false
 	_cases_passed += 1
 	print("LEADERBOARD case 6 pass")
+	return true
+
+
+func _case_7_two_device_players(main: Node) -> bool:
+	print("LEADERBOARD case 7 two players on one device")
+	OS.set_environment("SQUISH_LEADERBOARD_URL", LOCAL_URL)
+	_game.restart()
+	await process_frame
+	_profile.call("set_name", "Dad")
+	await process_frame
+	var dad_id := String(_profile.player_id)
+	if dad_id.is_empty():
+		return _fail("case 7: Dad has no player_id")
+	_reset_wait_flags()
+	_game.add_score(811)
+	for _i in 3:
+		_game.on_ball_drained()
+		await process_frame
+		await process_frame
+	if not await _wait_flag("_got_submit", 3500):
+		return _fail("case 7: Dad submit did not arrive")
+	_profile.call("set_name", "Natasha")
+	await process_frame
+	var natasha_id := String(_profile.player_id)
+	if natasha_id.is_empty() or natasha_id == dad_id:
+		return _fail("case 7: Natasha player_id should differ from Dad (%s vs %s)" % [natasha_id, dad_id])
+	_game.restart()
+	await process_frame
+	_reset_wait_flags()
+	_game.add_score(822)
+	for _i in 3:
+		_game.on_ball_drained()
+		await process_frame
+		await process_frame
+	if not await _wait_flag("_got_submit", 3500):
+		return _fail("case 7: Natasha submit did not arrive")
+	var board := await _api_get_board()
+	if board.is_empty():
+		return _fail("case 7: could not GET board")
+	var entries: Array = board.get("entries", [])
+	var dad_row: Dictionary = {}
+	var natasha_row: Dictionary = {}
+	for entry_variant in entries:
+		if typeof(entry_variant) != TYPE_DICTIONARY:
+			continue
+		var entry: Dictionary = entry_variant
+		var pid := String(entry.get("player_id", ""))
+		var pname := String(entry.get("name", ""))
+		if pid == dad_id or pname == "Dad":
+			dad_row = entry
+		if pid == natasha_id or pname == "Natasha":
+			natasha_row = entry
+	if dad_row.is_empty() or natasha_row.is_empty():
+		return _fail("case 7: board missing Dad/Natasha rows: %s" % entries)
+	if String(dad_row.get("player_id", "")) == String(natasha_row.get("player_id", "")):
+		return _fail("case 7: Dad and Natasha posted the same player_id")
+	if String(dad_row.get("name", "")) != "Dad":
+		return _fail("case 7: Dad row name was '%s'" % dad_row.get("name", ""))
+	if String(natasha_row.get("name", "")) != "Natasha":
+		return _fail("case 7: Natasha row name was '%s'" % natasha_row.get("name", ""))
+	if int(dad_row.get("score", 0)) != 811:
+		return _fail("case 7: Dad score should be 811, got %s" % dad_row)
+	if int(natasha_row.get("score", 0)) != 822:
+		return _fail("case 7: Natasha score should be 822, got %s" % natasha_row)
+	_cases_passed += 1
+	print("LEADERBOARD case 7 pass dad=%s natasha=%s" % [dad_id, natasha_id])
 	return true
 
 

@@ -1,6 +1,7 @@
 extends Node
 
-## Autoload Profile. Device id + player name, persisted at user://profile.save (D-027).
+## Autoload Profile. Per-name identity on this device (D-031).
+## players: sanitised-lowercase name → UUID v4. player_id follows player_name.
 
 signal name_changed(name: String)
 
@@ -9,6 +10,7 @@ const NAME_MAX_LEN := 16
 
 var player_id: String = ""
 var player_name: String = ""
+var players: Dictionary = {}
 
 
 func _ready() -> void:
@@ -20,8 +22,21 @@ func _ready() -> void:
 @warning_ignore("native_method_override")
 func set_name(n: StringName) -> void:
 	var cleaned := _sanitize_name(String(n))
-	if cleaned == player_name:
+	var key := _name_key(cleaned)
+	if key == _name_key(player_name):
 		return
+	if cleaned.is_empty():
+		player_name = ""
+		_save()
+		name_changed.emit(player_name)
+		return
+	if players.has(key) and _is_uuid_v4(String(players[key])):
+		player_id = String(players[key])
+	elif _is_uuid_v4(player_id) and not _id_is_claimed(player_id):
+		players[key] = player_id
+	else:
+		player_id = _generate_uuid_v4()
+		players[key] = player_id
 	player_name = cleaned
 	_save()
 	name_changed.emit(player_name)
@@ -32,6 +47,7 @@ func _load_or_create() -> void:
 		return
 	player_id = _generate_uuid_v4()
 	player_name = ""
+	players = {}
 	_save()
 
 
@@ -44,9 +60,43 @@ func _try_load() -> bool:
 	var id := String(data.get("player_id", ""))
 	if not _is_uuid_v4(id):
 		return false
+	var loaded_name := _sanitize_name(String(data.get("player_name", "")))
+	var loaded_players := _parse_players(data.get("players", {}))
+	var migrated := not data.has("players")
+	if loaded_players.is_empty() and not loaded_name.is_empty():
+		loaded_players[_name_key(loaded_name)] = id
+		migrated = true
 	player_id = id
-	player_name = _sanitize_name(String(data.get("player_name", "")))
+	player_name = loaded_name
+	players = loaded_players
+	if not player_name.is_empty():
+		var key := _name_key(player_name)
+		if players.has(key) and _is_uuid_v4(String(players[key])):
+			player_id = String(players[key])
+	if migrated:
+		_save()
 	return true
+
+
+func _parse_players(raw: Variant) -> Dictionary:
+	var out := {}
+	if typeof(raw) != TYPE_DICTIONARY:
+		return out
+	var src: Dictionary = raw
+	for key_variant in src.keys():
+		var key := _name_key(_sanitize_name(String(key_variant)))
+		var value := String(src[key_variant])
+		if key.is_empty() or not _is_uuid_v4(value):
+			continue
+		out[key] = value
+	return out
+
+
+func _id_is_claimed(id: String) -> bool:
+	for key in players:
+		if String(players[key]) == id:
+			return true
+	return false
 
 
 func _save() -> void:
@@ -54,7 +104,15 @@ func _save() -> void:
 	if file == null:
 		push_warning("Profile: could not write %s" % SAVE_PATH)
 		return
-	file.store_string(JSON.stringify({"player_id": player_id, "player_name": player_name}))
+	file.store_string(JSON.stringify({
+		"player_id": player_id,
+		"player_name": player_name,
+		"players": players,
+	}))
+
+
+func _name_key(n: String) -> String:
+	return n.to_lower()
 
 
 func _sanitize_name(n: String) -> String:
