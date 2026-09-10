@@ -34,7 +34,7 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T13b | Backlog: submit retry with backoff to ~60 s (survive a deploy window) | 5 | not started — only if scores get lost during deploys | cheap | T13 |
 | T13a | Server: friendly HTML board at `/` (D-026 amended) | 5 | merged + deployed 2026-09-09 (PR #23); live | cheap | T11.1 |
 | T16 | Per-name identity + per-player high score (D-031; fixes "Dad's score gone") | 5 fix | merged 2026-09-09 (PR #24); Steve: HIGH follows the name ✓ | mid | T13 |
-| T17 | App icon: glitter-drop default, icon catalog + `AppIcon` autoload (D-032) | 6 | brief written 2026-09-09; not yet dispatched | mid | — |
+| T17 | App icon: glitter-drop default, icon catalog + `AppIcon` autoload (D-032) | 6 | PR #25 reviewed 2026-09-09 — changes requested (7 px row gutter; D-032 corrected) | mid | — |
 | T17b | Backlog: title-screen icon picker (choose among the 4 icons; D-032 API) | 6 | not started — after T17 merges and Steve confirms the dock icon | cheap-mid | T17 |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8 → T10 → T9 →
@@ -426,3 +426,10 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   (6,6) (631,6) (6,630) (631,630). `Theme._save_settings` rewrites `settings.save` wholesale →
   D-032 gives `AppIcon` its own save file. Dock-icon behaviour of `DisplayServer.set_icon` on
   macOS is documented, not yet observed here — T17 gate requires the worker to look.
+- 2026-09-09: T17 (PR #25, 2a97513) reviewed in scratch clone. Base = f4c17de ✓, scope ✓, gate
+  SUMMARY all suites PASS (14 scripts + boot check; APP_ICON 6/6) — matches handoff. Probe: edge-row
+  luminance of sliced PNGs → glitter_drop/ice_cube bottom row 0.96 (white) vs ~0.45 inner. Cause:
+  sheet row gutter is 7 px, not 8 (my D-032 error); crop at y=631 includes border row 1247. Fix
+  proven in the clone (gutter {x:8,y:7} → bottom 0.54/0.53, top-row PNGs unchanged). Changes
+  requested; worker to re-slice + add edge-luminance case 7. Dock icon: worker screenshot only,
+  not re-observed by planner.
