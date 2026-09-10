@@ -34,8 +34,8 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T13b | Backlog: submit retry with backoff to ~60 s (survive a deploy window) | 5 | not started — only if scores get lost during deploys | cheap | T13 |
 | T13a | Server: friendly HTML board at `/` (D-026 amended) | 5 | merged + deployed 2026-09-09 (PR #23); live | cheap | T11.1 |
 | T16 | Per-name identity + per-player high score (D-031; fixes "Dad's score gone") | 5 fix | merged 2026-09-09 (PR #24); Steve: HIGH follows the name ✓ | mid | T13 |
-| T17 | App icon: glitter-drop default, icon catalog + `AppIcon` autoload (D-032) | 6 | PR #25 reviewed 2026-09-09 — changes requested (7 px row gutter; D-032 corrected) | mid | — |
-| T17b | Backlog: title-screen icon picker (choose among the 4 icons; D-032 API) | 6 | not started — after T17 merges and Steve confirms the dock icon | cheap-mid | T17 |
+| T17 | App icon: glitter-drop default, icon catalog + `AppIcon` autoload (D-032) | 6 | PR #25 approved 2026-09-09 (f49e333); awaiting Steve's merge | mid | — |
+| T17b | Title-screen icon picker (choose among the 4 icons; D-032 API) | 6 | ready to brief once PR #25 is merged | cheap-mid | T17 |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8 → T10 → T9 →
 **Phase 5:** T11 ∥ T12 → T11.1 (deploy) → T13.
@@ -433,3 +433,8 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   proven in the clone (gutter {x:8,y:7} → bottom 0.54/0.53, top-row PNGs unchanged). Changes
   requested; worker to re-slice + add edge-luminance case 7. Dock icon: worker screenshot only,
   not re-observed by planner.
+- 2026-09-09: T17 re-review (PR #25, f49e333, rebased on f567560) in scratch clone. Gate SUMMARY all
+  suites PASS, APP_ICON 7/7, boot check PASS. Independent edge probe: glitter_drop/ice_cube bottom
+  row 0.54/0.53 (was 0.96); top-row PNGs byte-identical. Slicer idempotent in the clone. Worker's
+  dock screenshot inspected: glitter drop tile, running dot. Approved; Steve to merge, then
+  `godot --headless --import` after pull (new PNGs).
