@@ -21,7 +21,7 @@ func _run() -> int:
 	var sheet_path := String(sheet_info.get("file", ""))
 	var cell := int(sheet_info.get("cell", 617))
 	var border := int(sheet_info.get("border", 6))
-	var gutter := int(sheet_info.get("gutter", 8))
+	var gutter := _gutter_xy(sheet_info.get("gutter", 8))
 	var grid: Array = sheet_info.get("grid", [2, 2])
 	var cols := int(grid[0])
 	var rows := int(grid[1])
@@ -55,8 +55,8 @@ func _run() -> int:
 		if row >= rows or col >= cols:
 			push_error("slice_icons: sheet_index %d out of range for %s" % [index, icon_id])
 			return 1
-		var x := border + col * (cell + gutter)
-		var y := border + row * (cell + gutter)
+		var x := border + col * (cell + gutter.x)
+		var y := border + row * (cell + gutter.y)
 		var cell_rect := Rect2i(x, y, cell, cell)
 		var cell_img := sheet.get_region(cell_rect)
 		cell_img.convert(Image.FORMAT_RGBA8)
@@ -72,3 +72,11 @@ func _run() -> int:
 
 	print("slice_icons done count=%d" % written)
 	return 0 if written > 0 else 1
+
+
+func _gutter_xy(raw: Variant) -> Vector2i:
+	if typeof(raw) == TYPE_DICTIONARY:
+		var d: Dictionary = raw
+		return Vector2i(int(d.get("x", 8)), int(d.get("y", 7)))
+	var n := int(raw)
+	return Vector2i(n, n)

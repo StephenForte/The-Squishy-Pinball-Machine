@@ -10,7 +10,7 @@
     "grid": [2, 2],
     "order": "row-major; sheet_index n = row n//2, col n%2",
     "border": 6,
-    "gutter": 8,
+    "gutter": {"x": 8, "y": 7},
     "cell": 617
   },
   "icons": [

@@ -38,6 +38,8 @@ func _run() -> void:
 		return
 	if not await _case_6_corrupt_fallback():
 		return
+	if not await _case_7_no_white_edge():
+		return
 
 	print("APP_ICON PASS cases=%d" % _cases_passed)
 	quit(0)
@@ -203,6 +205,43 @@ func _case_6_corrupt_fallback() -> bool:
 	_cases_passed += 1
 	print("APP_ICON case 6 pass")
 	return true
+
+
+func _case_7_no_white_edge() -> bool:
+	print("APP_ICON case 7 edges")
+	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(CATALOG_PATH))
+	if typeof(parsed) != TYPE_DICTIONARY:
+		return _fail("case 7: catalog is not a dictionary")
+	var data: Dictionary = parsed
+	for entry_var in data.get("icons", []):
+		var entry: Dictionary = entry_var
+		var icon_id := String(entry.get("id", ""))
+		var assets: Dictionary = entry.get("assets", {})
+		var path := String(assets.get("icon", ""))
+		var abs_path := ProjectSettings.globalize_path(path)
+		var img := Image.load_from_file(abs_path)
+		if img == null:
+			return _fail("case 7: load_from_file failed %s" % path)
+		var top := _row_mean_luminance(img, 0)
+		var bottom := _row_mean_luminance(img, img.get_height() - 1)
+		print("APP_ICON case 7 %s lum top=%.2f bottom=%.2f" % [icon_id, top, bottom])
+		if top >= 0.9:
+			return _fail("case 7: %s top-row luminance %.2f >= 0.9" % [icon_id, top])
+		if bottom >= 0.9:
+			return _fail("case 7: %s bottom-row luminance %.2f >= 0.9" % [icon_id, bottom])
+	_cases_passed += 1
+	print("APP_ICON case 7 pass")
+	return true
+
+
+func _row_mean_luminance(img: Image, y: int) -> float:
+	var w := img.get_width()
+	if w <= 0:
+		return 0.0
+	var total := 0.0
+	for x in w:
+		total += img.get_pixel(x, y).get_luminance()
+	return total / float(w)
 
 
 func _delete_save() -> void:
