@@ -408,12 +408,14 @@ Supersedes D-027's single `player_id` and D-005/D-011's single local high score.
   Steve/Natasha replay or ask the planner to rename the row via SSH.
 
 ## D-032 — Application icon: catalog-driven, runtime-applied, own save file (2026-09-09)
-Steve supplied four icon renders as one 2×2 sheet (1254×1254; 6 px white border, 8 px white
-gutter, 617 px cells — measured by the planner). The **glitter drop** (bottom-left) is the
+Steve supplied four icon renders as one 2×2 sheet (1254×1254; 6 px white border, 617 px cells;
+white gutter **8 px between columns, 7 px between rows** — measured by the planner. Corrected
+2026-09-09 at T17 review: the first version said 8 px for both axes, which put a white border row
+into the bottom-row icons; my error, caught by the worker's disclosure). The **glitter drop** (bottom-left) is the
 default; the other three become user-selectable later (T17b).
 - Sheet is committed as `res://assets/design/icons/app_icons_sheet.png`; catalog
   `res://assets/design/icons/app_icons.json` (schema_version 1): `default_icon_id`, `license`,
-  `sheet` {file, grid 2×2, border 6, gutter 8, cell 617}, `icons[]` with `id`, `display_name`,
+  `sheet` {file, grid 2×2, border 6, gutter {x: 8, y: 7}, cell 617}, `icons[]` with `id`, `display_name`,
   `sheet_index` (row-major: 0 `gummy_bear`, 1 `jelly_trio`, 2 `glitter_drop`, 3 `ice_cube`),
   `assets.icon` = `res://assets/icons/<id>.png`. Same shape and editability as D-020.
 - Per-icon PNGs are **generated** by `tools/slice_icons.gd` (crop cell, resize to 512×512,
