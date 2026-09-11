@@ -472,3 +472,8 @@ Replaces "one retry 5 s after a failed POST".
   (a score lost to a quit during a deploy is accepted; revisit if it happens).
 - Observability for tests: `var submit_attempts: Dictionary` (token → attempt count) and signal
   `submit_attempted(token: int, attempt: int)`.
+- As built (T13b, PR #27, reviewed 2026-09-10): `offline(reason)` is also **latest-token-only**
+  (Bugbot finding, fixed b4be7b0) — a stale failure from an older game never paints "Leaderboard
+  offline" over a game that already posted; the older token keeps retrying silently. Per-token
+  state lives in `_submit_state` {score, in_flight, retry_pending}; `_is_retryable(code)`:
+  code 0 (transport), 5xx and 429 retry, all other 4xx stop. Suite: leaderboard cases 8-12.
