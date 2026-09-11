@@ -214,10 +214,14 @@ func _on_submit_finished(ok: bool, code: int, parsed: Variant, reason: String, t
 			submitted.emit(parsed)
 		fetch_top(10)
 		return
-	if not ok:
-		offline.emit(reason)
-	else:
-		offline.emit("http_%d" % code if code > 0 else reason)
+	# Only the latest token talks to GameOver (same rule as submitted). A late
+	# failure from an older game must not paint "Leaderboard offline" over a
+	# score that already landed.
+	if token == _submit_token:
+		if not ok:
+			offline.emit(reason)
+		else:
+			offline.emit("http_%d" % code if code > 0 else reason)
 	if _is_retryable(code):
 		_schedule_retry(token)
 
