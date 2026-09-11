@@ -1,6 +1,7 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/game_over.gd" id="1_game_over"]
+[ext_resource type="PackedScene" path="res://scenes/ui/celebration.tscn" id="2_celebration"]
 
 [node name="GameOver" type="CanvasLayer"]
 layer = 20
@@ -142,3 +143,5 @@ theme_override_font_sizes/font_size = 28
 text = "R restart · Esc menu"
 horizontal_alignment = 1
 vertical_alignment = 1
+
+[node name="Celebration" parent="." instance=ExtResource("2_celebration")]

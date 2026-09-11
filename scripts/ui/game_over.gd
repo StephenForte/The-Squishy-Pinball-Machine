@@ -3,7 +3,10 @@ extends CanvasLayer
 var _game: Node
 var _leaderboard: Node
 var _last_submit: Dictionary = {}
+var _final_score: int = 0
+var _is_high_score: bool = false
 
+@onready var _celebration: Node = get_node_or_null("Celebration")
 @onready var _final_score_label: Label = $FinalScoreLabel
 @onready var _high_score_label: Label = $GameOverHighScoreLabel
 @onready var _new_high_score_label: Label = $NewHighScoreLabel
@@ -68,12 +71,18 @@ func _on_game_over(final_score: int, is_high_score: bool) -> void:
 	if _leaderboard != null and (_leaderboard.last_entries as Array).size() > 0:
 		_render_list(_leaderboard.last_entries)
 	visible = true
+	_final_score = final_score
+	_is_high_score = is_high_score
+	_play_celebration(_tier_for(final_score, is_high_score, 0))
 
 
 func _on_game_restarted() -> void:
 	visible = false
 	_new_high_score_label.visible = false
 	_reset_leaderboard_ui()
+	_stop_celebration()
+	_final_score = 0
+	_is_high_score = false
 
 
 func _on_board_updated(entries: Array, _total_players: int) -> void:
@@ -87,6 +96,7 @@ func _on_submitted(result: Dictionary) -> void:
 	_last_submit = result
 	_offline_label.visible = false
 	_your_rank_label.text = _format_rank_line(result)
+	_maybe_upgrade_celebration(result)
 
 
 func _on_offline(_reason: String) -> void:
@@ -163,6 +173,42 @@ func _paint_list_theme() -> void:
 		return
 	if (_leaderboard.last_entries as Array).size() > 0:
 		_render_list(_leaderboard.last_entries)
+
+
+func _tier_rank(tier: String) -> int:
+	if tier == "fireworks":
+		return 2
+	if tier == "confetti":
+		return 1
+	return 0
+
+
+func _tier_for(final_score: int, is_high_score: bool, rank: int) -> String:
+	if _celebration != null and _celebration.has_method("tier_for"):
+		return String(_celebration.tier_for(final_score, is_high_score, rank))
+	return "none"
+
+
+func _play_celebration(tier: String) -> void:
+	if _celebration != null and _celebration.has_method("play"):
+		_celebration.play(tier)
+
+
+func _stop_celebration() -> void:
+	if _celebration != null and _celebration.has_method("stop"):
+		_celebration.stop()
+
+
+func _maybe_upgrade_celebration(result: Dictionary) -> void:
+	if not visible:
+		return
+	if _celebration == null:
+		return
+	var current := String(_celebration.get("tier"))
+	var rank := int(result.get("rank", 0)) if bool(result.get("is_personal_best", false)) else 0
+	var next := _tier_for(_final_score, _is_high_score, rank)
+	if _tier_rank(next) > _tier_rank(current):
+		_play_celebration(next)
 
 
 func _on_restart_pressed() -> void:
