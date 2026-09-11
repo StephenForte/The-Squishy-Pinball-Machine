@@ -205,7 +205,8 @@ func _maybe_upgrade_celebration(result: Dictionary) -> void:
 	if _celebration == null:
 		return
 	var current := String(_celebration.get("tier"))
-	var next := _tier_for(_final_score, _is_high_score, int(result.get("rank", 0)))
+	var rank := int(result.get("rank", 0)) if bool(result.get("is_personal_best", false)) else 0
+	var next := _tier_for(_final_score, _is_high_score, rank)
 	if _tier_rank(next) > _tier_rank(current):
 		_play_celebration(next)
 

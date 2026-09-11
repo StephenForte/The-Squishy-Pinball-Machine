@@ -158,16 +158,26 @@ func _case_upgrade_and_hold(game: Node, leaderboard: Node, celebration: Node, fi
 		return _fail("upgrade: starting tier=%s expected confetti" % celebration.tier)
 	leaderboard.submitted.emit({
 		"rank": 1,
-		"best": 1500,
+		"best": 20000,
 		"is_personal_best": false,
 		"total_players": 4,
 	})
 	await process_frame
+	if String(celebration.tier) != "confetti":
+		return _fail("upgrade: rank 1 without personal best must stay confetti, got %s" % celebration.tier)
+	print("CELEBRATION upgrade rank 1 without PB stays confetti")
+	leaderboard.submitted.emit({
+		"rank": 1,
+		"best": 1500,
+		"is_personal_best": true,
+		"total_players": 4,
+	})
+	await process_frame
 	if String(celebration.tier) != "fireworks":
-		return _fail("upgrade: tier=%s expected fireworks after rank 1" % celebration.tier)
+		return _fail("upgrade: tier=%s expected fireworks after rank 1 personal best" % celebration.tier)
 	if not fireworks.emitting:
-		return _fail("upgrade: Fireworks should be emitting after rank 1")
-	print("CELEBRATION upgrade rank 1 -> fireworks")
+		return _fail("upgrade: Fireworks should be emitting after rank 1 personal best")
+	print("CELEBRATION upgrade rank 1 personal best -> fireworks")
 	leaderboard.submitted.emit({
 		"rank": 3,
 		"best": 1500,
