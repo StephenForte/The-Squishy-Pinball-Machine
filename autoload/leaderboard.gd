@@ -6,20 +6,23 @@ extends Node
 signal board_updated(entries: Array, total_players: int)
 signal submitted(result: Dictionary)
 signal offline(reason: String)
+signal submit_attempted(token: int, attempt: int)
 
 const BASE_URL := "https://squish-leaderboard.onrender.com"
 const KEY := "a419f5979f6891504b3af89a20e13125"
 const CLIENT := "squish/1.0"
 const REQUEST_TIMEOUT := 3.0
-const RETRY_DELAY_SEC := 5.0
+
+var retry_delays_sec: Array = [5.0, 10.0, 20.0, 30.0]
+var submit_attempts: Dictionary = {}
 
 var last_entries: Array = []
 var last_total_players: int = 0
 
 var _submit_token: int = 0
 var _submitted_tokens: Dictionary = {}
-var _inflight_token: int = -1
-var _retry_scheduled: Dictionary = {}
+## token → {score: int, in_flight: bool, retry_pending: bool}
+var _submit_state: Dictionary = {}
 var _hooked_titles: Dictionary = {}
 var _fetch_gen: int = 0
 
@@ -109,13 +112,22 @@ func _on_game_over(final_score: int, _is_high_score: bool) -> void:
 
 func _start_new_submit(score: int) -> void:
 	_submit_token += 1
-	_begin_submit(score, false, _submit_token)
+	var token := _submit_token
+	_submit_state[token] = {
+		"score": score,
+		"in_flight": false,
+		"retry_pending": false,
+	}
+	_begin_submit(token)
 
 
-func _begin_submit(score: int, is_retry: bool, token: int) -> void:
+func _begin_submit(token: int) -> void:
 	if _submitted_tokens.has(token):
 		return
-	if _inflight_token == token and not is_retry:
+	var state: Dictionary = _submit_state.get(token, {})
+	if state.is_empty():
+		return
+	if bool(state.get("in_flight", false)):
 		return
 	var profile := get_node_or_null("/root/Profile")
 	if profile == null:
@@ -124,7 +136,10 @@ func _begin_submit(score: int, is_retry: bool, token: int) -> void:
 	var player_id := String(profile.player_id)
 	if player_name.is_empty() or player_id.is_empty():
 		return
-	_inflight_token = token
+	state["in_flight"] = true
+	state["retry_pending"] = false
+	var score := int(state.get("score", 0))
+	_record_attempt(token)
 	var body := JSON.stringify({
 		"player_id": player_id,
 		"name": player_name,
@@ -132,24 +147,42 @@ func _begin_submit(score: int, is_retry: bool, token: int) -> void:
 		"client": CLIENT,
 	})
 	var url := "%s/v1/scores" % _base_url()
-	_http_request(HTTPClient.METHOD_POST, url, body, _on_submit_finished.bind(score, token, is_retry), true)
+	_http_request(HTTPClient.METHOD_POST, url, body, _on_submit_finished.bind(token), true)
 
 
-func _schedule_retry(score: int, token: int) -> void:
-	if _submitted_tokens.has(token) or _retry_scheduled.has(token):
+func _record_attempt(token: int) -> void:
+	var n := int(submit_attempts.get(token, 0)) + 1
+	submit_attempts[token] = n
+	submit_attempted.emit(token, n)
+
+
+func _schedule_retry(token: int) -> void:
+	if _submitted_tokens.has(token):
+		return
+	var state: Dictionary = _submit_state.get(token, {})
+	if state.is_empty() or bool(state.get("retry_pending", false)):
+		return
+	var attempts := int(submit_attempts.get(token, 0))
+	if attempts > retry_delays_sec.size():
+		return
+	if attempts < 1:
 		return
 	var tree := get_tree()
 	if tree == null:
 		return
-	_retry_scheduled[token] = true
-	var timer := tree.create_timer(RETRY_DELAY_SEC)
-	timer.timeout.connect(_on_retry_timeout.bind(score, token), CONNECT_ONE_SHOT)
+	var delay := float(retry_delays_sec[attempts - 1])
+	state["retry_pending"] = true
+	var timer := tree.create_timer(delay)
+	timer.timeout.connect(_on_retry_timeout.bind(token), CONNECT_ONE_SHOT)
 
 
-func _on_retry_timeout(score: int, token: int) -> void:
+func _on_retry_timeout(token: int) -> void:
 	if _submitted_tokens.has(token):
 		return
-	_begin_submit(score, true, token)
+	var state: Dictionary = _submit_state.get(token, {})
+	if not state.is_empty():
+		state["retry_pending"] = false
+	_begin_submit(token)
 
 
 func _on_fetch_finished(ok: bool, code: int, parsed: Variant, reason: String, gen: int) -> void:
@@ -171,24 +204,34 @@ func _on_fetch_finished(ok: bool, code: int, parsed: Variant, reason: String, ge
 	board_updated.emit(last_entries, last_total_players)
 
 
-func _on_submit_finished(ok: bool, code: int, parsed: Variant, reason: String, score: int, token: int, is_retry: bool) -> void:
-	if _inflight_token == token:
-		_inflight_token = -1
-	if token != _submit_token:
+func _on_submit_finished(ok: bool, code: int, parsed: Variant, reason: String, token: int) -> void:
+	var state: Dictionary = _submit_state.get(token, {})
+	if not state.is_empty():
+		state["in_flight"] = false
+	if ok and code == 201 and typeof(parsed) == TYPE_DICTIONARY:
+		_submitted_tokens[token] = true
+		if token == _submit_token:
+			submitted.emit(parsed)
+		fetch_top(10)
 		return
-	if not ok:
-		offline.emit(reason)
-		if not is_retry:
-			_schedule_retry(score, token)
-		return
-	if code != 201 or typeof(parsed) != TYPE_DICTIONARY:
-		offline.emit("http_%d" % code if code > 0 else reason)
-		if not is_retry:
-			_schedule_retry(score, token)
-		return
-	_submitted_tokens[token] = true
-	submitted.emit(parsed)
-	fetch_top(10)
+	# Only the latest token talks to GameOver (same rule as submitted). A late
+	# failure from an older game must not paint "Leaderboard offline" over a
+	# score that already landed.
+	if token == _submit_token:
+		if not ok:
+			offline.emit(reason)
+		else:
+			offline.emit("http_%d" % code if code > 0 else reason)
+	if _is_retryable(code):
+		_schedule_retry(token)
+
+
+func _is_retryable(code: int) -> bool:
+	if code == 400 or code == 401 or code == 404:
+		return false
+	if code >= 400 and code < 500 and code != 429:
+		return false
+	return true
 
 
 func _base_url() -> String:
