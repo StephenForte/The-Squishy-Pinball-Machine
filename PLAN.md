@@ -31,7 +31,7 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T14 | QA round (Natasha): Back-to-menu + squishy texture self-heal (D-029) | 5 | merged 2026-09-08 (PR #20) | mid | T12 |
 | T15 | Squishies never set up on real boot (D-030) + real-boot regression check | 4 fix | merged 2026-09-08 (PR #21) | cheap-mid | T14 |
 | T13 | Client leaderboard: post on game over, show on title + game over (D-026/D-027/D-028) | 5 | merged 2026-09-09 (PR #22); Steve: score posted, works | mid-strong | T11.1, T12, T14 |
-| T13b | Submit retry with backoff to ~65 s, per-game tokens, no retry on 4xx (D-034) | 6 | brief written 2026-09-10; not yet dispatched | mid | T13 |
+| T13b | Submit retry with backoff to ~65 s, per-game tokens, no retry on 4xx (D-034) | 6 | PR #27 approved 2026-09-10 (b4be7b0); awaiting Steve's merge | mid | T13 |
 | T13a | Server: friendly HTML board at `/` (D-026 amended) | 5 | merged + deployed 2026-09-09 (PR #23); live | cheap | T11.1 |
 | T16 | Per-name identity + per-player high score (D-031; fixes "Dad's score gone") | 5 fix | merged 2026-09-09 (PR #24); Steve: HIGH follows the name ✓ | mid | T13 |
 | T17 | App icon: glitter-drop default, icon catalog + `AppIcon` autoload (D-032) | 6 | merged 2026-09-10 (PR #25 → a45430c); dock icon seen in worker screenshot | mid | — |
@@ -480,3 +480,10 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   responses; no 4xx distinction. `game_over.gd` has no particles; `effects.tscn` Fireworks lives
   under Table. Server contract D-026: 201 result carries `rank`, `is_personal_best`; 429 at 30
   posts/min/player (a 4-attempt schedule stays far below). Both tasks disjoint → parallel.
+- 2026-09-10: T13b (PR #27, b4be7b0, base 5687139) reviewed in scratch clone. Scope ✓ (2 files).
+  Gate SUMMARY all suites PASS, LEADERBOARD 12/12 (was 7 — brief wrongly said 4, planner error).
+  Probe on a second memory server (:8788): older token's late failures emit offline 0 times while
+  attempts 1→3, then lands silently (submitted emits 0, attempts 4). Approved. D-034 as-built added.
+  **Incident:** after T13b pushed, the shared `Pinball/` checkout was found on `task/T18-celebration`
+  (04860f4, clean) and no `Pinball-T18` clone exists — the T18 worker ignored the clone step and
+  worked in the shared folder. No T13b work lost (already pushed). To be raised in the T18 review.
