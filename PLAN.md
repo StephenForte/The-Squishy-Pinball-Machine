@@ -36,7 +36,7 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T16 | Per-name identity + per-player high score (D-031; fixes "Dad's score gone") | 5 fix | merged 2026-09-09 (PR #24); Steve: HIGH follows the name ✓ | mid | T13 |
 | T17 | App icon: glitter-drop default, icon catalog + `AppIcon` autoload (D-032) | 6 | merged 2026-09-10 (PR #25 → a45430c); dock icon seen in worker screenshot | mid | — |
 | T17b | Title-screen icon picker (choose among the 4 icons; D-032 API) | 6 | merged 2026-09-10 (PR #26 → b668aa3) | cheap-mid | T17 |
-| T18 | Game-over celebration: confetti >1k, fireworks >5k / personal best / board #1 (D-033) | 6 | brief written 2026-09-10; not yet dispatched | mid | T17b (game_over.tscn quiet) |
+| T18 | Game-over celebration: confetti >1k, fireworks >5k / personal best / board #1 (D-033) | 6 | PR #28 reviewed 2026-09-10 — changes requested (rank-1 clause needs is_personal_best, D-033 corrected; rebase) | mid | T17b (game_over.tscn quiet) |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8 → T10 → T9 →
 **Phase 5:** T11 ∥ T12 → T11.1 (deploy) → T13.
@@ -487,3 +487,13 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   **Incident:** after T13b pushed, the shared `Pinball/` checkout was found on `task/T18-celebration`
   (04860f4, clean) and no `Pinball-T18` clone exists — the T18 worker ignored the clone step and
   worked in the shared folder. No T13b work lost (already pushed). To be raised in the T18 review.
+- 2026-09-10: T18 (PR #28, 04860f4, base 5687139 — stale, main at 019ec18) reviewed in scratch
+  clone rebased onto 019ec18: gate SUMMARY all suites PASS, 16 scripts + boot check, CELEBRATION 7/7.
+  Scope ✓. Screenshots inspected (confetti, fireworks, labels readable). Defect found via the
+  worker's disclosure: `result.rank` is the player's standing by best (D-026), so the board leader
+  gets fireworks for every game > 1 k — the brief's own coverage case (`rank 1, is_personal_best
+  false → fireworks`) encoded it. Planner error; D-033 corrected (c3e8535). Fix proven in scratch:
+  gate rank on `is_personal_best` → strengthened test passes; same test FAILS on unpatched code.
+  Changes requested. **Shared-checkout incident:** `Pinball/` is on `task/T18-celebration`; the
+  worker reports it deleted a `Pinball-T18` clone, yet the shared folder carries its branch.
+  Steve to `git switch main` there before the next dispatch.
