@@ -5,6 +5,8 @@ extends SceneTree
 const LOCAL_URL := "http://127.0.0.1:8787"
 const CLOSED_URL := "http://127.0.0.1:1"
 const CLIENT := "squish/1.0"
+const DEFAULT_RETRY_DELAYS := [5.0, 10.0, 20.0, 30.0]
+const FAST_RETRY_DELAYS := [0.2, 0.4, 0.8]
 
 var _cases_passed: int = 0
 var _leaderboard: Node
@@ -15,6 +17,9 @@ var _got_submit := false
 var _last_offline := ""
 var _got_offline := false
 var _got_board := false
+var _submit_count: int = 0
+var _last_attempt_token: int = -1
+var _last_attempt_n: int = 0
 
 
 func _initialize() -> void:
@@ -35,6 +40,8 @@ func _run() -> void:
 		_leaderboard.offline.connect(_on_offline)
 	if not _leaderboard.board_updated.is_connected(_on_board):
 		_leaderboard.board_updated.connect(_on_board)
+	if _leaderboard.has_signal("submit_attempted") and not _leaderboard.submit_attempted.is_connected(_on_submit_attempted):
+		_leaderboard.submit_attempted.connect(_on_submit_attempted)
 
 	OS.set_environment("SQUISH_LEADERBOARD_URL", LOCAL_URL)
 	OS.set_environment("SQUISH_LEADERBOARD_KEY", "devkey")
@@ -75,6 +82,16 @@ func _run() -> void:
 		return
 	if not await _case_7_two_device_players(main):
 		return
+	if not await _case_8_recovery(main):
+		return
+	if not await _case_9_give_up(main):
+		return
+	if not await _case_10_permanent_401(main):
+		return
+	if not await _case_11_two_games(main):
+		return
+	if not await _case_12_happy_path_attempts(main):
+		return
 
 	print("LEADERBOARD PASS cases=%d" % _cases_passed)
 	quit(0)
@@ -83,11 +100,17 @@ func _run() -> void:
 func _on_submitted(result: Dictionary) -> void:
 	_got_submit = true
 	_last_submit = result
+	_submit_count += 1
 
 
 func _on_offline(reason: String) -> void:
 	_got_offline = true
 	_last_offline = reason
+
+
+func _on_submit_attempted(token: int, attempt: int) -> void:
+	_last_attempt_token = token
+	_last_attempt_n = attempt
 
 
 func _on_board(_entries: Array, _total: int) -> void:
@@ -386,6 +409,217 @@ func _case_7_two_device_players(main: Node) -> bool:
 	_cases_passed += 1
 	print("LEADERBOARD case 7 pass dad=%s natasha=%s" % [dad_id, natasha_id])
 	return true
+
+
+func _case_8_recovery(_main: Node) -> bool:
+	print("LEADERBOARD case 8 recovery")
+	_use_fast_retries()
+	_profile.call("set_name", "RetryPat")
+	OS.set_environment("SQUISH_LEADERBOARD_URL", CLOSED_URL)
+	_reset_wait_flags()
+	await _play_scored_game(901)
+	if not await _wait_flag("_got_offline", 3500):
+		_restore_retries_and_url()
+		return _fail("case 8: offline did not arrive")
+	var token := int(_leaderboard._submit_token)
+	OS.set_environment("SQUISH_LEADERBOARD_URL", LOCAL_URL)
+	if not await _wait_flag("_got_submit", 1500):
+		_restore_retries_and_url()
+		return _fail("case 8: submitted did not arrive after restore")
+	if int(_last_submit.get("rank", 0)) <= 0:
+		_restore_retries_and_url()
+		return _fail("case 8: submitted missing rank %s" % _last_submit)
+	if int(_leaderboard.submit_attempts.get(token, 0)) != 2:
+		_restore_retries_and_url()
+		return _fail("case 8: expected 2 attempts, got %s" % _leaderboard.submit_attempts.get(token, 0))
+	_restore_retries_and_url()
+	_cases_passed += 1
+	print("LEADERBOARD case 8 pass token=%d attempts=2 rank=%s" % [token, _last_submit.get("rank")])
+	return true
+
+
+func _case_9_give_up(_main: Node) -> bool:
+	print("LEADERBOARD case 9 give up")
+	_use_fast_retries()
+	_profile.call("set_name", "GiveUpPat")
+	OS.set_environment("SQUISH_LEADERBOARD_URL", CLOSED_URL)
+	_reset_wait_flags()
+	_submit_count = 0
+	await _play_scored_game(902)
+	var token := int(_leaderboard._submit_token)
+	var expected: int = int(_leaderboard.retry_delays_sec.size()) + 1
+	if not await _wait_attempts(token, expected, 5000):
+		_restore_retries_and_url()
+		return _fail("case 9: expected %d attempts, got %s" % [expected, _leaderboard.submit_attempts.get(token, 0)])
+	await _wait_msec(1000)
+	if int(_leaderboard.submit_attempts.get(token, 0)) != expected:
+		_restore_retries_and_url()
+		return _fail("case 9: extra attempt after give-up: %s" % _leaderboard.submit_attempts.get(token, 0))
+	if _got_submit or _submit_count > 0:
+		_restore_retries_and_url()
+		return _fail("case 9: submitted fired on give-up")
+	_restore_retries_and_url()
+	_cases_passed += 1
+	print("LEADERBOARD case 9 pass attempts=%d" % expected)
+	return true
+
+
+func _case_10_permanent_401(_main: Node) -> bool:
+	print("LEADERBOARD case 10 permanent 401")
+	_use_fast_retries()
+	_profile.call("set_name", "PermPat")
+	OS.set_environment("SQUISH_LEADERBOARD_URL", LOCAL_URL)
+	OS.set_environment("SQUISH_LEADERBOARD_KEY", "wrongkey")
+	_reset_wait_flags()
+	_submit_count = 0
+	await _play_scored_game(903)
+	if not await _wait_flag("_got_offline", 3500):
+		_restore_retries_and_url()
+		OS.set_environment("SQUISH_LEADERBOARD_KEY", "devkey")
+		return _fail("case 10: offline did not arrive")
+	if _last_offline != "http_401":
+		_restore_retries_and_url()
+		OS.set_environment("SQUISH_LEADERBOARD_KEY", "devkey")
+		return _fail("case 10: expected http_401, got '%s'" % _last_offline)
+	var token := int(_leaderboard._submit_token)
+	await _wait_msec(1000)
+	if int(_leaderboard.submit_attempts.get(token, 0)) != 1:
+		_restore_retries_and_url()
+		OS.set_environment("SQUISH_LEADERBOARD_KEY", "devkey")
+		return _fail("case 10: expected 1 attempt, got %s" % _leaderboard.submit_attempts.get(token, 0))
+	if _got_submit or _submit_count > 0:
+		_restore_retries_and_url()
+		OS.set_environment("SQUISH_LEADERBOARD_KEY", "devkey")
+		return _fail("case 10: submitted fired on 401")
+	OS.set_environment("SQUISH_LEADERBOARD_KEY", "devkey")
+	_restore_retries_and_url()
+	_cases_passed += 1
+	print("LEADERBOARD case 10 pass reason=http_401")
+	return true
+
+
+func _case_11_two_games(_main: Node) -> bool:
+	print("LEADERBOARD case 11 two games")
+	_use_fast_retries()
+	_profile.call("set_name", "TwoGamePat")
+	await process_frame
+	var player_id := String(_profile.player_id)
+	if player_id.is_empty():
+		_restore_retries_and_url()
+		return _fail("case 11: no player_id")
+	OS.set_environment("SQUISH_LEADERBOARD_URL", CLOSED_URL)
+	_reset_wait_flags()
+	_submit_count = 0
+	await _play_scored_game(555)
+	if not await _wait_flag("_got_offline", 3500):
+		_restore_retries_and_url()
+		return _fail("case 11: game A offline did not arrive")
+	var token_a := int(_leaderboard._submit_token)
+	OS.set_environment("SQUISH_LEADERBOARD_URL", LOCAL_URL)
+	_got_submit = false
+	_last_submit = {}
+	await _play_scored_game(222)
+	var token_b := int(_leaderboard._submit_token)
+	if token_b == token_a:
+		_restore_retries_and_url()
+		return _fail("case 11: game B reused token %d" % token_a)
+	if not await _wait_flag("_got_submit", 3500):
+		_restore_retries_and_url()
+		return _fail("case 11: game B submitted did not arrive")
+	if not await _wait_attempts(token_a, 2, 2000):
+		_restore_retries_and_url()
+		return _fail("case 11: game A never retried, attempts=%s" % _leaderboard.submit_attempts.get(token_a, 0))
+	var me := await _wait_me_best(player_id, 555, 2000)
+	if me.is_empty() or int(me.get("best", 0)) != 555:
+		_restore_retries_and_url()
+		return _fail("case 11: expected best 555 (max A,B), got %s" % me)
+	if _submit_count != 1:
+		_restore_retries_and_url()
+		return _fail("case 11: submitted should fire once (B only), got %d" % _submit_count)
+	_restore_retries_and_url()
+	_cases_passed += 1
+	print("LEADERBOARD case 11 pass a=%d b=%d best=555 submitted=1" % [token_a, token_b])
+	return true
+
+
+func _case_12_happy_path_attempts(_main: Node) -> bool:
+	print("LEADERBOARD case 12 happy path attempts")
+	_use_fast_retries()
+	_profile.call("set_name", "HappyPat")
+	OS.set_environment("SQUISH_LEADERBOARD_URL", LOCAL_URL)
+	OS.set_environment("SQUISH_LEADERBOARD_KEY", "devkey")
+	_reset_wait_flags()
+	await _play_scored_game(904)
+	if not await _wait_flag("_got_submit", 3500):
+		_restore_retries_and_url()
+		return _fail("case 12: submitted did not arrive")
+	var token := int(_leaderboard._submit_token)
+	if int(_leaderboard.submit_attempts.get(token, 0)) != 1:
+		_restore_retries_and_url()
+		return _fail("case 12: expected 1 attempt, got %s" % _leaderboard.submit_attempts.get(token, 0))
+	if int(_last_submit.get("rank", 0)) <= 0:
+		_restore_retries_and_url()
+		return _fail("case 12: first-try 201 missing rank %s" % _last_submit)
+	_restore_retries_and_url()
+	_cases_passed += 1
+	print("LEADERBOARD case 12 pass token=%d attempts=1" % token)
+	return true
+
+
+func _use_fast_retries() -> void:
+	_leaderboard.retry_delays_sec = FAST_RETRY_DELAYS.duplicate()
+
+
+func _restore_retries_and_url() -> void:
+	_leaderboard.retry_delays_sec = DEFAULT_RETRY_DELAYS.duplicate()
+	OS.set_environment("SQUISH_LEADERBOARD_URL", LOCAL_URL)
+	OS.set_environment("SQUISH_LEADERBOARD_KEY", "devkey")
+
+
+func _play_scored_game(score: int) -> void:
+	_game.restart()
+	await process_frame
+	await process_frame
+	_game.add_score(score)
+	for _i in 3:
+		_game.on_ball_drained()
+		await process_frame
+		await process_frame
+
+
+func _wait_attempts(token: int, n: int, ms: int) -> bool:
+	var start := Time.get_ticks_msec()
+	while Time.get_ticks_msec() - start < ms:
+		if int(_leaderboard.submit_attempts.get(token, 0)) >= n:
+			return true
+		await process_frame
+	return int(_leaderboard.submit_attempts.get(token, 0)) >= n
+
+
+func _wait_me_best(player_id: String, best: int, ms: int) -> Dictionary:
+	var start := Time.get_ticks_msec()
+	var me: Dictionary = {}
+	while Time.get_ticks_msec() - start < ms:
+		me = await _api_get_me(player_id)
+		if int(me.get("best", 0)) == best:
+			return me
+		await process_frame
+	return me
+
+
+func _api_get_me(player_id: String) -> Dictionary:
+	var got := await _http(
+		HTTPClient.METHOD_GET,
+		LOCAL_URL + "/v1/leaderboard/me?player_id=%s" % player_id,
+		"",
+		""
+	)
+	if not bool(got.get("ok", false)):
+		return {}
+	var parsed: Variant = got.get("parsed")
+	if typeof(parsed) != TYPE_DICTIONARY:
+		return {}
+	return parsed
 
 
 func _wait_highlighted_row(list: Node, player_name: String, score: int, ms: int) -> Label:
