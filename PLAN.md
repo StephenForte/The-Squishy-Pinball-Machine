@@ -35,7 +35,7 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T13a | Server: friendly HTML board at `/` (D-026 amended) | 5 | merged + deployed 2026-09-09 (PR #23); live | cheap | T11.1 |
 | T16 | Per-name identity + per-player high score (D-031; fixes "Dad's score gone") | 5 fix | merged 2026-09-09 (PR #24); Steve: HIGH follows the name ✓ | mid | T13 |
 | T17 | App icon: glitter-drop default, icon catalog + `AppIcon` autoload (D-032) | 6 | merged 2026-09-10 (PR #25 → a45430c); dock icon seen in worker screenshot | mid | — |
-| T17b | Title-screen icon picker (choose among the 4 icons; D-032 API) | 6 | brief written 2026-09-10; not yet dispatched | cheap-mid | T17 |
+| T17b | Title-screen icon picker (choose among the 4 icons; D-032 API) | 6 | PR #26 approved 2026-09-10 (154348e); awaiting Steve's merge | cheap-mid | T17 |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8 → T10 → T9 →
 **Phase 5:** T11 ∥ T12 → T11.1 (deploy) → T13.
@@ -441,3 +441,10 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   row 0.54/0.53 (was 0.96); top-row PNGs byte-identical. Slicer idempotent in the clone. Worker's
   dock screenshot inspected: glitter drop tile, running dot. Approved; Steve to merge, then
   `godot --headless --import` after pull (new PNGs).
+- 2026-09-10: T17b (PR #26, 154348e, base eba1c45) reviewed in scratch clone. Scope ✓ (title.tscn:
+  ext_resource + load_steps + one node block). Gate SUMMARY all suites PASS, 15 scripts + boot
+  check, ICON_PICKER 5/5, TITLE 4/4. Planner probe via isolated runner: `I` during name capture →
+  no cycle, LineEdit got the `i`; `I` while playing (title hidden) → no cycle
+  (is_visible_in_tree=false under hidden CanvasLayer); `I` after show_menu → cycles. Worker
+  screenshots inspected (layout + name-box case). Approved. Worker /tmp litter removed;
+  /tmp/t17-saves left for Steve.
