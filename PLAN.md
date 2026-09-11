@@ -31,15 +31,16 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T14 | QA round (Natasha): Back-to-menu + squishy texture self-heal (D-029) | 5 | merged 2026-09-08 (PR #20) | mid | T12 |
 | T15 | Squishies never set up on real boot (D-030) + real-boot regression check | 4 fix | merged 2026-09-08 (PR #21) | cheap-mid | T14 |
 | T13 | Client leaderboard: post on game over, show on title + game over (D-026/D-027/D-028) | 5 | merged 2026-09-09 (PR #22); Steve: score posted, works | mid-strong | T11.1, T12, T14 |
-| T13b | Backlog: submit retry with backoff to ~60 s (survive a deploy window) | 5 | not started — only if scores get lost during deploys | cheap | T13 |
+| T13b | Submit retry with backoff to ~65 s, per-game tokens, no retry on 4xx (D-034) | 6 | brief written 2026-09-10; not yet dispatched | mid | T13 |
 | T13a | Server: friendly HTML board at `/` (D-026 amended) | 5 | merged + deployed 2026-09-09 (PR #23); live | cheap | T11.1 |
 | T16 | Per-name identity + per-player high score (D-031; fixes "Dad's score gone") | 5 fix | merged 2026-09-09 (PR #24); Steve: HIGH follows the name ✓ | mid | T13 |
 | T17 | App icon: glitter-drop default, icon catalog + `AppIcon` autoload (D-032) | 6 | merged 2026-09-10 (PR #25 → a45430c); dock icon seen in worker screenshot | mid | — |
-| T17b | Title-screen icon picker (choose among the 4 icons; D-032 API) | 6 | PR #26 approved 2026-09-10 (154348e); awaiting Steve's merge | cheap-mid | T17 |
+| T17b | Title-screen icon picker (choose among the 4 icons; D-032 API) | 6 | merged 2026-09-10 (PR #26 → b668aa3) | cheap-mid | T17 |
+| T18 | Game-over celebration: confetti >1k, fireworks >5k / personal best / board #1 (D-033) | 6 | brief written 2026-09-10; not yet dispatched | mid | T17b (game_over.tscn quiet) |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8 → T10 → T9 →
 **Phase 5:** T11 ∥ T12 → T11.1 (deploy) → T13.
-**Phase 6:** T17 → T17b (T17b touches `title.tscn`; run it alone).
+**Phase 6:** T17 → T17b (T17b touches `title.tscn`; run it alone) → **T13b ∥ T18** (disjoint files; T18 runs in a clone).
 T5 and T6 are the only truly parallel pair; ownership below is drawn to keep them apart.
 
 ## Running the game after a pull
@@ -232,6 +233,27 @@ placed in the free band y 1150-1270, x 80-640 of the 720×1280 viewport). Must n
 icon, uses only the D-032 `AppIcon` API. Key: `I` cycles forward; ←/→ stay with the theme
 picker. Gate adds a suite (15 scripts + boot check).
 
+### T13b — Submit retry with backoff (Steve, 2026-09-10)
+Verified before design: `autoload/leaderboard.gd` retries exactly once after 5 s
+(`RETRY_DELAY_SEC`), retries on every failure incl. 401/400, and `_on_submit_finished` drops any
+response whose token is not the latest — so a game whose post is pending when the next game ends
+is silently lost. Contract: D-034.
+Owns: `autoload/leaderboard.gd`, `tests/leaderboard_test.gd`. Must not touch: `scripts/ui/**`,
+`scenes/**` (T18 is editing game_over.*), `tests/run_all.sh`, `server/**`.
+Working directory: main checkout `Pinball/`.
+
+### T18 — Game-over celebration (Steve, 2026-09-10)
+Verified before design: `GameOver` is a CanvasLayer under `Main` with labels only; the only
+particles in the project are `Table/Effects/Fireworks` (T7a big-score moment, CPUParticles2D).
+Contract: D-033.
+Owns: `scenes/ui/celebration.tscn`, `scripts/ui/celebration.gd`, `tests/celebration_test.gd`.
+Additive: `scenes/ui/game_over.tscn` (one instanced node `Celebration`), `scripts/ui/game_over.gd`
+(wire play/upgrade/stop). Must not touch: `scenes/table.tscn`, `scenes/effects.tscn`,
+`scripts/effects.gd`, `autoload/**` (T13b is editing leaderboard.gd), `tests/ui_test.gd`,
+`tests/leaderboard_test.gd`.
+Working directory: clone `~/Library/CloudStorage/Dropbox-Personal/Dev/Pinball-T18` (T13b holds
+the main checkout).
+
 ### T9 — Test isolation (found in T8 review)
 Every `-s tests/*.gd` run uses the app's real `user://` (macOS: ~/Library/Application
 Support/Godot/app_userdata/The Squishy Pinball Machine/). `game_flow.gd` and `ui_test.gd`
@@ -277,6 +299,11 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
 - `scenes/ui/title.tscn`: T17b will edit it; do not run T17b alongside any other title-screen task.
 - `project.godot` `[autoload]` block: T17 appends `AppIcon`; any concurrent task adding an
   autoload collides at the same line.
+- T13b ∥ T18 (2026-09-10): disjoint by design — T13b owns `autoload/leaderboard.gd` +
+  `tests/leaderboard_test.gd`; T18 owns celebration.* + additive `game_over.*`. The one shared
+  seam is the `Leaderboard.submitted(result)` signal, which neither task changes (D-034 keeps
+  its shape; D-033 only reads `rank`). leaderboard_test reads GameOver labels — T18 must not
+  rename or move `YourRankLabel`/`OfflineLabel`.
 
 ## Verification log
 
@@ -448,3 +475,8 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   (is_visible_in_tree=false under hidden CanvasLayer); `I` after show_menu → cycles. Worker
   screenshots inspected (layout + name-box case). Approved. Worker /tmp litter removed;
   /tmp/t17-saves left for Steve.
+- 2026-09-10: T13b/T18 design check. `leaderboard.gd`: `RETRY_DELAY_SEC := 5.0`, one retry
+  (`if not is_retry: _schedule_retry`), `if token != _submit_token: return` drops older games'
+  responses; no 4xx distinction. `game_over.gd` has no particles; `effects.tscn` Fireworks lives
+  under Table. Server contract D-026: 201 result carries `rank`, `is_personal_best`; 429 at 30
+  posts/min/player (a 4-attempt schedule stays far below). Both tasks disjoint → parallel.
