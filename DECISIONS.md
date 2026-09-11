@@ -437,9 +437,14 @@ Steve: "confetti for any game over 1k, fireworks for over 5k, a high score, or a
 - Tiers, evaluated on `Game.game_over(final_score, is_high_score)` and re-evaluated when
   `Leaderboard.submitted(result)` arrives for the same game:
   `none` if `final_score <= 1000`; else `fireworks` if `final_score > 5000` **or**
-  `is_high_score` (per-player best, D-031) **or** `int(result.rank) == 1` (top of the shared
-  board = "a high score"); else `confetti`. Thresholds are `const` in `celebration.gd`
+  `is_high_score` (per-player best, D-031) **or** the game took the top of the shared board;
+  else `confetti`. Thresholds are `const` in `celebration.gd`
   (`CONFETTI_MIN = 1000`, `FIREWORKS_MIN = 5000`, `BOARD_TOP_RANK = 1`).
+  **Correction (T18 review, 2026-09-10):** "took the top of the board" means
+  `int(result.rank) == 1 AND bool(result.is_personal_best)`. `result.rank` is the player's
+  standing by their *best* score (D-026), not this game's — with rank alone the current leader got
+  fireworks for every game over 1 k (seen in the worker's hand test: Natasha, 1500 points, rank 1).
+  The first version of this entry and the T18 brief's coverage list had it wrong; planner error.
   Planner assumptions to confirm with Steve: (a) "a high score" means rank 1 on the shared board,
   not any top-10 placement (with 4 players every game would be top 10); (b) a personal best
   below 1 k gets nothing — a first game is always a personal best and should not launch fireworks
