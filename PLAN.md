@@ -31,12 +31,12 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T14 | QA round (Natasha): Back-to-menu + squishy texture self-heal (D-029) | 5 | merged 2026-09-08 (PR #20) | mid | T12 |
 | T15 | Squishies never set up on real boot (D-030) + real-boot regression check | 4 fix | merged 2026-09-08 (PR #21) | cheap-mid | T14 |
 | T13 | Client leaderboard: post on game over, show on title + game over (D-026/D-027/D-028) | 5 | merged 2026-09-09 (PR #22); Steve: score posted, works | mid-strong | T11.1, T12, T14 |
-| T13b | Submit retry with backoff to ~65 s, per-game tokens, no retry on 4xx (D-034) | 6 | PR #27 approved 2026-09-10 (b4be7b0); awaiting Steve's merge | mid | T13 |
+| T13b | Submit retry with backoff to ~65 s, per-game tokens, no retry on 4xx (D-034) | 6 | merged 2026-09-10 (PR #27 → 019ec18) | mid | T13 |
 | T13a | Server: friendly HTML board at `/` (D-026 amended) | 5 | merged + deployed 2026-09-09 (PR #23); live | cheap | T11.1 |
 | T16 | Per-name identity + per-player high score (D-031; fixes "Dad's score gone") | 5 fix | merged 2026-09-09 (PR #24); Steve: HIGH follows the name ✓ | mid | T13 |
 | T17 | App icon: glitter-drop default, icon catalog + `AppIcon` autoload (D-032) | 6 | merged 2026-09-10 (PR #25 → a45430c); dock icon seen in worker screenshot | mid | — |
 | T17b | Title-screen icon picker (choose among the 4 icons; D-032 API) | 6 | merged 2026-09-10 (PR #26 → b668aa3) | cheap-mid | T17 |
-| T18 | Game-over celebration: confetti >1k, fireworks >5k / personal best / board #1 (D-033) | 6 | PR #28 reviewed 2026-09-10 — changes requested (rank-1 clause needs is_personal_best, D-033 corrected; rebase) | mid | T17b (game_over.tscn quiet) |
+| T18 | Game-over celebration: confetti >1k, fireworks >5k / personal best / board #1 (D-033) | 6 | PR #28 approved 2026-09-10 (e10faa5); awaiting Steve's merge; Natasha play-test next | mid | T17b (game_over.tscn quiet) |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8 → T10 → T9 →
 **Phase 5:** T11 ∥ T12 → T11.1 (deploy) → T13.
@@ -497,3 +497,8 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   Changes requested. **Shared-checkout incident:** `Pinball/` is on `task/T18-celebration`; the
   worker reports it deleted a `Pinball-T18` clone, yet the shared folder carries its branch.
   Steve to `git switch main` there before the next dispatch.
+- 2026-09-10: T18 re-review (PR #28, e10faa5, rebased on d1ce9e3) in scratch clone. Gate SUMMARY all
+  suites PASS, 16 scripts + boot check, CELEBRATION 7/7 incl. "rank 1 without PB stays confetti".
+  Fix identical to the planner-proven patch; test change is a strengthening. Shared checkout back on
+  main, no stray clones. Approved. Phase 6 (T17, T17b, T13b, T18) complete once #28 merges;
+  Natasha play-test before calling it done.
