@@ -34,8 +34,8 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T13b | Backlog: submit retry with backoff to ~60 s (survive a deploy window) | 5 | not started — only if scores get lost during deploys | cheap | T13 |
 | T13a | Server: friendly HTML board at `/` (D-026 amended) | 5 | merged + deployed 2026-09-09 (PR #23); live | cheap | T11.1 |
 | T16 | Per-name identity + per-player high score (D-031; fixes "Dad's score gone") | 5 fix | merged 2026-09-09 (PR #24); Steve: HIGH follows the name ✓ | mid | T13 |
-| T17 | App icon: glitter-drop default, icon catalog + `AppIcon` autoload (D-032) | 6 | PR #25 approved 2026-09-09 (f49e333); awaiting Steve's merge | mid | — |
-| T17b | Title-screen icon picker (choose among the 4 icons; D-032 API) | 6 | ready to brief once PR #25 is merged | cheap-mid | T17 |
+| T17 | App icon: glitter-drop default, icon catalog + `AppIcon` autoload (D-032) | 6 | merged 2026-09-10 (PR #25 → a45430c); dock icon seen in worker screenshot | mid | — |
+| T17b | Title-screen icon picker (choose among the 4 icons; D-032 API) | 6 | brief written 2026-09-10; not yet dispatched | cheap-mid | T17 |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8 → T10 → T9 →
 **Phase 5:** T11 ∥ T12 → T11.1 (deploy) → T13.
@@ -223,11 +223,14 @@ touch: any `scenes/**`, `scripts/**`, other autoloads, `tests/run_all.sh`.
 Gate adds a suite (15 total) and re-runs the real-boot step because autoload wiring changes.
 Hand-verified (not automatable headless): the dock icon of a `godot --path .` run shows the drop.
 
-### T17b — Icon picker on the title screen (backlog)
-Owns: `scenes/ui/icon_picker.tscn`, `scripts/ui/icon_picker.gd`; additive: `scenes/ui/title.tscn`
-/ `scripts/ui/title.gd` (one node next to `ThemePicker`), `tests/title_test.gd`. Mirrors
-`theme_picker.gd`. Uses only the D-032 `AppIcon` API. Dispatch after T17 is merged and Steve
-has seen the default icon in the dock.
+### T17b — Icon picker on the title screen (brief 2026-09-10)
+Owns: `scenes/ui/icon_picker.tscn`, `scripts/ui/icon_picker.gd`, `tests/icon_picker_test.gd`;
+additive: `scenes/ui/title.tscn` (one instanced node `IconPicker`, appended after `ThemePicker`,
+placed in the free band y 1150-1270, x 80-640 of the 720×1280 viewport). Must not touch
+`title.gd`, `theme_picker.*`, `tests/title_test.gd`, autoloads, `project.godot`. Mirrors
+`theme_picker.gd` (buttons + one key, themed via `Theme`), shows a 96 px preview of the current
+icon, uses only the D-032 `AppIcon` API. Key: `I` cycles forward; ←/→ stay with the theme
+picker. Gate adds a suite (15 scripts + boot check).
 
 ### T9 — Test isolation (found in T8 review)
 Every `-s tests/*.gd` run uses the app's real `user://` (macOS: ~/Library/Application
