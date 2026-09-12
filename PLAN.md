@@ -606,3 +606,14 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   at once. D-038 written; T21 briefed. Steve can self-heal Dad now by choosing Dad in-game.
   Also deleted the planner's `/tmp` leftovers (t17-saves backup, squish test DBs and logs) after
   confirming the live saves are strictly richer than the backup.
+- 2026-09-12 (later): Dad's profile self-healed exactly as predicted — selecting his name pushed
+  `coffee_cuppa` at 04:06:58Z, so both players are now on the board. But Natasha's row also reads
+  `coffee_cuppa` (was `puppy_jax`), and the **local** save now holds
+  `{natasha: coffee_cuppa, dad: coffee_cuppa}` — the server is faithfully mirroring the device, so
+  whatever changed it happened locally. Planner reproduced four candidate sequences on a clean clone:
+  switching Natasha→Dad→Natasha leaves the map **intact** (`natasha: puppy_jax`), with or without an
+  avatar pick while Dad is current; adopting a cloud value for *another* player's id is correctly
+  refused by the player_id guard. The only sequences that yield the observed state are a direct
+  picker click for Natasha, or a cloud adopt into an empty local slot. **No client defect proven** —
+  asked Steve what he clicked rather than asserting a bug. Natasha's avatar is restored by re-picking
+  it in Settings.
