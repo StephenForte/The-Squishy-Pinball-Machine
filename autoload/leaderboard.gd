@@ -30,6 +30,8 @@ var _submit_state: Dictionary = {}
 var _hooked_titles: Dictionary = {}
 var _fetch_gen: int = 0
 var _profile_push_count: int = 0
+## Set while adopting a cloud avatar so set_avatar does not fire a PUT (D-038).
+var _suppress_profile_push: bool = false
 
 
 func _ready() -> void:
@@ -65,13 +67,13 @@ func push_profile() -> void:
 	_http_request(HTTPClient.METHOD_PUT, url, body, _on_push_profile_finished, true)
 
 
-func fetch_profile(player_id: String) -> void:
+func fetch_profile(player_id: String, from_boot: bool = false) -> void:
 	if player_id.is_empty():
 		return
 	if _profile_http_skipped():
 		return
 	var url := "%s/v1/profile?player_id=%s" % [_base_url(), player_id]
-	_http_request(HTTPClient.METHOD_GET, url, "", _on_fetch_profile_finished)
+	_http_request(HTTPClient.METHOD_GET, url, "", _on_fetch_profile_finished.bind(player_id, from_boot))
 
 
 func fetch_top(limit: int) -> void:
@@ -103,10 +105,14 @@ func _connect_profile() -> void:
 
 
 func _on_profile_name_changed(_name: String) -> void:
+	if _suppress_profile_push:
+		return
 	push_profile()
 
 
 func _on_profile_avatar_changed(_avatar_id: String) -> void:
+	if _suppress_profile_push:
+		return
 	push_profile()
 
 
@@ -119,7 +125,7 @@ func _boot_restore_profile() -> void:
 	var player_id := String(profile.player_id)
 	if player_id.is_empty():
 		return
-	fetch_profile(player_id)
+	fetch_profile(player_id, true)
 
 
 func _profile_http_skipped() -> bool:
@@ -131,17 +137,52 @@ func _on_push_profile_finished(_ok: bool, _code: int, _parsed: Variant, _reason:
 	return
 
 
-func _on_fetch_profile_finished(ok: bool, code: int, parsed: Variant, _reason: String) -> void:
-	# 404 = no cloud profile yet. Transport failures stay quiet (D-037).
-	if not ok:
-		return
+func _on_fetch_profile_finished(ok: bool, code: int, parsed: Variant, _reason: String, requested_id: String, from_boot: bool) -> void:
+	# D-038: 404 is a real "no cloud profile". Check it before `not ok` —
+	# `_on_http_completed` reports every non-2xx as ok == false, including 404.
+	# Transport failure is code 0, never a 404; do nothing at all.
 	if code == 404:
+		if from_boot:
+			_reconcile_boot_missing_cloud(requested_id)
+		return
+	if not ok:
 		return
 	if typeof(parsed) != TYPE_DICTIONARY:
 		return
 	var data: Dictionary = parsed
 	_adopt_cloud_avatar_if_local_empty(data)
+	if from_boot:
+		_reconcile_boot_divergence(data)
 	profile_synced.emit(data)
+
+
+func _reconcile_boot_missing_cloud(requested_id: String) -> void:
+	var profile := get_node_or_null("/root/Profile")
+	if profile == null:
+		return
+	if requested_id.is_empty() or String(profile.player_id) != requested_id:
+		return
+	if String(profile.player_name).is_empty():
+		return
+	if String(profile.avatar_id).is_empty():
+		return
+	push_profile()
+
+
+func _reconcile_boot_divergence(data: Dictionary) -> void:
+	var profile := get_node_or_null("/root/Profile")
+	if profile == null:
+		return
+	if String(data.get("player_id", "")) != String(profile.player_id):
+		return
+	if String(profile.player_name).is_empty():
+		return
+	var local_avatar := String(profile.avatar_id)
+	if local_avatar.is_empty():
+		return
+	if local_avatar == String(data.get("avatar", "")):
+		return
+	push_profile()
 
 
 func _adopt_cloud_avatar_if_local_empty(data: Dictionary) -> void:
@@ -159,7 +200,10 @@ func _adopt_cloud_avatar_if_local_empty(data: Dictionary) -> void:
 	var server_avatar := String(data.get("avatar", ""))
 	if server_avatar.is_empty():
 		return
+	# Adopting must not PUT the value the cloud already has (D-038 gap-fill).
+	_suppress_profile_push = true
 	profile.set_avatar(server_avatar)
+	_suppress_profile_push = false
 
 
 func _bind_existing_tree() -> void:
