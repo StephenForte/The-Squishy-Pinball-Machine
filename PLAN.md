@@ -38,8 +38,8 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T17b | Title-screen icon picker (choose among the 4 icons; D-032 API) | 6 | merged 2026-09-10 (PR #26 → b668aa3) | cheap-mid | T17 |
 | T18 | Game-over celebration: confetti >1k, fireworks >5k / personal best / board #1 (D-033) | 6 | merged 2026-09-11 (PR #28 → 659aaa6); Natasha play-test pending | mid | T17b |
 | T19 | Settings overlay (theme + icon + avatar pickers off the title) + local avatar (D-035/D-036) | 7 | merged 2026-09-11 (PR #29 → f93f1c1); Natasha play-test pending | mid-strong | T18 |
-| T20a | Server: `profiles` table, `PUT/GET /v1/profile`, avatar on the board and `/` (D-037) | 7 | PR #30 approved 2026-09-11 (07260d2); merge → planner deploys → then T20b | mid | T19 |
-| T20b | Client: push profile on change, restore when local is empty (D-037) | 7 | brief written 2026-09-11; dispatch after T20a is merged **and deployed** | mid | T20a |
+| T20a | Server: `profiles` table, `PUT/GET /v1/profile`, avatar on the board and `/` (D-037) | 7 | merged + **deployed live** 2026-09-12 (PR #30 → 70918fe, dep-daibbvp594qs73823ssg) | mid | T19 |
+| T20b | Client: push profile on change, restore when local is empty (D-037) | 7 | **ready to dispatch** — brief written, T20a live 2026-09-12 | mid | T20a |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8 → T10 → T9 →
 **Phase 5:** T11 ∥ T12 → T11.1 (deploy) → T13.
@@ -582,3 +582,8 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   avatar appears after upsert, board HTML has exactly one same-origin img. Approved.
   Verified operational fact, now in D-037: the catalog is cached at boot, so a newly added squishy
   needs a deploy before the server accepts it (400 on the running process, 200 after restart).
+- 2026-09-12: T20a deployed and smoke-checked live (see D-028 deploy record). Board data intact
+  across the deploy; `avatar` present and empty on every entry; `/avatars/bear_bounce.png` serves a
+  228×167 PNG; auth and validation paths answer correctly. Traversal re-tested **in production**:
+  Cloudflare returns 400 for the encoded form before the app sees it, the app returns 404 for the
+  rest. No production rows written during the check. T20b is now safe to dispatch.
