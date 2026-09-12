@@ -38,7 +38,7 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T17b | Title-screen icon picker (choose among the 4 icons; D-032 API) | 6 | merged 2026-09-10 (PR #26 → b668aa3) | cheap-mid | T17 |
 | T18 | Game-over celebration: confetti >1k, fireworks >5k / personal best / board #1 (D-033) | 6 | merged 2026-09-11 (PR #28 → 659aaa6); Natasha play-test pending | mid | T17b |
 | T19 | Settings overlay (theme + icon + avatar pickers off the title) + local avatar (D-035/D-036) | 7 | brief written 2026-09-11; not yet dispatched | mid-strong | T18 |
-| T20 | Cloud half of the profile (avatar + name) — scope blocked on Steve's answer | 7 | not started — question asked 2026-09-11 | tbd | T19 |
+| T20 | Cloud profile: server `profiles` table + avatar on the board (D-036; amends D-026) | 7 | unblocked 2026-09-11 (Steve: sync to the server); brief after T19 merges | mid | T19 |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8 → T10 → T9 →
 **Phase 5:** T11 ∥ T12 → T11.1 (deploy) → T13.
@@ -271,12 +271,12 @@ Must not touch: `scripts/main.gd`, `theme_picker.*`, `icon_picker.*` (re-parente
 `autoload/{game,theme,sfx,leaderboard,app_icon}.gd`, `server/**`, `tests/menu_test.gd`,
 `tests/title_test.gd`, `tests/run_all.sh`.
 
-### T20 — Cloud profile (blocked on a question, 2026-09-11)
-Steve asked to save avatar + name "locally or from the cloud". Two readings, materially different
-work: (a) sync this device's profile to the leaderboard server — new `profiles` table, key-protected
-`PUT/GET /v1/profile`, avatar on the board and on `/`, restore after a reinstall; or (b) load an
-avatar image from a URL. Asked 2026-09-11; brief not written until answered. Either way it lands
-after T19 and, if (a), it amends D-026 and needs a manual Render deploy (D-028).
+### T20 — Cloud profile (Steve answered 2026-09-11: sync to the server)
+Server half is independent of T19 and could be split out as T20a if Steve wants it in parallel;
+the client half reads `Profile`'s as-built avatar API, so its brief is written once T19 merges.
+Shape per D-036: `profiles(player_id, name, avatar, updated_at)`, key-protected `PUT /v1/profile`,
+public `GET /v1/profile?player_id=`, `avatar` on leaderboard entries and on the `/` page, 16 PNGs
+served from the server. Amends D-026; manual deploy after merge (D-028), then check `/healthz` + `/`.
 
 ### T9 — Test isolation (found in T8 review)
 Every `-s tests/*.gd` run uses the app's real `user://` (macOS: ~/Library/Application
@@ -534,3 +534,7 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   `autoload/profile.gd` keys identity by sanitised-lowercase name (D-031); avatars key the same way.
   `assets/design/squishes/art/`: 16 PNGs, 228×167, 1.1 MB total; `squishy_catalog.gd` exposes
   `static sprite_path(id)`. Server unchanged by T19: `parseScoreBody` has no avatar field.
+- 2026-09-11: Steve answered both T19/T20 questions — cloud = sync to the leaderboard server (not a
+  URL image); avatar set = the 16 squishies, and he wants to keep adding squishies by editing the
+  JSON. D-036 amended: the picker enumerates the whole catalog at run time and skips entries whose
+  art will not load, so a hand-added entry needs no code change.
