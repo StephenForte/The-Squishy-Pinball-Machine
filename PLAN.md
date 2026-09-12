@@ -38,7 +38,7 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T17b | Title-screen icon picker (choose among the 4 icons; D-032 API) | 6 | merged 2026-09-10 (PR #26 → b668aa3) | cheap-mid | T17 |
 | T18 | Game-over celebration: confetti >1k, fireworks >5k / personal best / board #1 (D-033) | 6 | merged 2026-09-11 (PR #28 → 659aaa6); Natasha play-test pending | mid | T17b |
 | T19 | Settings overlay (theme + icon + avatar pickers off the title) + local avatar (D-035/D-036) | 7 | merged 2026-09-11 (PR #29 → f93f1c1); Natasha play-test pending | mid-strong | T18 |
-| T20a | Server: `profiles` table, `PUT/GET /v1/profile`, avatar on the board and `/` (D-037) | 7 | brief written 2026-09-11; not yet dispatched | mid | T19 |
+| T20a | Server: `profiles` table, `PUT/GET /v1/profile`, avatar on the board and `/` (D-037) | 7 | PR #30 approved 2026-09-11 (07260d2); merge → planner deploys → then T20b | mid | T19 |
 | T20b | Client: push profile on change, restore when local is empty (D-037) | 7 | brief written 2026-09-11; dispatch after T20a is merged **and deployed** | mid | T20a |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8 → T10 → T9 →
@@ -570,3 +570,15 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   suite its own DB, so new tests need no shared fixture. D-028 records Render's build as
   `cd server && npm ci` with no rootDir, so the repo's `assets/` is present in production — T20a
   must still degrade gracefully if it is not.
+- 2026-09-11: T20a (PR #30, 07260d2, base 993664d) reviewed in scratch clone. Scope ✓ (server/** only).
+  `npm test` 47/20 pass; main re-run separately for the baseline: 32/14 — the handoff's 32 → 47 is exact.
+  Godot gate SUMMARY all suites PASS (17 + boot), so the shipped client still parses the responses.
+  Probe 1, traversal: 13 crafted requests against a live server with a canary planted outside the art
+  dir — only the control returned 200, nothing leaked; falsified by swapping the whitelist for a naive
+  decodeURIComponent join, which went red at once (macOS case-insensitivity alone leaks there).
+  Probe 2, D-026's latest-name rule: 9000 as "OldName" then 100 as "NewName" → board shows NewName /
+  9000 / frog_gus; a profile-less player gets "" not null. Probe 3, migration built with **main's**
+  db.js then opened with the branch's: 2 legacy rows intact, scores columns unchanged, profiles empty,
+  avatar appears after upsert, board HTML has exactly one same-origin img. Approved.
+  Verified operational fact, now in D-037: the catalog is cached at boot, so a newly added squishy
+  needs a deploy before the server accepts it (400 on the running process, 200 after restart).
