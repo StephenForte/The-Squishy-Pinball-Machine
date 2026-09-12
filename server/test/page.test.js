@@ -49,6 +49,56 @@ describe('renderBoard', () => {
     const html = renderBoard({});
     assert.match(html, /No scores yet/);
   });
+
+  it('emits one same-origin img when avatar is set, and none when empty', () => {
+    const withAvatar = renderBoard({
+      entries: [{
+        rank: 1,
+        player_id: NATASHA,
+        name: 'Natasha',
+        score: 100,
+        at: '2026-09-08T18:00:00.000Z',
+        avatar: 'bear_bounce',
+      }],
+      total_players: 1,
+    });
+    const imgs = [...withAvatar.matchAll(/<img\b[^>]*>/g)].map((m) => m[0]);
+    assert.equal(imgs.length, 1);
+    assert.match(imgs[0], /src="\/avatars\/bear_bounce\.png"/);
+    assert.doesNotMatch(imgs[0], /src="https?:/);
+
+    const without = renderBoard({
+      entries: [{
+        rank: 1,
+        player_id: NATASHA,
+        name: 'Natasha',
+        score: 100,
+        at: '2026-09-08T18:00:00.000Z',
+        avatar: '',
+      }],
+      total_players: 1,
+    });
+    assert.doesNotMatch(without, /<img\b/);
+  });
+
+  it('escapes a <script> name everywhere including the img alt text', () => {
+    const nasty = `<script>alert(1)</script>`;
+    const html = renderBoard({
+      entries: [{
+        rank: 1,
+        player_id: NATASHA,
+        name: nasty,
+        score: 100,
+        at: '2026-09-08T18:00:00.000Z',
+        avatar: 'bear_bounce',
+      }],
+      total_players: 1,
+    });
+    assert.match(html, /alt="&lt;script&gt;alert\(1\)&lt;\/script&gt;"/);
+    assert.match(html, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
+    assert.doesNotMatch(html, /<script/i);
+    assert.doesNotMatch(html, new RegExp(nasty));
+  });
 });
 
 describe('GET /', () => {

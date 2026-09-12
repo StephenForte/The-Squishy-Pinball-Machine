@@ -1,9 +1,11 @@
 import { timingSafeEqual } from 'node:crypto';
+import { existsSync, readFileSync } from 'node:fs';
 import http from 'node:http';
 import { pathToFileURL } from 'node:url';
-import { closeDb, getLeaderboard, getMe, insertScore, openDb, storeLabel } from './db.js';
+import { createCatalog } from './catalog.js';
+import { closeDb, getLeaderboard, getMe, getProfile, insertScore, openDb, storeLabel, upsertProfile } from './db.js';
 import { renderBoard } from './page.js';
-import { isUuidV4, normalizePlayerId, parseLimit, parseScoreBody } from './validate.js';
+import { isUuidV4, normalizePlayerId, parseLimit, parseProfileBody, parseScoreBody } from './validate.js';
 
 const BODY_LIMIT = 4096;
 const RATE_WINDOW_MS = 60_000;
@@ -54,6 +56,15 @@ function sendHtml(res, status, html) {
     'content-length': Buffer.byteLength(html),
   });
   res.end(html);
+}
+
+function sendPng(res, data) {
+  res.writeHead(200, {
+    'content-type': 'image/png',
+    'cache-control': 'public, max-age=86400',
+    'content-length': data.length,
+  });
+  res.end(data);
 }
 
 function readBody(req, limit = BODY_LIMIT) {
@@ -178,6 +189,87 @@ async function handle(req, res, ctx) {
     return;
   }
 
+  if (req.method === 'PUT' && path === '/v1/profile') {
+    if (!keysMatch(req.headers['x-squish-key'], ctx.key)) {
+      send(res, 401, { error: 'unauthorized' });
+      return;
+    }
+
+    let raw;
+    try {
+      raw = await readBody(req);
+    } catch (err) {
+      if (err.code === 'body_too_large') {
+        send(res, 400, { error: 'body_too_large' });
+        return;
+      }
+      send(res, 400, { error: 'invalid_json' });
+      return;
+    }
+
+    let body;
+    try {
+      body = JSON.parse(raw.toString('utf8'));
+    } catch {
+      send(res, 400, { error: 'invalid_json' });
+      return;
+    }
+
+    const parsed = parseProfileBody(body, (id) => ctx.catalog.has(id));
+    if (!parsed.ok) {
+      send(res, 400, { error: parsed.error });
+      return;
+    }
+
+    if (!ctx.limiter.allow(parsed.value.player_id)) {
+      send(res, 429, { error: 'rate_limited' });
+      return;
+    }
+
+    const result = upsertProfile(ctx.db, parsed.value);
+    send(res, 200, result);
+    return;
+  }
+
+  if (req.method === 'GET' && path === '/v1/profile') {
+    const playerId = url.searchParams.get('player_id');
+    if (!isUuidV4(playerId)) {
+      send(res, 400, { error: 'invalid_player_id' });
+      return;
+    }
+    const profile = getProfile(ctx.db, normalizePlayerId(playerId));
+    if (!profile) {
+      send(res, 404, { error: 'unknown_profile' });
+      return;
+    }
+    send(res, 200, profile);
+    return;
+  }
+
+  if (req.method === 'GET' && path.startsWith('/avatars/')) {
+    const match = /^\/avatars\/([^/]+)\.png$/.exec(path);
+    if (!match) {
+      send(res, 404, { error: 'not_found' });
+      return;
+    }
+    const id = match[1];
+    if (!ctx.catalog.has(id)) {
+      send(res, 404, { error: 'not_found' });
+      return;
+    }
+    const filePath = ctx.catalog.pathFor(id);
+    if (!filePath || !existsSync(filePath)) {
+      send(res, 404, { error: 'not_found' });
+      return;
+    }
+    try {
+      sendPng(res, readFileSync(filePath));
+    } catch {
+      send(res, 404, { error: 'not_found' });
+    }
+    return;
+  }
+
   send(res, 404, { error: 'not_found' });
 }
 
@@ -186,7 +278,11 @@ export function createServer(options = {}) {
   const key = options.key ?? process.env.SQUISH_KEY ?? '';
   const db = openDb(dbPath);
   const limiter = options.limiter ?? createRateLimiter();
-  const ctx = { db, key, limiter, store: storeLabel(dbPath) };
+  const catalog = options.catalog ?? createCatalog({
+    catalogPath: options.catalogPath,
+    repoRoot: options.repoRoot,
+  });
+  const ctx = { db, key, limiter, store: storeLabel(dbPath), catalog };
 
   const server = http.createServer((req, res) => {
     handle(req, res, ctx).catch(() => {

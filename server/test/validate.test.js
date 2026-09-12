@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { parseLimit, parseScoreBody, sanitizeName } from '../src/validate.js';
+import { parseLimit, parseProfileBody, parseScoreBody, sanitizeName } from '../src/validate.js';
 
 const ID = '11111111-1111-4111-8111-111111111111';
 
@@ -48,6 +48,36 @@ describe('parseScoreBody', () => {
   it('rejects a negative or float score', () => {
     assert.equal(parseScoreBody({ ...good, score: -1 }).error, 'invalid_score');
     assert.equal(parseScoreBody({ ...good, score: 1.5 }).error, 'invalid_score');
+  });
+});
+
+describe('parseProfileBody', () => {
+  const known = (id) => id === 'bear_bounce';
+  const good = {
+    player_id: ID,
+    name: 'Natasha',
+    avatar: 'bear_bounce',
+    client: 'squish/1.0',
+  };
+
+  it('accepts a valid body, empty avatar, and lowercases the uuid', () => {
+    const parsed = parseProfileBody({ ...good, player_id: ID.toUpperCase() }, known);
+    assert.equal(parsed.ok, true);
+    assert.equal(parsed.value.player_id, ID);
+    assert.equal(parsed.value.avatar, 'bear_bounce');
+
+    const empty = parseProfileBody({ ...good, avatar: '' }, () => false);
+    assert.equal(empty.ok, true);
+    assert.equal(empty.value.avatar, '');
+  });
+
+  it('rejects a bad uuid, empty name, unknown avatar, and bad client', () => {
+    assert.equal(parseProfileBody({ ...good, player_id: 'nope' }, known).error, 'invalid_player_id');
+    assert.equal(parseProfileBody({ ...good, name: '   ' }, known).error, 'invalid_name');
+    assert.equal(parseProfileBody({ ...good, name: 'Nat\u0001asha' }, known).error, 'invalid_name');
+    assert.equal(parseProfileBody({ ...good, avatar: 'not_a_squishy' }, known).error, 'invalid_avatar');
+    assert.equal(parseProfileBody({ ...good, avatar: 1 }, known).error, 'invalid_avatar');
+    assert.equal(parseProfileBody({ ...good, client: 'nope' }, known).error, 'invalid_client');
   });
 });
 
