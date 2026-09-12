@@ -1,8 +1,8 @@
 extends Control
 
 ## Title-screen settings overlay (D-035). Hidden on boot. While visible it
-## consumes S, menu/Escape, restart/R and launch_ball/Space so those keys
-## do not reach main.gd. Guard is is_visible_in_tree(): a closed overlay
+## consumes S, menu/Escape, restart/R, launch_ball/Space and change_name/N
+## so those keys do not reach main.gd or open NameEntry under the overlay. Guard is is_visible_in_tree(): a closed overlay
 ## must not steal Escape/R. Children run _unhandled_input before parents,
 ## so this Control under Title beats scripts/main.gd without editing it.
 
@@ -76,6 +76,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		return
 	if event.is_action_pressed("launch_ball"):
+		get_viewport().set_input_as_handled()
+		return
+	if event.is_action_pressed("change_name"):
 		get_viewport().set_input_as_handled()
 		return
 	if not (event is InputEventKey) or not event.pressed or event.echo:

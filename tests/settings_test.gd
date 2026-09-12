@@ -57,6 +57,8 @@ func _run() -> void:
 		return
 	if not await _case_5_name_entry(main):
 		return
+	if not await _case_5b_n_while_open(main):
+		return
 	if not await _case_6_layout(main):
 		return
 	if not await _case_7_avatar_ids(main):
@@ -294,6 +296,31 @@ func _case_5_name_entry(main: Node) -> bool:
 
 	_cases_passed += 1
 	print("SETTINGS case 5 pass")
+	return true
+
+
+func _case_5b_n_while_open(main: Node) -> bool:
+	print("SETTINGS case 5b N while Settings open")
+	var settings := main.get_node_or_null("Title/Settings") as Control
+	var entry := main.get_node_or_null("Title/NameEntry")
+	if settings == null or entry == null:
+		return _fail("case 5b: Settings or NameEntry missing")
+	_open_settings(main)
+	await process_frame
+	if not settings.is_visible_in_tree():
+		return _fail("case 5b: Settings should be open")
+	_push_action(main, "change_name")
+	await process_frame
+	await process_frame
+	_push_action(main, "change_name", false)
+	if entry.visible or (entry.has_method("is_capturing") and entry.is_capturing()):
+		return _fail("case 5b: N opened NameEntry under Settings")
+	if not settings.is_visible_in_tree():
+		return _fail("case 5b: N should leave Settings open")
+	_close_settings(main)
+	await process_frame
+	_cases_passed += 1
+	print("SETTINGS case 5b pass")
 	return true
 
 
