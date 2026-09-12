@@ -39,7 +39,8 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T18 | Game-over celebration: confetti >1k, fireworks >5k / personal best / board #1 (D-033) | 6 | merged 2026-09-11 (PR #28 → 659aaa6); Natasha play-test pending | mid | T17b |
 | T19 | Settings overlay (theme + icon + avatar pickers off the title) + local avatar (D-035/D-036) | 7 | merged 2026-09-11 (PR #29 → f93f1c1); Natasha play-test pending | mid-strong | T18 |
 | T20a | Server: `profiles` table, `PUT/GET /v1/profile`, avatar on the board and `/` (D-037) | 7 | merged + **deployed live** 2026-09-12 (PR #30 → 70918fe, dep-daibbvp594qs73823ssg) | mid | T19 |
-| T20b | Client: push profile on change, restore when local is empty (D-037) | 7 | PR #31 approved 2026-09-12 (69f4de8); awaiting Steve's merge | mid | T20a |
+| T20b | Client: push profile on change, restore when local is empty (D-037) | 7 | merged 2026-09-12 (PR #31 → 817d295) | mid | T20a |
+| T21 | Boot reconciles profile both ways so a pre-existing avatar uploads (D-038) | 7 fix | brief written 2026-09-12; not yet dispatched | mid | T20b |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8 → T10 → T9 →
 **Phase 5:** T11 ∥ T12 → T11.1 (deploy) → T13.
@@ -596,3 +597,12 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   deleting the empty-avatar check — only the race case goes red, so case 17 is the discriminating
   one. A/B on the sentinel guard showed it changes nothing (23 s vs 24 s, identical error and warning
   counts): the brief's trap text was wrong, D-037 now records the correction. Approved.
+- 2026-09-12: Steve played and reported "did not see our avatars" on the web board. Planner verified
+  rather than assumed: Natasha's avatar IS live (`/v1/profile` returns puppy_jax; the `/` row emits
+  `<img src="/avatars/puppy_jax.png">`; the image serves 200 image/png 68189 B). Dad returns
+  `unknown_profile`. Root cause is a hole in D-037 — push fires only on change, boot only fetches —
+  so an avatar chosen before T20b merged (20:56:45 local) never uploads. Reproduced on a clean clone
+  of main: boot with a local avatar and an empty cloud fired 0 pushes; re-selecting the name pushed
+  at once. D-038 written; T21 briefed. Steve can self-heal Dad now by choosing Dad in-game.
+  Also deleted the planner's `/tmp` leftovers (t17-saves backup, squish test DBs and logs) after
+  confirming the live saves are strictly richer than the backup.
