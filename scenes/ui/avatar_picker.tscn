@@ -1,0 +1,37 @@
+[gd_scene load_steps=2 format=3 uid="uid://c19avatar7picker"]
+
+[ext_resource type="Script" path="res://scripts/ui/avatar_picker.gd" id="1_avatar"]
+
+[node name="AvatarPicker" type="Control"]
+layout_mode = 3
+anchors_preset = 0
+offset_left = 40.0
+offset_top = 100.0
+offset_right = 680.0
+offset_bottom = 780.0
+mouse_filter = 0
+script = ExtResource("1_avatar")
+
+[node name="Caption" type="Label" parent="."]
+layout_mode = 0
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 640.0
+offset_bottom = 36.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 0.92, 0.35, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 6
+theme_override_font_sizes/font_size = 22
+text = "AVATAR"
+horizontal_alignment = 1
+
+[node name="Grid" type="GridContainer" parent="."]
+layout_mode = 0
+offset_left = 0.0
+offset_top = 40.0
+offset_right = 640.0
+offset_bottom = 680.0
+theme_override_constants/h_separation = 8
+theme_override_constants/v_separation = 8
+columns = 4

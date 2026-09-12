@@ -4,6 +4,7 @@ extends Node
 ## players: sanitised-lowercase name → UUID v4. player_id follows player_name.
 
 signal name_changed(name: String)
+signal avatar_changed(avatar_id: String)
 
 const SAVE_PATH := "user://profile.save"
 const NAME_MAX_LEN := 16
@@ -11,6 +12,8 @@ const NAME_MAX_LEN := 16
 var player_id: String = ""
 var player_name: String = ""
 var players: Dictionary = {}
+var avatar_id: String = ""
+var avatars: Dictionary = {}
 
 
 func _ready() -> void:
@@ -25,10 +28,14 @@ func set_name(n: StringName) -> void:
 	var key := _name_key(cleaned)
 	if key == _name_key(player_name):
 		return
+	var previous_avatar := avatar_id
 	if cleaned.is_empty():
 		player_name = ""
+		avatar_id = ""
 		_save()
 		name_changed.emit(player_name)
+		if previous_avatar != avatar_id:
+			avatar_changed.emit(avatar_id)
 		return
 	if players.has(key) and _is_uuid_v4(String(players[key])):
 		player_id = String(players[key])
@@ -38,8 +45,11 @@ func set_name(n: StringName) -> void:
 		player_id = _generate_uuid_v4()
 		players[key] = player_id
 	player_name = cleaned
+	avatar_id = _avatar_for_key(key)
 	_save()
 	name_changed.emit(player_name)
+	if previous_avatar != avatar_id:
+		avatar_changed.emit(avatar_id)
 
 
 func _load_or_create() -> void:
@@ -48,6 +58,8 @@ func _load_or_create() -> void:
 	player_id = _generate_uuid_v4()
 	player_name = ""
 	players = {}
+	avatar_id = ""
+	avatars = {}
 	_save()
 
 
@@ -62,20 +74,66 @@ func _try_load() -> bool:
 		return false
 	var loaded_name := _sanitize_name(String(data.get("player_name", "")))
 	var loaded_players := _parse_players(data.get("players", {}))
-	var migrated := not data.has("players")
+	var loaded_avatars := _parse_avatars(data.get("avatars", {}))
+	var migrated := not data.has("players") or not data.has("avatars")
 	if loaded_players.is_empty() and not loaded_name.is_empty():
 		loaded_players[_name_key(loaded_name)] = id
 		migrated = true
 	player_id = id
 	player_name = loaded_name
 	players = loaded_players
+	avatars = loaded_avatars
 	if not player_name.is_empty():
 		var key := _name_key(player_name)
 		if players.has(key) and _is_uuid_v4(String(players[key])):
 			player_id = String(players[key])
+		avatar_id = _avatar_for_key(key)
+	else:
+		avatar_id = ""
 	if migrated:
 		_save()
 	return true
+
+
+func set_avatar(id: String) -> bool:
+	if not _is_catalog_avatar(id):
+		return false
+	var key := _name_key(player_name)
+	if avatar_id == id and (key.is_empty() or String(avatars.get(key, "")) == id):
+		return true
+	avatar_id = id
+	if not key.is_empty():
+		avatars[key] = id
+	_save()
+	avatar_changed.emit(avatar_id)
+	return true
+
+
+func _avatar_for_key(key: String) -> String:
+	var id := String(avatars.get(key, ""))
+	if not _is_catalog_avatar(id):
+		return ""
+	return id
+
+
+func _is_catalog_avatar(id: String) -> bool:
+	if id.is_empty():
+		return false
+	return not SquishyCatalog.entry(id).is_empty()
+
+
+func _parse_avatars(raw: Variant) -> Dictionary:
+	var out := {}
+	if typeof(raw) != TYPE_DICTIONARY:
+		return out
+	var src: Dictionary = raw
+	for key_variant in src.keys():
+		var key := _name_key(_sanitize_name(String(key_variant)))
+		var value := String(src[key_variant])
+		if key.is_empty() or value.is_empty():
+			continue
+		out[key] = value
+	return out
 
 
 func _parse_players(raw: Variant) -> Dictionary:
@@ -108,6 +166,7 @@ func _save() -> void:
 		"player_id": player_id,
 		"player_name": player_name,
 		"players": players,
+		"avatars": avatars,
 	}))
 
 

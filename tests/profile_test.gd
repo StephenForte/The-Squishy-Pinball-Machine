@@ -5,6 +5,8 @@ const PROFILE_SCRIPT := preload("res://autoload/profile.gd")
 
 var _cases_passed: int = 0
 var _name_changed_count: int = 0
+var _avatar_changed_count: int = 0
+var _last_avatar_id: String = ""
 var _profile: Node
 var _game: Node
 var _theme: Node
@@ -24,6 +26,7 @@ func _run() -> void:
 		return
 	_profile._load_or_create()
 	_profile.name_changed.connect(_on_name_changed)
+	_profile.avatar_changed.connect(_on_avatar_changed)
 
 	if change_scene_to_file("res://scenes/main.tscn") != OK:
 		_fail("could not load main.tscn")
@@ -56,6 +59,16 @@ func _run() -> void:
 		return
 	if not await _case_9_migrate_planner_save():
 		return
+	if not await _case_10_set_avatar(main):
+		return
+	if not await _case_11_reject_unknown():
+		return
+	if not await _case_12_name_restores_avatar():
+		return
+	if not await _case_13_unknown_id_loads_empty():
+		return
+	if not await _case_14_pre_t19_save():
+		return
 
 	print("PROFILE PASS cases=%d" % _cases_passed)
 	quit(0)
@@ -63,6 +76,11 @@ func _run() -> void:
 
 func _on_name_changed(_name: String) -> void:
 	_name_changed_count += 1
+
+
+func _on_avatar_changed(avatar_id: String) -> void:
+	_avatar_changed_count += 1
+	_last_avatar_id = avatar_id
 
 
 func _case_1_fresh(main: Node) -> bool:
@@ -375,6 +393,148 @@ func _case_9_migrate_planner_save() -> bool:
 	_cases_passed += 1
 	print("PROFILE case 9 pass")
 	return true
+
+
+func _case_10_set_avatar(main: Node) -> bool:
+	print("PROFILE case 10 set_avatar")
+	var ids := _loadable_avatar_ids()
+	if ids.size() < 1:
+		return _fail("case 10: catalog has no loadable avatars")
+	var pick_id := String(ids[0])
+	_avatar_changed_count = 0
+	if not bool(_profile.set_avatar(pick_id)):
+		return _fail("case 10: set_avatar(%s) returned false" % pick_id)
+	await process_frame
+	if String(_profile.avatar_id) != pick_id:
+		return _fail("case 10: avatar_id %s want %s" % [_profile.avatar_id, pick_id])
+	if _avatar_changed_count != 1:
+		return _fail("case 10: avatar_changed fired %d times, expected 1" % _avatar_changed_count)
+	var data := _read_profile_save()
+	var key := String(_profile.player_name).to_lower()
+	if String((data.get("avatars", {}) as Dictionary).get(key, "")) != pick_id:
+		return _fail("case 10: profile.save avatars missing %s: %s" % [pick_id, data])
+	var view := main.get_node_or_null("Title/AvatarView") as TextureRect
+	if view == null:
+		return _fail("case 10: Title/AvatarView missing")
+	if view.texture == null:
+		return _fail("case 10: AvatarView texture is null")
+	if String(view.texture.resource_path) != SquishyCatalog.sprite_path(pick_id):
+		return _fail(
+			"case 10: AvatarView path %s want %s"
+			% [view.texture.resource_path, SquishyCatalog.sprite_path(pick_id)]
+		)
+	_cases_passed += 1
+	print("PROFILE case 10 pass")
+	return true
+
+
+func _case_11_reject_unknown() -> bool:
+	print("PROFILE case 11 reject unknown")
+	var before_id := String(_profile.avatar_id)
+	var before_text := FileAccess.get_file_as_string(SAVE_PATH)
+	_avatar_changed_count = 0
+	if bool(_profile.set_avatar("not_a_squishy")):
+		return _fail("case 11: set_avatar(not_a_squishy) should return false")
+	await process_frame
+	if String(_profile.avatar_id) != before_id:
+		return _fail("case 11: rejected set_avatar changed avatar_id")
+	if _avatar_changed_count != 0:
+		return _fail("case 11: rejected set_avatar emitted avatar_changed")
+	if FileAccess.get_file_as_string(SAVE_PATH) != before_text:
+		return _fail("case 11: rejected set_avatar wrote profile.save")
+	_cases_passed += 1
+	print("PROFILE case 11 pass")
+	return true
+
+
+func _case_12_name_restores_avatar() -> bool:
+	print("PROFILE case 12 name restores avatar")
+	var ids := _loadable_avatar_ids()
+	if ids.size() < 2:
+		return _fail("case 12: need two loadable avatars")
+	var avatar_x := String(ids[0])
+	var avatar_y := String(ids[1])
+	_profile.call("set_name", "Alpha")
+	await process_frame
+	if not bool(_profile.set_avatar(avatar_x)):
+		return _fail("case 12: could not set avatar X")
+	_profile.call("set_name", "Bravo")
+	await process_frame
+	if String(_profile.avatar_id) != "":
+		return _fail("case 12: new name Bravo should start with empty avatar, got %s" % _profile.avatar_id)
+	if not bool(_profile.set_avatar(avatar_y)):
+		return _fail("case 12: could not set avatar Y")
+	if String(_profile.avatar_id) != avatar_y:
+		return _fail("case 12: Bravo avatar %s want %s" % [_profile.avatar_id, avatar_y])
+	_profile.call("set_name", "Alpha")
+	await process_frame
+	if String(_profile.avatar_id) != avatar_x:
+		return _fail("case 12: switching back to Alpha should restore %s, got %s" % [avatar_x, _profile.avatar_id])
+	_cases_passed += 1
+	print("PROFILE case 12 pass")
+	return true
+
+
+func _case_13_unknown_id_loads_empty() -> bool:
+	print("PROFILE case 13 unknown avatar id")
+	var current_id := String(_profile.player_id)
+	var current_name := String(_profile.player_name)
+	var players_copy: Dictionary = _profile.players.duplicate()
+	_write_profile_text(JSON.stringify({
+		"player_id": current_id,
+		"player_name": current_name,
+		"players": players_copy,
+		"avatars": {current_name.to_lower(): "not_a_squishy"},
+	}))
+	_profile._load_or_create()
+	await process_frame
+	if String(_profile.avatar_id) != "":
+		return _fail("case 13: unknown avatar id should load as empty, got %s" % _profile.avatar_id)
+	if String(_profile.player_id) != current_id or String(_profile.player_name) != current_name:
+		return _fail("case 13: unknown avatar load changed identity")
+	_cases_passed += 1
+	print("PROFILE case 13 pass")
+	return true
+
+
+func _case_14_pre_t19_save() -> bool:
+	print("PROFILE case 14 pre-T19 save")
+	const PLANNER_ID := "6c107d4d-64d7-49f3-9e09-8db3a4ba9e3b"
+	_write_profile_text(
+		'{"player_id":"%s","player_name":"Natasha","players":{"natasha":"%s"}}' % [PLANNER_ID, PLANNER_ID]
+	)
+	_profile._load_or_create()
+	await process_frame
+	if String(_profile.player_id) != PLANNER_ID:
+		return _fail("case 14: player_id should stay %s, got %s" % [PLANNER_ID, _profile.player_id])
+	if String(_profile.player_name) != "Natasha":
+		return _fail("case 14: name should stay Natasha, got %s" % _profile.player_name)
+	var data := _read_profile_save()
+	if String((data.get("players", {}) as Dictionary).get("natasha", "")) != PLANNER_ID:
+		return _fail("case 14: players map lost natasha: %s" % data)
+	if String(_profile.avatar_id) != "":
+		return _fail("case 14: pre-T19 save should have empty avatar_id")
+	_cases_passed += 1
+	print("PROFILE case 14 pass")
+	return true
+
+
+func _loadable_avatar_ids() -> PackedStringArray:
+	var out := PackedStringArray()
+	var catalog: Dictionary = SquishyCatalog.data()
+	for item_variant in catalog.get("squishies", []):
+		if typeof(item_variant) != TYPE_DICTIONARY:
+			continue
+		var item: Dictionary = item_variant
+		var id := String(item.get("id", ""))
+		if id.is_empty():
+			continue
+		var path := SquishyCatalog.sprite_path(id)
+		if path.is_empty() or not ResourceLoader.exists(path):
+			continue
+		if load(path) is Texture2D:
+			out.append(id)
+	return out
 
 
 func _read_profile_save() -> Dictionary:
