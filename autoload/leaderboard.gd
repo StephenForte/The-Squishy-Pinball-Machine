@@ -7,11 +7,15 @@ signal board_updated(entries: Array, total_players: int)
 signal submitted(result: Dictionary)
 signal offline(reason: String)
 signal submit_attempted(token: int, attempt: int)
+signal profile_synced(profile: Dictionary)
 
 const BASE_URL := "https://squish-leaderboard.onrender.com"
 const KEY := "a419f5979f6891504b3af89a20e13125"
 const CLIENT := "squish/1.0"
 const REQUEST_TIMEOUT := 3.0
+## Runner sentinel (tests/run_all.sh): every suite except leaderboard_test
+## points here. Profile name/avatar changes must not enqueue doomed HTTP.
+const _CLOSED_SENTINEL_URL := "http://127.0.0.1:1"
 
 var retry_delays_sec: Array = [5.0, 10.0, 20.0, 30.0]
 var submit_attempts: Dictionary = {}
@@ -25,14 +29,49 @@ var _submitted_tokens: Dictionary = {}
 var _submit_state: Dictionary = {}
 var _hooked_titles: Dictionary = {}
 var _fetch_gen: int = 0
+var _profile_push_count: int = 0
 
 
 func _ready() -> void:
 	_connect_game()
+	_connect_profile()
 	var tree := get_tree()
 	if tree != null and not tree.node_added.is_connected(_on_node_added):
 		tree.node_added.connect(_on_node_added)
 	call_deferred("_bind_existing_tree")
+	call_deferred("_boot_restore_profile")
+
+
+func push_profile() -> void:
+	var profile := get_node_or_null("/root/Profile")
+	if profile == null:
+		return
+	var player_name := String(profile.player_name)
+	if player_name.is_empty():
+		return
+	var player_id := String(profile.player_id)
+	if player_id.is_empty():
+		return
+	if _profile_http_skipped():
+		return
+	_profile_push_count += 1
+	var body := JSON.stringify({
+		"player_id": player_id,
+		"name": player_name,
+		"avatar": String(profile.avatar_id),
+		"client": CLIENT,
+	})
+	var url := "%s/v1/profile" % _base_url()
+	_http_request(HTTPClient.METHOD_PUT, url, body, _on_push_profile_finished, true)
+
+
+func fetch_profile(player_id: String) -> void:
+	if player_id.is_empty():
+		return
+	if _profile_http_skipped():
+		return
+	var url := "%s/v1/profile?player_id=%s" % [_base_url(), player_id]
+	_http_request(HTTPClient.METHOD_GET, url, "", _on_fetch_profile_finished)
 
 
 func fetch_top(limit: int) -> void:
@@ -51,6 +90,76 @@ func _connect_game() -> void:
 	var game := get_node_or_null("/root/Game")
 	if game != null and game.has_signal("game_over") and not game.game_over.is_connected(_on_game_over):
 		game.game_over.connect(_on_game_over)
+
+
+func _connect_profile() -> void:
+	var profile := get_node_or_null("/root/Profile")
+	if profile == null:
+		return
+	if profile.has_signal("name_changed") and not profile.name_changed.is_connected(_on_profile_name_changed):
+		profile.name_changed.connect(_on_profile_name_changed)
+	if profile.has_signal("avatar_changed") and not profile.avatar_changed.is_connected(_on_profile_avatar_changed):
+		profile.avatar_changed.connect(_on_profile_avatar_changed)
+
+
+func _on_profile_name_changed(_name: String) -> void:
+	push_profile()
+
+
+func _on_profile_avatar_changed(_avatar_id: String) -> void:
+	push_profile()
+
+
+func _boot_restore_profile() -> void:
+	var profile := get_node_or_null("/root/Profile")
+	if profile == null:
+		return
+	if String(profile.player_name).is_empty():
+		return
+	var player_id := String(profile.player_id)
+	if player_id.is_empty():
+		return
+	fetch_profile(player_id)
+
+
+func _profile_http_skipped() -> bool:
+	return _base_url() == _CLOSED_SENTINEL_URL
+
+
+func _on_push_profile_finished(_ok: bool, _code: int, _parsed: Variant, _reason: String) -> void:
+	# D-037: fire-and-forget. Failures are dropped; not enrolled in D-034.
+	return
+
+
+func _on_fetch_profile_finished(ok: bool, code: int, parsed: Variant, _reason: String) -> void:
+	# 404 = no cloud profile yet. Transport failures stay quiet (D-037).
+	if not ok:
+		return
+	if code == 404:
+		return
+	if typeof(parsed) != TYPE_DICTIONARY:
+		return
+	var data: Dictionary = parsed
+	_adopt_cloud_avatar_if_local_empty(data)
+	profile_synced.emit(data)
+
+
+func _adopt_cloud_avatar_if_local_empty(data: Dictionary) -> void:
+	var profile := get_node_or_null("/root/Profile")
+	if profile == null:
+		return
+	# Device wins: adopt only if this response is still for the current player
+	# and the local avatar is empty *now*, not when the request went out (D-037).
+	if String(data.get("player_id", "")) != String(profile.player_id):
+		return
+	if String(profile.player_name).is_empty():
+		return
+	if not String(profile.avatar_id).is_empty():
+		return
+	var server_avatar := String(data.get("avatar", ""))
+	if server_avatar.is_empty():
+		return
+	profile.set_avatar(server_avatar)
 
 
 func _bind_existing_tree() -> void:
