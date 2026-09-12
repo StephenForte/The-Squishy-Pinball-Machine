@@ -36,11 +36,15 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T16 | Per-name identity + per-player high score (D-031; fixes "Dad's score gone") | 5 fix | merged 2026-09-09 (PR #24); Steve: HIGH follows the name ✓ | mid | T13 |
 | T17 | App icon: glitter-drop default, icon catalog + `AppIcon` autoload (D-032) | 6 | merged 2026-09-10 (PR #25 → a45430c); dock icon seen in worker screenshot | mid | — |
 | T17b | Title-screen icon picker (choose among the 4 icons; D-032 API) | 6 | merged 2026-09-10 (PR #26 → b668aa3) | cheap-mid | T17 |
-| T18 | Game-over celebration: confetti >1k, fireworks >5k / personal best / board #1 (D-033) | 6 | PR #28 approved 2026-09-10 (e10faa5); awaiting Steve's merge; Natasha play-test next | mid | T17b (game_over.tscn quiet) |
+| T18 | Game-over celebration: confetti >1k, fireworks >5k / personal best / board #1 (D-033) | 6 | merged 2026-09-11 (PR #28 → 659aaa6); Natasha play-test pending | mid | T17b |
+| T19 | Settings overlay (theme + icon + avatar pickers off the title) + local avatar (D-035/D-036) | 7 | brief written 2026-09-11; not yet dispatched | mid-strong | T18 |
+| T20 | Cloud half of the profile (avatar + name) — scope blocked on Steve's answer | 7 | not started — question asked 2026-09-11 | tbd | T19 |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8 → T10 → T9 →
 **Phase 5:** T11 ∥ T12 → T11.1 (deploy) → T13.
 **Phase 6:** T17 → T17b (T17b touches `title.tscn`; run it alone) → **T13b ∥ T18** (disjoint files; T18 runs in a clone).
+**Phase 7:** T19 → T20. Sequential, both in the main checkout: they share `profile.gd`, and the
+clone rule has now been ignored by two separate workers (T13b, T18) — do not run them in parallel.
 T5 and T6 are the only truly parallel pair; ownership below is drawn to keep them apart.
 
 ## Running the game after a pull
@@ -254,6 +258,26 @@ Additive: `scenes/ui/game_over.tscn` (one instanced node `Celebration`), `script
 Working directory: clone `~/Library/CloudStorage/Dropbox-Personal/Dev/Pinball-T18` (T13b holds
 the main checkout).
 
+### T19 — Settings overlay + local avatar (Steve, 2026-09-11)
+Measured before designing: the title fills y 220→1270 of a 720×1280 viewport (table name, controls,
+player name, play hint, top five, ThemePicker 960-1140, IconPicker 1150-1270 — the last sitting over
+the flipper art). `main.gd` handles `restart`/`menu` in `_unhandled_input`, so a Control under Title
+can consume them first. 16 catalogued squishy PNGs exist for avatars (D-020). Contracts: D-035, D-036.
+Owns: `scenes/ui/settings.tscn`, `scripts/ui/settings.gd`, `scenes/ui/avatar_picker.tscn`,
+`scripts/ui/avatar_picker.gd`, `tests/settings_test.gd`, `autoload/profile.gd` (avatar fields).
+Additive: `scenes/ui/title.tscn` (re-parent the two pickers, add Settings + avatar display),
+`scripts/ui/title.gd` (avatar display + settings affordance), `tests/profile_test.gd` (avatar cases).
+Must not touch: `scripts/main.gd`, `theme_picker.*`, `icon_picker.*` (re-parented, not edited),
+`autoload/{game,theme,sfx,leaderboard,app_icon}.gd`, `server/**`, `tests/menu_test.gd`,
+`tests/title_test.gd`, `tests/run_all.sh`.
+
+### T20 — Cloud profile (blocked on a question, 2026-09-11)
+Steve asked to save avatar + name "locally or from the cloud". Two readings, materially different
+work: (a) sync this device's profile to the leaderboard server — new `profiles` table, key-protected
+`PUT/GET /v1/profile`, avatar on the board and on `/`, restore after a reinstall; or (b) load an
+avatar image from a URL. Asked 2026-09-11; brief not written until answered. Either way it lands
+after T19 and, if (a), it amends D-026 and needs a manual Render deploy (D-028).
+
 ### T9 — Test isolation (found in T8 review)
 Every `-s tests/*.gd` run uses the app's real `user://` (macOS: ~/Library/Application
 Support/Godot/app_userdata/The Squishy Pinball Machine/). `game_flow.gd` and `ui_test.gd`
@@ -297,6 +321,8 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
 - Godot .tscn files merge badly in general: never run two tasks that touch the same
   scene file, even "append-only" edits.
 - `scenes/ui/title.tscn`: T17b will edit it; do not run T17b alongside any other title-screen task.
+- `scenes/ui/title.tscn` again in T19 (re-parenting two pickers) and `autoload/profile.gd` in T19
+  then T20 — hence Phase 7 is strictly sequential.
 - `project.godot` `[autoload]` block: T17 appends `AppIcon`; any concurrent task adding an
   autoload collides at the same line.
 - T13b ∥ T18 (2026-09-10): disjoint by design — T13b owns `autoload/leaderboard.gd` +
@@ -502,3 +528,9 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   Fix identical to the planner-proven patch; test change is a strengthening. Shared checkout back on
   main, no stray clones. Approved. Phase 6 (T17, T17b, T13b, T18) complete once #28 merges;
   Natasha play-test before calling it done.
+- 2026-09-11: T19/T20 design check. `grep -nE '^offset_' scenes/ui/title.tscn` → the seven bands
+  above; nothing free below 220 except 340-380 and 930-960. `scripts/main.gd` uses
+  `_unhandled_input` for `restart`/`menu` (so a Title descendant sees them first — worker to prove).
+  `autoload/profile.gd` keys identity by sanitised-lowercase name (D-031); avatars key the same way.
+  `assets/design/squishes/art/`: 16 PNGs, 228×167, 1.1 MB total; `squishy_catalog.gd` exposes
+  `static sprite_path(id)`. Server unchanged by T19: `parseScoreBody` has no avatar field.
