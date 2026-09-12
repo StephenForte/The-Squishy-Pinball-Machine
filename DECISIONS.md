@@ -633,5 +633,22 @@ by the planner before any fix was dispatched.
 - Implementation note for whoever takes T21: `_on_http_completed` reports any non-2xx with
   `ok == false`, so the existing `if code == 404` branch in `_on_fetch_profile_finished` is
   unreachable today. The 404 case must be distinguished *before* the `if not ok` early return.
+- **As built (T21, PR #32, reviewed 2026-09-12):** `fetch_profile(player_id, from_boot)` carries the
+  requested id and a boot flag; `_on_fetch_profile_finished` checks `code == 404` **before** the
+  `not ok` early return, so a transport failure (code 0) still does nothing. Boot then calls
+  `_reconcile_boot_missing_cloud` (404 + non-empty local avatar → push) or
+  `_reconcile_boot_divergence` (cloud avatar differs from a non-empty local one → push), both
+  re-checking that the response still belongs to the current `player_id`. A `_suppress_profile_push`
+  flag wraps the gap-fill `set_avatar` so adopting a cloud value does not echo a PUT straight back.
+  Measured PUT counts at review: unknown cloud 1, agreed 0, gap fill 0, divergence 1, unreachable 0,
+  both empty 0.
+- **Testing note:** `127.0.0.1:1` is the runner sentinel and `_profile_http_skipped()` returns early
+  for it, so a case that points there proves nothing about a real transport failure. Use another
+  refused port (`127.0.0.1:9`) to exercise that path — the planner's falsification only bit once the
+  port was changed. Applies to T20b case 19 and T21 case 27 as written.
+- **Planner error (2026-09-12):** the T21 brief told the worker to use `ice_cube` as a divergence
+  avatar. `ice_cube` is an **app-icon** id (D-032), not a squishy (D-036), and would have been
+  rejected as `invalid_avatar`; the worker correctly substituted `puffo` and flagged it. Check which
+  catalog an id belongs to before naming it in a brief.
 - Self-heal available now, no code required: selecting a name re-pushes that player's profile, so
   Dad uploads as soon as Dad is chosen in-game.
