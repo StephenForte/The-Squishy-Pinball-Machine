@@ -1,7 +1,7 @@
 # Decisions — The Squishy Pinball Machine
 
 Numbered, append-only. Never renumber; supersede in place with date and reason.
-Workers cite these instead of re-deciding. Next free number: **D-038**.
+Workers cite these instead of re-deciding. Next free number: **D-039**.
 
 ## D-001 — Engine: Godot 4.x, GDScript (2026-09-02)
 Per PRD. Exact version to be pinned as D-006 once installed on the build machine.
@@ -611,3 +611,27 @@ because the client needs live endpoints to test against.
 - **Out of scope, deliberately:** claiming a profile on a *fresh* device (you would need the old
   `player_id`, which is an identity question, not a storage one — D-036 already flags it), and any
   upload of player-supplied images.
+
+## D-038 — Boot must reconcile both ways, not just pull (Steve, 2026-09-12; amends D-037)
+Steve played on 2026-09-11 and reported no avatars on the web board. Diagnosed and **reproduced**
+by the planner before any fix was dispatched.
+- What is actually true: Natasha's avatar *is* on the board (`puppy_jax`, row renders one
+  same-origin `<img>`, image serves 200). **Dad's is missing**, and "our avatars" is the complaint.
+- Root cause, and it is a hole in D-037 rather than a coding mistake: the client pushes **only** on
+  `name_changed` / `avatar_changed`, while boot only *fetches*. A player whose avatar was chosen
+  before T20b shipped therefore never uploads, because no change event will ever fire for it.
+  Timeline confirms it to the second: T20b merged 2026-09-11 20:56:45 local; the only avatar changed
+  afterwards was Natasha's at 21:00:58, and the server recorded her profile at 21:00:58. Dad's
+  `coffee_cuppa` predates 20:56 and was never sent.
+- Reproduced on a clean clone of main: with an avatar in the local save and no cloud profile,
+  `_boot_restore_profile()` fired **0 pushes**; re-selecting the name pushed immediately.
+- **Contract change (T21):** boot reconciles in both directions, device still winning.
+  After the boot fetch resolves: if the cloud has **no** profile for this player (404), or its
+  avatar differs from a **non-empty** local avatar, push the local profile. Only when the local
+  avatar is empty does the cloud value get adopted (D-037, unchanged). Net effect: whoever has an
+  avatar wins over a cloud that has none, and the cloud never silently overwrites a device.
+- Implementation note for whoever takes T21: `_on_http_completed` reports any non-2xx with
+  `ok == false`, so the existing `if code == 404` branch in `_on_fetch_profile_finished` is
+  unreachable today. The 404 case must be distinguished *before* the `if not ok` early return.
+- Self-heal available now, no code required: selecting a name re-pushes that player's profile, so
+  Dad uploads as soon as Dad is chosen in-game.
