@@ -110,6 +110,22 @@ func _run() -> void:
 		return
 	if not await _case_19_profile_unreachable(main):
 		return
+	if not await _case_20_boot_uploads_unknown_profile(main):
+		return
+	if not await _case_21_boot_push_on_divergence(main):
+		return
+	if not await _case_22_boot_gap_fill_sends_no_push(main):
+		return
+	if not await _case_23_boot_noop_when_agreed(main):
+		return
+	if not await _case_24_boot_both_empty_noop(main):
+		return
+	if not await _case_25_boot_unreachable_is_not_404(main):
+		return
+	if not await _case_26_boot_restore_race(main):
+		return
+	if not await _case_27_boot_empty_name_noop(main):
+		return
 
 	print("LEADERBOARD PASS cases=%d" % _cases_passed)
 	quit(0)
@@ -784,6 +800,237 @@ func _case_19_profile_unreachable(main: Node) -> bool:
 	_cases_passed += 1
 	print("LEADERBOARD case 19 pass")
 	return true
+
+
+func _case_20_boot_uploads_unknown_profile(_main: Node) -> bool:
+	print("LEADERBOARD case 20 boot uploads unknown profile")
+	OS.set_environment("SQUISH_LEADERBOARD_URL", LOCAL_URL)
+	OS.set_environment("SQUISH_LEADERBOARD_KEY", "devkey")
+	var player_id := _unused_player_id(20)
+	_plant_local_profile("BootDad", "coffee_cuppa", player_id)
+	var missing := await _api_get_profile(player_id)
+	if not missing.is_empty():
+		return _fail("case 20: cloud should not know this player yet")
+	var before := int(_leaderboard._profile_push_count)
+	_reset_wait_flags()
+	_leaderboard._boot_restore_profile()
+	if not await _wait_cloud_profile(player_id, "BootDad", "coffee_cuppa", 3500):
+		return _fail("case 20: boot did not upload the local avatar (Dad's bug)")
+	if int(_leaderboard._profile_push_count) != before + 1:
+		return _fail("case 20: expected one PUT, count %s → %s" % [before, _leaderboard._profile_push_count])
+	if String(_profile.avatar_id) != "coffee_cuppa":
+		return _fail("case 20: local avatar changed to %s" % _profile.avatar_id)
+	_cases_passed += 1
+	print("LEADERBOARD case 20 pass")
+	return true
+
+
+func _case_21_boot_push_on_divergence(_main: Node) -> bool:
+	print("LEADERBOARD case 21 boot push on divergence")
+	OS.set_environment("SQUISH_LEADERBOARD_URL", LOCAL_URL)
+	_profile.call("set_name", "DivPat")
+	await process_frame
+	var player_id := String(_profile.player_id)
+	if not bool(_profile.set_avatar("frog_gus")):
+		return _fail("case 21: set_avatar(frog_gus) failed")
+	if not await _wait_cloud_profile(player_id, "DivPat", "frog_gus", 3500):
+		return _fail("case 21: local avatar push did not land")
+	if not await _api_put_profile(player_id, "DivPat", "puffo"):
+		return _fail("case 21: seed cloud puffo failed")
+	var before := int(_leaderboard._profile_push_count)
+	_reset_wait_flags()
+	_leaderboard._boot_restore_profile()
+	if not await _wait_cloud_profile(player_id, "DivPat", "frog_gus", 3500):
+		return _fail("case 21: boot did not push local frog_gus over cloud puffo")
+	if String(_profile.avatar_id) != "frog_gus":
+		return _fail("case 21: local avatar was changed to %s" % _profile.avatar_id)
+	if int(_leaderboard._profile_push_count) != before + 1:
+		return _fail("case 21: expected one PUT on divergence, count %s → %s" % [before, _leaderboard._profile_push_count])
+	_cases_passed += 1
+	print("LEADERBOARD case 21 pass")
+	return true
+
+
+func _case_22_boot_gap_fill_sends_no_push(_main: Node) -> bool:
+	print("LEADERBOARD case 22 boot gap fill sends no push")
+	OS.set_environment("SQUISH_LEADERBOARD_URL", LOCAL_URL)
+	_profile.call("set_name", "GapPat")
+	await process_frame
+	var player_id := String(_profile.player_id)
+	_clear_local_avatar()
+	if String(_profile.avatar_id) != "":
+		return _fail("case 22: local avatar should be empty")
+	if not await _api_put_profile(player_id, "GapPat", "cosmo"):
+		return _fail("case 22: seed cloud cosmo failed")
+	var before := int(_leaderboard._profile_push_count)
+	_reset_wait_flags()
+	_leaderboard._boot_restore_profile()
+	if not await _wait_flag("_got_profile", 3500):
+		return _fail("case 22: profile_synced did not arrive")
+	if String(_profile.avatar_id) != "cosmo":
+		return _fail("case 22: local avatar %s want cosmo" % _profile.avatar_id)
+	if int(_leaderboard._profile_push_count) != before:
+		return _fail("case 22: gap fill must not PUT, count %s → %s" % [before, _leaderboard._profile_push_count])
+	_cases_passed += 1
+	print("LEADERBOARD case 22 pass")
+	return true
+
+
+func _case_23_boot_noop_when_agreed(_main: Node) -> bool:
+	print("LEADERBOARD case 23 boot noop when agreed")
+	OS.set_environment("SQUISH_LEADERBOARD_URL", LOCAL_URL)
+	_profile.call("set_name", "AgreePat")
+	await process_frame
+	var player_id := String(_profile.player_id)
+	if not bool(_profile.set_avatar("frog_gus")):
+		return _fail("case 23: set_avatar(frog_gus) failed")
+	if not await _wait_cloud_profile(player_id, "AgreePat", "frog_gus", 3500):
+		return _fail("case 23: agreed avatar did not land")
+	var before := int(_leaderboard._profile_push_count)
+	_reset_wait_flags()
+	_leaderboard._boot_restore_profile()
+	if not await _wait_flag("_got_profile", 3500):
+		return _fail("case 23: profile_synced did not arrive")
+	if int(_leaderboard._profile_push_count) != before:
+		return _fail("case 23: agreed boot must send zero PUTs, count %s → %s" % [before, _leaderboard._profile_push_count])
+	if String(_profile.avatar_id) != "frog_gus":
+		return _fail("case 23: local avatar changed to %s" % _profile.avatar_id)
+	_cases_passed += 1
+	print("LEADERBOARD case 23 pass")
+	return true
+
+
+func _case_24_boot_both_empty_noop(_main: Node) -> bool:
+	print("LEADERBOARD case 24 boot both empty noop")
+	OS.set_environment("SQUISH_LEADERBOARD_URL", LOCAL_URL)
+	var player_id := _unused_player_id(24)
+	_plant_local_profile("EmptyPat", "", player_id)
+	var before := int(_leaderboard._profile_push_count)
+	_reset_wait_flags()
+	_leaderboard._boot_restore_profile()
+	await _wait_msec(1500)
+	if int(_leaderboard._profile_push_count) != before:
+		return _fail("case 24: both-empty boot must send zero PUTs, count %s → %s" % [before, _leaderboard._profile_push_count])
+	if _got_offline:
+		return _fail("case 24: both-empty boot must stay quiet, got '%s'" % _last_offline)
+	if String(_profile.avatar_id) != "":
+		return _fail("case 24: local avatar should stay empty")
+	var cloud := await _api_get_profile(player_id)
+	if not cloud.is_empty():
+		return _fail("case 24: cloud should still have no profile: %s" % cloud)
+	_cases_passed += 1
+	print("LEADERBOARD case 24 pass")
+	return true
+
+
+func _case_25_boot_unreachable_is_not_404(main: Node) -> bool:
+	print("LEADERBOARD case 25 boot unreachable is not 404")
+	OS.set_environment("SQUISH_LEADERBOARD_URL", LOCAL_URL)
+	var player_id := _unused_player_id(25)
+	_plant_local_profile("UnreachPat", "frog_gus", player_id)
+	# Not the runner sentinel: fetch must actually fail in transit (code 0),
+	# not be short-circuited as "no cloud profile".
+	OS.set_environment("SQUISH_LEADERBOARD_URL", "http://127.0.0.1:2")
+	var before := int(_leaderboard._profile_push_count)
+	_reset_wait_flags()
+	_leaderboard._boot_restore_profile()
+	await _wait_msec(3500)
+	if int(_leaderboard._profile_push_count) != before:
+		OS.set_environment("SQUISH_LEADERBOARD_URL", LOCAL_URL)
+		return _fail("case 25: transport failure must not PUT, count %s → %s" % [before, _leaderboard._profile_push_count])
+	if _got_offline:
+		OS.set_environment("SQUISH_LEADERBOARD_URL", LOCAL_URL)
+		return _fail("case 25: boot fetch must stay quiet, got '%s'" % _last_offline)
+	if _got_profile:
+		OS.set_environment("SQUISH_LEADERBOARD_URL", LOCAL_URL)
+		return _fail("case 25: unreachable boot emitted profile_synced")
+	if String(_profile.avatar_id) != "frog_gus" or String(_profile.player_name) != "UnreachPat":
+		OS.set_environment("SQUISH_LEADERBOARD_URL", LOCAL_URL)
+		return _fail("case 25: transport failure changed local profile")
+	_use_fast_retries()
+	OS.set_environment("SQUISH_LEADERBOARD_URL", CLOSED_URL)
+	_reset_wait_flags()
+	_submit_count = 0
+	await _play_scored_game(906)
+	if not await _wait_flag("_got_offline", 3500):
+		_restore_retries_and_url()
+		return _fail("case 25: D-034 offline did not arrive for score submit")
+	if _got_submit or _submit_count > 0:
+		_restore_retries_and_url()
+		return _fail("case 25: score submit succeeded against a closed port")
+	var game_over := _require_node(main, "GameOver")
+	if game_over == null:
+		_restore_retries_and_url()
+		return false
+	if not game_over.visible:
+		_restore_retries_and_url()
+		return _fail("case 25: GameOver should still show while score submit is offline")
+	_leaderboard._submitted_tokens[_leaderboard._submit_token] = true
+	_restore_retries_and_url()
+	_cases_passed += 1
+	print("LEADERBOARD case 25 pass")
+	return true
+
+
+func _case_26_boot_restore_race(_main: Node) -> bool:
+	print("LEADERBOARD case 26 boot restore race")
+	OS.set_environment("SQUISH_LEADERBOARD_URL", LOCAL_URL)
+	_profile.call("set_name", "BootRace")
+	await process_frame
+	var player_id := String(_profile.player_id)
+	_clear_local_avatar()
+	if not await _api_put_profile(player_id, "BootRace", "bear_bounce"):
+		return _fail("case 26: seed PUT failed")
+	_reset_wait_flags()
+	_leaderboard._boot_restore_profile()
+	if not bool(_profile.set_avatar("frog_gus")):
+		return _fail("case 26: set_avatar(frog_gus) before response failed")
+	if not await _wait_flag("_got_profile", 3500):
+		return _fail("case 26: profile_synced did not arrive")
+	if String(_profile.avatar_id) != "frog_gus":
+		return _fail("case 26: late boot fetch overwrote the local pick: %s" % _profile.avatar_id)
+	_cases_passed += 1
+	print("LEADERBOARD case 26 pass")
+	return true
+
+
+func _case_27_boot_empty_name_noop(_main: Node) -> bool:
+	print("LEADERBOARD case 27 boot empty name noop")
+	OS.set_environment("SQUISH_LEADERBOARD_URL", LOCAL_URL)
+	_profile.call("set_name", "")
+	await process_frame
+	if String(_profile.player_name) != "":
+		return _fail("case 27: name did not clear")
+	var before := int(_leaderboard._profile_push_count)
+	_reset_wait_flags()
+	_leaderboard._boot_restore_profile()
+	await _wait_msec(800)
+	if int(_leaderboard._profile_push_count) != before:
+		return _fail("case 27: empty name must not PUT, count %s → %s" % [before, _leaderboard._profile_push_count])
+	if _got_profile:
+		return _fail("case 27: empty name must not fetch a profile")
+	if _got_offline:
+		return _fail("case 27: empty name must stay quiet, got '%s'" % _last_offline)
+	_cases_passed += 1
+	print("LEADERBOARD case 27 pass")
+	return true
+
+
+func _unused_player_id(n: int) -> String:
+	return "00000000-0000-4000-8000-%012d" % (2100 + n)
+
+
+func _plant_local_profile(player_name: String, avatar: String, player_id: String) -> void:
+	# Plant device state without name_changed / avatar_changed, so nothing is
+	# uploaded. That is Dad's situation: an avatar chosen before T20b shipped.
+	_profile.player_id = player_id
+	_profile.player_name = player_name
+	_profile.players[player_name.to_lower()] = player_id
+	_profile.avatar_id = avatar
+	if avatar.is_empty():
+		_profile.avatars.erase(player_name.to_lower())
+	else:
+		_profile.avatars[player_name.to_lower()] = avatar
 
 
 func _use_fast_retries() -> void:
