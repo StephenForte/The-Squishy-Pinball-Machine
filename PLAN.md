@@ -40,7 +40,7 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T19 | Settings overlay (theme + icon + avatar pickers off the title) + local avatar (D-035/D-036) | 7 | merged 2026-09-11 (PR #29 → f93f1c1); Natasha play-test pending | mid-strong | T18 |
 | T20a | Server: `profiles` table, `PUT/GET /v1/profile`, avatar on the board and `/` (D-037) | 7 | merged + **deployed live** 2026-09-12 (PR #30 → 70918fe, dep-daibbvp594qs73823ssg) | mid | T19 |
 | T20b | Client: push profile on change, restore when local is empty (D-037) | 7 | merged 2026-09-12 (PR #31 → 817d295) | mid | T20a |
-| T21 | Boot reconciles profile both ways so a pre-existing avatar uploads (D-038) | 7 fix | brief written 2026-09-12; not yet dispatched | mid | T20b |
+| T21 | Boot reconciles profile both ways so a pre-existing avatar uploads (D-038) | 7 fix | PR #32 approved 2026-09-12 (8cb3ed7); awaiting Steve's merge | mid | T20b |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8 → T10 → T9 →
 **Phase 5:** T11 ∥ T12 → T11.1 (deploy) → T13.
@@ -620,3 +620,10 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   cost real time and the next person should not re-open it. Lesson kept: the picker writes to the
   *currently selected* name, so clicking an avatar "to test" changes that player's real profile,
   locally and in the cloud.
+- 2026-09-12: T21 (PR #32, 8cb3ed7, base b6c0266) reviewed in scratch clone. Scope ✓. Gate SUMMARY
+  all suites PASS, LEADERBOARD 27/27. Planner probe counted PUTs on every branch — unknown cloud 1,
+  agreed 0, gap fill 0, divergence 1, unreachable 0, both empty 0 — so the rate-limit trap in the
+  brief is avoided. Falsified twice: removing the adopt-echo suppression makes gap fill push;
+  replacing `code == 404` with `not ok` makes an unreachable server push. The unreachable check only
+  discriminates against a non-sentinel port (see D-038 testing note). Worker correctly rejected the
+  brief's `ice_cube` (an app-icon id, not a squishy) — planner error, recorded. Approved.
