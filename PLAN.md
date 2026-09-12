@@ -37,7 +37,7 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T17 | App icon: glitter-drop default, icon catalog + `AppIcon` autoload (D-032) | 6 | merged 2026-09-10 (PR #25 → a45430c); dock icon seen in worker screenshot | mid | — |
 | T17b | Title-screen icon picker (choose among the 4 icons; D-032 API) | 6 | merged 2026-09-10 (PR #26 → b668aa3) | cheap-mid | T17 |
 | T18 | Game-over celebration: confetti >1k, fireworks >5k / personal best / board #1 (D-033) | 6 | merged 2026-09-11 (PR #28 → 659aaa6); Natasha play-test pending | mid | T17b |
-| T19 | Settings overlay (theme + icon + avatar pickers off the title) + local avatar (D-035/D-036) | 7 | brief written 2026-09-11; not yet dispatched | mid-strong | T18 |
+| T19 | Settings overlay (theme + icon + avatar pickers off the title) + local avatar (D-035/D-036) | 7 | PR #29 approved 2026-09-11 (0324735); awaiting Steve's merge | mid-strong | T18 |
 | T20 | Cloud profile: server `profiles` table + avatar on the board (D-036; amends D-026) | 7 | unblocked 2026-09-11 (Steve: sync to the server); brief after T19 merges | mid | T19 |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8 → T10 → T9 →
@@ -538,3 +538,19 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   URL image); avatar set = the 16 squishies, and he wants to keep adding squishies by editing the
   JSON. D-036 amended: the picker enumerates the whole catalog at run time and skips entries whose
   art will not load, so a hand-added entry needs no code change.
+- 2026-09-11: T19 (PR #29, 0324735, base 3daef59) reviewed in scratch clone. Scope ✓ (main.gd and
+  both picker scripts untouched). Gate SUMMARY all suites PASS — 17 scripts + boot check, SETTINGS 9,
+  PROFILE 14, ICON_PICKER 5, MENU 5, TITLE 4; matches the handoff. Probe 1 (independent input
+  driving): with Settings closed, arrows/I/N behave as before; with it open, arrows and I reach the
+  pickers while N, R, Space and Escape are consumed and Escape does not restart — the trap is closed
+  both ways, and Bugbot's N-under-overlay finding (@43917f8) is really fixed at 0324735. Probe 2
+  (Steve's requirement): added two catalog entries in the clone — one with new art, one with none —
+  catalog 18 → offered 17; the new entry is selectable with no code change, the artless one is
+  skipped with one warning. Adding art still needs `godot --headless --import`. Migration re-proved
+  on Steve's live profile.save: players dad+natasha and player_id intact, avatars {natasha:
+  bear_bounce} added. icon_picker_test changes are adaptation, not weakening. Approved.
+  Worker left the shared checkout on its branch again (third dispatch running) and set Natasha's
+  live avatar during the hand test; both noted, neither blocking.
+- 2026-09-11: planner error in the T19 brief — it said the gate should show "18 scripts + boot
+  check". Main had 16 script suites plus `boot_check.gd` (17 `.gd` files), so T19 correctly produces
+  17 + boot check. Count suites from a gate log, not from `ls tests/*.gd`.
