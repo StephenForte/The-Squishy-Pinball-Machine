@@ -1,7 +1,7 @@
 # Decisions — The Squishy Pinball Machine
 
 Numbered, append-only. Never renumber; supersede in place with date and reason.
-Workers cite these instead of re-deciding. Next free number: **D-035**.
+Workers cite these instead of re-deciding. Next free number: **D-037**.
 
 ## D-001 — Engine: Godot 4.x, GDScript (2026-09-02)
 Per PRD. Exact version to be pinned as D-006 once installed on the build machine.
@@ -482,3 +482,45 @@ Replaces "one retry 5 s after a failed POST".
   offline" over a game that already posted; the older token keeps retrying silently. Per-token
   state lives in `_submit_state` {score, in_flight, retry_pending}; `_is_retryable(code)`:
   code 0 (transport), 5xx and 429 retry, all other 4xx stop. Suite: leaderboard cases 8-12.
+
+## D-035 — Settings overlay; the title screen is for playing (Steve, 2026-09-11)
+Steve: "our main menu screen is getting crowded." Measured before deciding: in the 720×1280
+viewport the title fills 220→1270 with seven blocks, and `IconPicker` (1150-1270) sits over the
+flipper art at the bottom edge.
+- New `scenes/ui/settings.tscn`, root `Settings` (Control, script `scripts/ui/settings.gd`),
+  instanced inside `scenes/ui/title.tscn` and **hidden by default**. It is a title-screen overlay,
+  not a scene change: no `change_scene_to_file`, the table keeps running behind it.
+- Moves into it, unchanged in behaviour: `ThemePicker` (D-020) and `IconPicker` (D-032). They are
+  re-parented, not rewritten; their own scripts, node names and key bindings (←/→, `I`) keep
+  working while Settings is visible. It also hosts the avatar picker (D-036) and a Close button.
+- Opens on physical key `S` from the title, and on a `SettingsButton` on the title. While it is
+  visible it swallows `S` (closes), `menu`/Escape (closes), `restart`/R and `launch_ball`/Space,
+  so Escape means "back out of settings" and Space never starts a game from under the overlay.
+  `_unhandled_input` in a Title descendant runs before `scripts/main.gd`'s handler (children before
+  parents), so no change to `main.gd` or `title.gd` input code is needed — the worker must prove it,
+  because menu_test cases 1-5 encode the old Escape/R behaviour and must stay green.
+- Never opens while `NameEntry` is capturing (the `N` prompt owns the keyboard first).
+- The title keeps: table name, controls, player name + avatar, "Press SPACE to play", top five,
+  and the settings affordance. Nothing may be drawn below y=1150 any more.
+- No new input action in `project.godot`: `S` is read as a physical keycode, the way
+  `icon_picker.gd` reads `I` (D-032).
+
+## D-036 — Player avatar is a squishy from the D-020 catalog (Steve, 2026-09-11)
+Steve asked to "save a user avatar and user name locally or from the cloud". The 16 squishies
+already in `assets/design/squishes/art/` (228×167 PNG, ~62 KB each, 1.1 MB total, catalogued with
+`id` + `display_name` by D-020) are the avatar set. Chosen over uploaded photos: no new assets, no
+image upload/decode path, nothing to moderate in a family game, and the sync payload is one short
+id instead of a file. Photo avatars would be a different project; ask before assuming it.
+- **Local (T19):** `Profile` gains `avatar_id: String` and `avatars: Dictionary`
+  (sanitised-lowercase name → squishy id) in `profile.save`, exactly parallel to `players` (D-031):
+  the avatar follows the *name*, so switching names switches avatars. New signal
+  `avatar_changed(avatar_id: String)`. `set_avatar(id) -> bool` rejects ids not in the catalog.
+  Default for a name with no avatar: `""` → the UI shows a neutral placeholder, never a crash.
+  Unknown id in a loaded save falls back to `""`.
+- Picker lives in the settings overlay (D-035); the title shows the current avatar next to the
+  player name. Sprites load at run time via `SquishyCatalog.sprite_path(id)` and `load()`,
+  never `preload()` (CLAUDE.md).
+- **Cloud (T20, not yet specified):** whether "from the cloud" means (a) this profile syncing to
+  the leaderboard server so the board shows the avatar and a reinstall restores it, or (b) loading
+  an avatar image from a URL, is **Steve's call — asked 2026-09-11, not yet answered.** Nothing in
+  T19 depends on the answer. D-026's `POST /v1/scores` contract is unchanged by T19.
