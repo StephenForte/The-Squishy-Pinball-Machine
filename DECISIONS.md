@@ -594,6 +594,20 @@ because the client needs live endpoints to test against.
   it never overwrites a local choice. That makes "from the cloud" mean *restore after a reinstall*
   without one device silently undoing a change made on another. Last-write-wins would need a local
   clock and is not worth it for a family game.
+- **As built (T20b, PR #31, reviewed 2026-09-12):** `Leaderboard` connects to `Profile`'s signals
+  itself, so `profile.gd` was not touched. `_boot_restore_profile()` is deferred from `_ready`;
+  adoption re-checks *at response time* that the payload's `player_id` is still the current player
+  and the local avatar is still empty, which is what makes the race safe. Push failures are dropped
+  in a no-op callback, outside D-034.
+- **Planner correction (2026-09-12):** the T20b brief claimed that unguarded profile pushes would
+  make the other suites "slower and noisier", so the worker added `_profile_http_skipped()`, which
+  short-circuits when the base URL equals the runner's sentinel `http://127.0.0.1:1`. **Measured at
+  review and the claim was wrong:** running the full gate with the guard forced off gives all suites
+  PASS, 23 s vs 24 s, 12 errors vs 12, 14 warnings vs 14 — identical, because the async request plus
+  its watchdog already absorbs a closed port. The guard is therefore unnecessary; it is also
+  harmless, since `_base_url()` is never the sentinel in production. Its one real cost is that
+  leaderboard case 19's profile assertions are tautological — the genuinely unreachable path was
+  instead verified by the planner's guard-off run. Do not repeat that trap text in a future brief.
 - **Out of scope, deliberately:** claiming a profile on a *fresh* device (you would need the old
   `player_id`, which is an identity question, not a storage one — D-036 already flags it), and any
   upload of player-supplied images.
