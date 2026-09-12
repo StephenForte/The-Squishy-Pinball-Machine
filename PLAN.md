@@ -614,6 +614,9 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   switching Natasha→Dad→Natasha leaves the map **intact** (`natasha: puppy_jax`), with or without an
   avatar pick while Dad is current; adopting a cloud value for *another* player's id is correctly
   refused by the player_id guard. The only sequences that yield the observed state are a direct
-  picker click for Natasha, or a cloud adopt into an empty local slot. **No client defect proven** —
-  asked Steve what he clicked rather than asserting a bug. Natasha's avatar is restored by re-picking
-  it in Settings.
+  picker click for Natasha, or a cloud adopt into an empty local slot.
+  **Answered by Steve the same day: he clicked the coffee cup himself, and Natasha then picked the
+  same one. No defect — the sync did exactly what it should.** Recorded because the investigation
+  cost real time and the next person should not re-open it. Lesson kept: the picker writes to the
+  *currently selected* name, so clicking an avatar "to test" changes that player's real profile,
+  locally and in the cloud.
