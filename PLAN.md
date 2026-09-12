@@ -37,13 +37,14 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T17 | App icon: glitter-drop default, icon catalog + `AppIcon` autoload (D-032) | 6 | merged 2026-09-10 (PR #25 → a45430c); dock icon seen in worker screenshot | mid | — |
 | T17b | Title-screen icon picker (choose among the 4 icons; D-032 API) | 6 | merged 2026-09-10 (PR #26 → b668aa3) | cheap-mid | T17 |
 | T18 | Game-over celebration: confetti >1k, fireworks >5k / personal best / board #1 (D-033) | 6 | merged 2026-09-11 (PR #28 → 659aaa6); Natasha play-test pending | mid | T17b |
-| T19 | Settings overlay (theme + icon + avatar pickers off the title) + local avatar (D-035/D-036) | 7 | PR #29 approved 2026-09-11 (0324735); awaiting Steve's merge | mid-strong | T18 |
-| T20 | Cloud profile: server `profiles` table + avatar on the board (D-036; amends D-026) | 7 | unblocked 2026-09-11 (Steve: sync to the server); brief after T19 merges | mid | T19 |
+| T19 | Settings overlay (theme + icon + avatar pickers off the title) + local avatar (D-035/D-036) | 7 | merged 2026-09-11 (PR #29 → f93f1c1); Natasha play-test pending | mid-strong | T18 |
+| T20a | Server: `profiles` table, `PUT/GET /v1/profile`, avatar on the board and `/` (D-037) | 7 | brief written 2026-09-11; not yet dispatched | mid | T19 |
+| T20b | Client: push profile on change, restore when local is empty (D-037) | 7 | brief written 2026-09-11; dispatch after T20a is merged **and deployed** | mid | T20a |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8 → T10 → T9 →
 **Phase 5:** T11 ∥ T12 → T11.1 (deploy) → T13.
 **Phase 6:** T17 → T17b (T17b touches `title.tscn`; run it alone) → **T13b ∥ T18** (disjoint files; T18 runs in a clone).
-**Phase 7:** T19 → T20. Sequential, both in the main checkout: they share `profile.gd`, and the
+**Phase 7:** T19 → T20a → *(planner deploys)* → T20b. Sequential, all in the main checkout: they share `profile.gd`, and the
 clone rule has now been ignored by two separate workers (T13b, T18) — do not run them in parallel.
 T5 and T6 are the only truly parallel pair; ownership below is drawn to keep them apart.
 
@@ -271,12 +272,19 @@ Must not touch: `scripts/main.gd`, `theme_picker.*`, `icon_picker.*` (re-parente
 `autoload/{game,theme,sfx,leaderboard,app_icon}.gd`, `server/**`, `tests/menu_test.gd`,
 `tests/title_test.gd`, `tests/run_all.sh`.
 
-### T20 — Cloud profile (Steve answered 2026-09-11: sync to the server)
-Server half is independent of T19 and could be split out as T20a if Steve wants it in parallel;
-the client half reads `Profile`'s as-built avatar API, so its brief is written once T19 merges.
-Shape per D-036: `profiles(player_id, name, avatar, updated_at)`, key-protected `PUT /v1/profile`,
-public `GET /v1/profile?player_id=`, `avatar` on leaderboard entries and on the `/` page, 16 PNGs
-served from the server. Amends D-026; manual deploy after merge (D-028), then check `/healthz` + `/`.
+### T20a — Cloud profile, server half (Steve, 2026-09-11)
+Contract D-037. Owns `server/**` only; no Godot file changes, so it cannot collide with T20b.
+Verified before designing: `openDb` creates tables with `CREATE TABLE IF NOT EXISTS` so a new table
+needs no backfill of the live rows; `insertScore`/`boardRows`/`getMe` are the only readers of
+`scores`; the limiter is per `player_id` and already shared; `renderBoard` is pure and unit-tested
+in `server/test/page.test.js`. After merge the **planner** triggers the Render deploy (D-028) and
+smoke-checks `/healthz`, `/`, `/v1/leaderboard` and `/avatars/<id>.png` before T20b is dispatched.
+
+### T20b — Cloud profile, client half (after T20a is live)
+Contract D-037. Owns `autoload/leaderboard.gd`, `autoload/profile.gd` hooks and
+`tests/leaderboard_test.gd`; the device-wins rule is the part to get right. Dispatch only once
+T20a is merged and deployed, because its cases talk to the endpoints through the local memory
+server the runner already starts.
 
 ### T9 — Test isolation (found in T8 review)
 Every `-s tests/*.gd` run uses the app's real `user://` (macOS: ~/Library/Application
@@ -554,3 +562,11 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
 - 2026-09-11: planner error in the T19 brief — it said the gate should show "18 scripts + boot
   check". Main had 16 script suites plus `boot_check.gd` (17 `.gd` files), so T19 correctly produces
   17 + boot check. Count suites from a gate log, not from `ls tests/*.gd`.
+- 2026-09-11: T20a/T20b design check. `server/src/db.js` `openDb` uses CREATE TABLE IF NOT EXISTS
+  (new table is safe on the live disk; `scores` untouched). `boardRows` already takes the player's
+  *latest* name from a different row than their best score — the avatar LEFT JOIN must not disturb
+  that. `validate.js` `parseScoreBody` is the sanitise/validate pattern to mirror. `page.js`
+  `renderBoard` is pure and takes `{entries, total_players}`. `helpers.js` `withServer` gives each
+  suite its own DB, so new tests need no shared fixture. D-028 records Render's build as
+  `cd server && npm ci` with no rootDir, so the repo's `assets/` is present in production — T20a
+  must still degrade gracefully if it is not.
