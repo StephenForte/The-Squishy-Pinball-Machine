@@ -6,9 +6,13 @@ var _flippers_enabled := true
 @onready var _name_entry: Control = $NameEntry
 @onready var _player_name_label: Label = $PlayerNameLabel
 @onready var _top_five_label: Label = $TopFiveLabel
+@onready var _avatar_view: TextureRect = $AvatarView
+@onready var _settings_button: Button = $SettingsButton
+@onready var _settings: Control = $Settings
 
 var _leaderboard: Node
 var _title_offline := false
+var _placeholder_avatar: Texture2D
 
 
 func _ready() -> void:
@@ -20,7 +24,12 @@ func _ready() -> void:
 	var profile := get_node("/root/Profile")
 	if not profile.name_changed.is_connected(_on_name_changed):
 		profile.name_changed.connect(_on_name_changed)
+	if not profile.avatar_changed.is_connected(_on_avatar_changed):
+		profile.avatar_changed.connect(_on_avatar_changed)
+	_settings_button.focus_mode = Control.FOCUS_NONE
+	_settings_button.pressed.connect(_open_settings)
 	_refresh_name_ui(String(profile.player_name))
+	_refresh_avatar()
 	if _leaderboard != null:
 		if _leaderboard.has_signal("board_updated") and not _leaderboard.board_updated.is_connected(_on_board_updated):
 			_leaderboard.board_updated.connect(_on_board_updated)
@@ -49,20 +58,38 @@ func _apply_theme(_id: String = "") -> void:
 	$PlayHintLabel.add_theme_color_override("font_color", primary)
 	_player_name_label.add_theme_color_override("font_color", primary)
 	_top_five_label.add_theme_color_override("font_color", primary)
+	var style := StyleBoxFlat.new()
+	style.bg_color = theme_node.color("object_pink")
+	style.corner_radius_top_left = 8
+	style.corner_radius_top_right = 8
+	style.corner_radius_bottom_left = 8
+	style.corner_radius_bottom_right = 8
+	_settings_button.add_theme_stylebox_override("normal", style)
+	_settings_button.add_theme_stylebox_override("hover", style)
+	_settings_button.add_theme_stylebox_override("pressed", style)
+	_settings_button.add_theme_color_override("font_color", theme_node.color("text_on_color"))
 
 
 func _on_name_changed(new_name: String) -> void:
 	_refresh_name_ui(new_name)
+	_refresh_avatar()
+
+
+func _on_avatar_changed(_avatar_id: String) -> void:
+	_refresh_avatar()
 
 
 func show_menu() -> void:
 	_dismissed = false
 	visible = true
+	_close_settings()
 	var profile := get_node_or_null("/root/Profile")
 	if profile != null:
 		_refresh_name_ui(String(profile.player_name))
+		_refresh_avatar()
 	else:
 		_refresh_name_ui("")
+		_refresh_avatar()
 	if _leaderboard != null and _leaderboard.has_method("fetch_top"):
 		_leaderboard.fetch_top(5)
 
@@ -120,6 +147,47 @@ func _refresh_name_ui(player_name: String) -> void:
 		_name_entry.open()
 
 
+func _refresh_avatar() -> void:
+	if _avatar_view == null:
+		return
+	var profile := get_node_or_null("/root/Profile")
+	var id := ""
+	if profile != null:
+		id = String(profile.avatar_id)
+	if id.is_empty():
+		_avatar_view.texture = _placeholder_texture()
+		return
+	var path := SquishyCatalog.sprite_path(id)
+	if path.is_empty() or not ResourceLoader.exists(path):
+		_avatar_view.texture = _placeholder_texture()
+		return
+	var tex := load(path) as Texture2D
+	_avatar_view.texture = tex if tex != null else _placeholder_texture()
+
+
+func _placeholder_texture() -> Texture2D:
+	if _placeholder_avatar != null:
+		return _placeholder_avatar
+	var img := Image.create(128, 128, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0.18, 0.16, 0.22, 0.9))
+	_placeholder_avatar = ImageTexture.create_from_image(img)
+	return _placeholder_avatar
+
+
+func _open_settings() -> void:
+	if _dismissed or _is_capturing_name() or _needs_name():
+		return
+	if _settings != null and _settings.has_method("open"):
+		_settings.open()
+
+
+func _close_settings() -> void:
+	if _settings != null and _settings.has_method("close"):
+		_settings.close()
+	elif _settings != null:
+		_settings.visible = false
+
+
 func _is_capturing_name() -> bool:
 	return _name_entry != null and _name_entry.has_method("is_capturing") and _name_entry.is_capturing()
 
@@ -174,12 +242,19 @@ func _unhandled_input(event: InputEvent) -> void:
 			if key.physical_keycode == KEY_LEFT or key.physical_keycode == KEY_RIGHT:
 				get_viewport().set_input_as_handled()
 		return
+	if event is InputEventKey and event.pressed and not event.echo:
+		var key := event as InputEventKey
+		if key.physical_keycode == KEY_S:
+			_open_settings()
+			get_viewport().set_input_as_handled()
+			return
 	if event.is_action_pressed("change_name"):
 		_name_entry.open()
 		get_viewport().set_input_as_handled()
 		return
 	if event.is_action_pressed("launch_ball"):
 		_dismissed = true
+		_close_settings()
 		_name_entry.release_name_focus()
 		_set_flippers_enabled(true)
 		visible = false

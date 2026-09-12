@@ -1,0 +1,48 @@
+[gd_scene load_steps=5 format=3 uid="uid://c19settings7scene"]
+
+[ext_resource type="Script" path="res://scripts/ui/settings.gd" id="1_settings"]
+[ext_resource type="PackedScene" path="res://scenes/ui/theme_picker.tscn" id="2_theme"]
+[ext_resource type="PackedScene" path="res://scenes/ui/icon_picker.tscn" id="3_icon"]
+[ext_resource type="PackedScene" path="res://scenes/ui/avatar_picker.tscn" id="4_avatar"]
+
+[node name="Settings" type="Control"]
+visible = false
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 0
+script = ExtResource("1_settings")
+
+[node name="Heading" type="Label" parent="."]
+layout_mode = 0
+offset_left = 40.0
+offset_top = 24.0
+offset_right = 400.0
+offset_bottom = 88.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 0.92, 0.35, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 8
+theme_override_font_sizes/font_size = 40
+text = "SETTINGS"
+horizontal_alignment = 0
+vertical_alignment = 1
+
+[node name="CloseButton" type="Button" parent="."]
+layout_mode = 0
+offset_left = 520.0
+offset_top = 28.0
+offset_right = 680.0
+offset_bottom = 88.0
+focus_mode = 0
+theme_override_font_sizes/font_size = 28
+text = "Close"
+
+[node name="AvatarPicker" parent="." instance=ExtResource("4_avatar")]
+
+[node name="ThemePicker" parent="." instance=ExtResource("2_theme")]
+
+[node name="IconPicker" parent="." instance=ExtResource("3_icon")]

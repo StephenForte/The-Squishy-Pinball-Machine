@@ -1,9 +1,8 @@
-[gd_scene load_steps=5 format=3 uid="uid://d4m8title7scene"]
+[gd_scene load_steps=4 format=3 uid="uid://d4m8title7scene"]
 
 [ext_resource type="Script" path="res://scripts/ui/title.gd" id="1_title"]
-[ext_resource type="PackedScene" path="res://scenes/ui/theme_picker.tscn" id="2_picker"]
 [ext_resource type="PackedScene" path="res://scenes/ui/name_entry.tscn" id="3_name"]
-[ext_resource type="PackedScene" path="res://scenes/ui/icon_picker.tscn" id="4_icon"]
+[ext_resource type="PackedScene" path="res://scenes/ui/settings.tscn" id="5_settings"]
 
 [node name="Title" type="CanvasLayer"]
 layer = 15
@@ -94,10 +93,22 @@ text = ""
 horizontal_alignment = 1
 vertical_alignment = 0
 
-[node name="ThemePicker" parent="." instance=ExtResource("2_picker")]
-offset_top = 960.0
-offset_bottom = 1140.0
+[node name="AvatarView" type="TextureRect" parent="."]
+offset_left = 80.0
+offset_top = 950.0
+offset_right = 240.0
+offset_bottom = 1110.0
+mouse_filter = 2
+expand_mode = 1
+stretch_mode = 5
 
-[node name="IconPicker" parent="." instance=ExtResource("4_icon")]
-offset_top = 1150.0
-offset_bottom = 1270.0
+[node name="SettingsButton" type="Button" parent="."]
+offset_left = 360.0
+offset_top = 980.0
+offset_right = 640.0
+offset_bottom = 1100.0
+focus_mode = 0
+theme_override_font_sizes/font_size = 32
+text = "Settings  S"
+
+[node name="Settings" parent="." instance=ExtResource("5_settings")]
