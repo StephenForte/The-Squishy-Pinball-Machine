@@ -354,6 +354,19 @@ not the global identifier — the global is unavailable when a `-s` test preload
   service (new disk, data copy). Operating rule: merge server change → planner `trigger_deploy`
   → wait for `/healthz` 200 → check `/`. ~30 s of 502 during each deploy.
 
+- **Deploy 2026-09-12 (T20a, planner):** `trigger_deploy` on merge commit 70918fe →
+  `dep-daibbvp594qs73823ssg`, build → update → **live in 39 s**. The 502 window opened ~20 s in and
+  lasted under 20 s, matching the note above. Smoke: `/healthz` `{"ok":true,"store":"sqlite"}`;
+  `/` 200 html listing Natasha 14300, Dad 9200, T13 1313, Smoke Test 1 — **the disk survived**;
+  `/v1/leaderboard` carries `avatar` (all `''`, nothing has pushed a profile yet);
+  `/avatars/bear_bounce.png` 200 image/png 62263 B, 228×167; `/v1/profile` GET unknown → 404
+  `unknown_profile`, malformed → 400; PUT without/with a wrong key → 401; `POST /v1/scores`
+  unchanged. No production rows were written by the smoke check.
+- **Edge note (measured 2026-09-12):** Render fronts the service with Cloudflare, which rejects a
+  percent-encoded traversal (`/avatars/%2e%2e%2f…`) with its own **400** before the app is reached;
+  the app returns 404 for the same path locally. Two independent rejections — do not mistake the 400
+  for an application error.
+
 ## D-029 — Back to menu (Natasha QA, 2026-09-08)
 - New input action `menu` = Escape (D-004). `scripts/main.gd` handles it in any state except
   while the NameEntry is capturing: calls `Game.restart()` (fresh score/balls, frees balls,
