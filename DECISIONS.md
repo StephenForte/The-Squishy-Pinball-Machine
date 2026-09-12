@@ -557,7 +557,12 @@ because the client needs live endpoints to test against.
   validate avatar ids. Render checks out the whole repo (D-028: build `cd server && npm ci`), so the
   path exists in production; if it is missing the server still boots, logs once, and then rejects
   every non-empty avatar as `invalid_avatar`. This means adding a squishy to the JSON teaches the
-  client *and* the server at once — Steve's stated workflow (D-036).
+  client *and* the server — Steve's stated workflow (D-036).
+  **Operational note (verified at the T20a review, 2026-09-11):** the catalog is read **once at
+  boot**, which is the right trade against a disk read per request. So a newly added squishy is
+  rejected by the *running* server (400 `invalid_avatar`) and accepted after a restart — measured,
+  not assumed. Since deploys are manual (D-028), **adding a squishy now needs a deploy** before the
+  cloud will store it as an avatar; the game itself picks it up on the next pull as usual.
 - **`GET /avatars/<id>.png`** — serves the art from `../assets/design/squishes/art/`, but only for
   ids the catalog lists (whitelist, never the raw path segment — no traversal, no arbitrary reads).
   `image/png`, `Cache-Control: public, max-age=86400`. 404 for anything else, including a catalogued
