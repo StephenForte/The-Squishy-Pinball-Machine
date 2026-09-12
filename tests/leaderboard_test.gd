@@ -20,6 +20,8 @@ var _got_board := false
 var _submit_count: int = 0
 var _last_attempt_token: int = -1
 var _last_attempt_n: int = 0
+var _got_profile := false
+var _last_profile: Dictionary = {}
 
 
 func _initialize() -> void:
@@ -42,6 +44,8 @@ func _run() -> void:
 		_leaderboard.board_updated.connect(_on_board)
 	if _leaderboard.has_signal("submit_attempted") and not _leaderboard.submit_attempted.is_connected(_on_submit_attempted):
 		_leaderboard.submit_attempted.connect(_on_submit_attempted)
+	if _leaderboard.has_signal("profile_synced") and not _leaderboard.profile_synced.is_connected(_on_profile_synced):
+		_leaderboard.profile_synced.connect(_on_profile_synced)
 
 	OS.set_environment("SQUISH_LEADERBOARD_URL", LOCAL_URL)
 	OS.set_environment("SQUISH_LEADERBOARD_KEY", "devkey")
@@ -92,6 +96,20 @@ func _run() -> void:
 		return
 	if not await _case_12_happy_path_attempts(main):
 		return
+	if not await _case_13_push_profile(main):
+		return
+	if not await _case_14_push_skipped_empty_name(main):
+		return
+	if not await _case_15_restore_fills_gap(main):
+		return
+	if not await _case_16_restore_does_not_clobber(main):
+		return
+	if not await _case_17_restore_race(main):
+		return
+	if not await _case_18_profile_404(main):
+		return
+	if not await _case_19_profile_unreachable(main):
+		return
 
 	print("LEADERBOARD PASS cases=%d" % _cases_passed)
 	quit(0)
@@ -115,6 +133,11 @@ func _on_submit_attempted(token: int, attempt: int) -> void:
 
 func _on_board(_entries: Array, _total: int) -> void:
 	_got_board = true
+
+
+func _on_profile_synced(profile: Dictionary) -> void:
+	_got_profile = true
+	_last_profile = profile
 
 
 func _case_1_title_top_five(main: Node) -> bool:
@@ -566,6 +589,203 @@ func _case_12_happy_path_attempts(_main: Node) -> bool:
 	return true
 
 
+func _case_13_push_profile(_main: Node) -> bool:
+	print("LEADERBOARD case 13 push profile")
+	OS.set_environment("SQUISH_LEADERBOARD_URL", LOCAL_URL)
+	OS.set_environment("SQUISH_LEADERBOARD_KEY", "devkey")
+	_profile.call("set_name", "PushPat")
+	await process_frame
+	var player_id := String(_profile.player_id)
+	if player_id.is_empty():
+		return _fail("case 13: no player_id")
+	if not await _wait_cloud_profile(player_id, "PushPat", "", 3500):
+		return _fail("case 13: name change did not PUT profile")
+	var before := int(_leaderboard._profile_push_count)
+	if not bool(_profile.set_avatar("bear_bounce")):
+		return _fail("case 13: set_avatar(bear_bounce) failed")
+	if int(_leaderboard._profile_push_count) != before + 1:
+		return _fail("case 13: expected one PUT on avatar, count %s → %s" % [before, _leaderboard._profile_push_count])
+	if not await _wait_cloud_profile(player_id, "PushPat", "bear_bounce", 3500):
+		return _fail("case 13: GET /v1/profile missing pushed avatar")
+	await _wait_msec(400)
+	if int(_leaderboard._profile_push_count) != before + 1:
+		return _fail("case 13: profile push retried (D-034 must not apply)")
+	_profile.call("set_name", "RenamedPat")
+	await process_frame
+	var renamed_id := String(_profile.player_id)
+	if renamed_id.is_empty():
+		return _fail("case 13: rename left player_id empty")
+	if not await _wait_cloud_profile(renamed_id, "RenamedPat", "", 3500):
+		return _fail("case 13: rename did not push the new name")
+	_cases_passed += 1
+	print("LEADERBOARD case 13 pass")
+	return true
+
+
+func _case_14_push_skipped_empty_name(_main: Node) -> bool:
+	print("LEADERBOARD case 14 push skipped empty name")
+	OS.set_environment("SQUISH_LEADERBOARD_URL", LOCAL_URL)
+	_profile.call("set_name", "")
+	await process_frame
+	if String(_profile.player_name) != "":
+		return _fail("case 14: name did not clear")
+	var before := int(_leaderboard._profile_push_count)
+	if not bool(_profile.set_avatar("bear_bounce")):
+		return _fail("case 14: set_avatar with empty name should still set locally")
+	await _wait_msec(400)
+	if int(_leaderboard._profile_push_count) != before:
+		return _fail("case 14: push must be skipped when name is empty")
+	_cases_passed += 1
+	print("LEADERBOARD case 14 pass")
+	return true
+
+
+func _case_15_restore_fills_gap(_main: Node) -> bool:
+	print("LEADERBOARD case 15 restore fills gap")
+	OS.set_environment("SQUISH_LEADERBOARD_URL", LOCAL_URL)
+	_profile.call("set_name", "RestorePat")
+	await process_frame
+	var player_id := String(_profile.player_id)
+	if player_id.is_empty():
+		return _fail("case 15: no player_id")
+	_clear_local_avatar()
+	if String(_profile.avatar_id) != "":
+		return _fail("case 15: local avatar should be empty before restore")
+	if not await _api_put_profile(player_id, "RestorePat", "bear_bounce"):
+		return _fail("case 15: seed PUT /v1/profile failed")
+	_got_profile = false
+	_last_profile = {}
+	_leaderboard._boot_restore_profile()
+	if not await _wait_flag("_got_profile", 3500):
+		return _fail("case 15: profile_synced did not arrive")
+	if String(_profile.avatar_id) != "bear_bounce":
+		return _fail("case 15: local avatar %s want bear_bounce" % _profile.avatar_id)
+	if String(_profile.player_name) != "RestorePat":
+		return _fail("case 15: restore must not overwrite the device name")
+	_cases_passed += 1
+	print("LEADERBOARD case 15 pass")
+	return true
+
+
+func _case_16_restore_does_not_clobber(_main: Node) -> bool:
+	print("LEADERBOARD case 16 restore does not clobber")
+	OS.set_environment("SQUISH_LEADERBOARD_URL", LOCAL_URL)
+	_profile.call("set_name", "KeepPat")
+	await process_frame
+	var player_id := String(_profile.player_id)
+	if not bool(_profile.set_avatar("bear_bounce")):
+		return _fail("case 16: set_avatar(bear_bounce) failed")
+	if not await _wait_cloud_profile(player_id, "KeepPat", "bear_bounce", 3500):
+		return _fail("case 16: local avatar push did not land")
+	if not await _api_put_profile(player_id, "KeepPat", "frog_gus"):
+		return _fail("case 16: seed different server avatar failed")
+	_got_profile = false
+	_last_profile = {}
+	_leaderboard.fetch_profile(player_id)
+	if not await _wait_flag("_got_profile", 3500):
+		return _fail("case 16: profile_synced did not arrive")
+	if String(_profile.avatar_id) != "bear_bounce":
+		return _fail("case 16: local avatar was clobbered to %s" % _profile.avatar_id)
+	if String(_profile.player_name) != "KeepPat":
+		return _fail("case 16: name was overwritten")
+	var cloud := await _api_get_profile(player_id)
+	if String(cloud.get("avatar", "")) != "frog_gus":
+		return _fail("case 16: fetch must not write local avatar to the server: %s" % cloud)
+	_cases_passed += 1
+	print("LEADERBOARD case 16 pass")
+	return true
+
+
+func _case_17_restore_race(_main: Node) -> bool:
+	print("LEADERBOARD case 17 restore race")
+	OS.set_environment("SQUISH_LEADERBOARD_URL", LOCAL_URL)
+	_profile.call("set_name", "RacePat")
+	await process_frame
+	var player_id := String(_profile.player_id)
+	_clear_local_avatar()
+	if not await _api_put_profile(player_id, "RacePat", "bear_bounce"):
+		return _fail("case 17: seed PUT failed")
+	_got_profile = false
+	_last_profile = {}
+	_leaderboard.fetch_profile(player_id)
+	if not bool(_profile.set_avatar("frog_gus")):
+		return _fail("case 17: set_avatar(frog_gus) before response failed")
+	if not await _wait_flag("_got_profile", 3500):
+		return _fail("case 17: profile_synced did not arrive")
+	if String(_profile.avatar_id) != "frog_gus":
+		return _fail("case 17: late fetch overwrote the local pick: %s" % _profile.avatar_id)
+	_cases_passed += 1
+	print("LEADERBOARD case 17 pass")
+	return true
+
+
+func _case_18_profile_404(_main: Node) -> bool:
+	print("LEADERBOARD case 18 profile 404")
+	OS.set_environment("SQUISH_LEADERBOARD_URL", LOCAL_URL)
+	var before_name := String(_profile.player_name)
+	var before_avatar := String(_profile.avatar_id)
+	var before_id := String(_profile.player_id)
+	_reset_wait_flags()
+	_got_profile = false
+	_leaderboard.fetch_profile("00000000-0000-4000-8000-000000000404")
+	await _wait_msec(1500)
+	if _got_offline:
+		return _fail("case 18: 404 must stay quiet, got offline '%s'" % _last_offline)
+	if _got_profile:
+		return _fail("case 18: 404 must not emit profile_synced")
+	if String(_profile.player_name) != before_name or String(_profile.avatar_id) != before_avatar:
+		return _fail("case 18: 404 changed local profile")
+	if String(_profile.player_id) != before_id:
+		return _fail("case 18: 404 changed player_id")
+	_cases_passed += 1
+	print("LEADERBOARD case 18 pass")
+	return true
+
+
+func _case_19_profile_unreachable(main: Node) -> bool:
+	print("LEADERBOARD case 19 profile unreachable")
+	OS.set_environment("SQUISH_LEADERBOARD_URL", CLOSED_URL)
+	var before_name := String(_profile.player_name)
+	var before_avatar := String(_profile.avatar_id)
+	var player_id := String(_profile.player_id)
+	_reset_wait_flags()
+	_got_profile = false
+	_leaderboard.push_profile()
+	_leaderboard.fetch_profile(player_id)
+	await _wait_msec(400)
+	if _got_offline:
+		OS.set_environment("SQUISH_LEADERBOARD_URL", LOCAL_URL)
+		return _fail("case 19: profile push/fetch must stay quiet, got '%s'" % _last_offline)
+	if _got_profile:
+		OS.set_environment("SQUISH_LEADERBOARD_URL", LOCAL_URL)
+		return _fail("case 19: unreachable fetch emitted profile_synced")
+	if String(_profile.player_name) != before_name or String(_profile.avatar_id) != before_avatar:
+		OS.set_environment("SQUISH_LEADERBOARD_URL", LOCAL_URL)
+		return _fail("case 19: unreachable sync changed local profile")
+	_use_fast_retries()
+	_reset_wait_flags()
+	_submit_count = 0
+	await _play_scored_game(905)
+	if not await _wait_flag("_got_offline", 3500):
+		_restore_retries_and_url()
+		return _fail("case 19: D-034 offline did not arrive for score submit")
+	if _got_submit or _submit_count > 0:
+		_restore_retries_and_url()
+		return _fail("case 19: score submit succeeded against a closed port")
+	var game_over := _require_node(main, "GameOver")
+	if game_over == null:
+		_restore_retries_and_url()
+		return false
+	if not game_over.visible:
+		_restore_retries_and_url()
+		return _fail("case 19: GameOver should still show while score submit is offline")
+	_leaderboard._submitted_tokens[_leaderboard._submit_token] = true
+	_restore_retries_and_url()
+	_cases_passed += 1
+	print("LEADERBOARD case 19 pass")
+	return true
+
+
 func _use_fast_retries() -> void:
 	_leaderboard.retry_delays_sec = FAST_RETRY_DELAYS.duplicate()
 
@@ -648,8 +868,10 @@ func _reset_wait_flags() -> void:
 	_got_submit = false
 	_got_offline = false
 	_got_board = false
+	_got_profile = false
 	_last_offline = ""
 	_last_submit = {}
+	_last_profile = {}
 
 
 func _wait_flag(flag_name: String, ms: int) -> bool:
@@ -693,6 +915,53 @@ func _api_post(player_id: String, player_name: String, score: int) -> bool:
 	})
 	var got := await _http(HTTPClient.METHOD_POST, LOCAL_URL + "/v1/scores", body, "devkey")
 	return bool(got.get("ok", false)) and int(got.get("code", 0)) == 201
+
+
+func _clear_local_avatar() -> void:
+	var key := String(_profile.player_name).to_lower()
+	_profile.avatar_id = ""
+	if _profile.avatars.has(key):
+		_profile.avatars.erase(key)
+
+
+func _wait_cloud_profile(player_id: String, player_name: String, avatar: String, ms: int) -> bool:
+	var start := Time.get_ticks_msec()
+	while Time.get_ticks_msec() - start < ms:
+		var got := await _api_get_profile(player_id)
+		if (
+			not got.is_empty()
+			and String(got.get("name", "")) == player_name
+			and String(got.get("avatar", "")) == avatar
+		):
+			return true
+		await process_frame
+	return false
+
+
+func _api_get_profile(player_id: String) -> Dictionary:
+	var got := await _http(
+		HTTPClient.METHOD_GET,
+		LOCAL_URL + "/v1/profile?player_id=%s" % player_id,
+		"",
+		""
+	)
+	if not bool(got.get("ok", false)):
+		return {}
+	var parsed: Variant = got.get("parsed")
+	if typeof(parsed) != TYPE_DICTIONARY:
+		return {}
+	return parsed
+
+
+func _api_put_profile(player_id: String, player_name: String, avatar: String) -> bool:
+	var body := JSON.stringify({
+		"player_id": player_id,
+		"name": player_name,
+		"avatar": avatar,
+		"client": CLIENT,
+	})
+	var got := await _http(HTTPClient.METHOD_PUT, LOCAL_URL + "/v1/profile", body, "devkey")
+	return bool(got.get("ok", false)) and int(got.get("code", 0)) == 200
 
 
 func _api_get_board() -> Dictionary:
