@@ -39,7 +39,7 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T18 | Game-over celebration: confetti >1k, fireworks >5k / personal best / board #1 (D-033) | 6 | merged 2026-09-11 (PR #28 → 659aaa6); Natasha play-test pending | mid | T17b |
 | T19 | Settings overlay (theme + icon + avatar pickers off the title) + local avatar (D-035/D-036) | 7 | merged 2026-09-11 (PR #29 → f93f1c1); Natasha play-test pending | mid-strong | T18 |
 | T20a | Server: `profiles` table, `PUT/GET /v1/profile`, avatar on the board and `/` (D-037) | 7 | merged + **deployed live** 2026-09-12 (PR #30 → 70918fe, dep-daibbvp594qs73823ssg) | mid | T19 |
-| T20b | Client: push profile on change, restore when local is empty (D-037) | 7 | **ready to dispatch** — brief written, T20a live 2026-09-12 | mid | T20a |
+| T20b | Client: push profile on change, restore when local is empty (D-037) | 7 | PR #31 approved 2026-09-12 (69f4de8); awaiting Steve's merge | mid | T20a |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8 → T10 → T9 →
 **Phase 5:** T11 ∥ T12 → T11.1 (deploy) → T13.
@@ -587,3 +587,12 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   228×167 PNG; auth and validation paths answer correctly. Traversal re-tested **in production**:
   Cloudflare returns 400 for the encoded form before the app sees it, the app returns 404 for the
   rest. No production rows written during the check. T20b is now safe to dispatch.
+- 2026-09-12: T20b (PR #31, 69f4de8, base f4a9555) reviewed in scratch clone. Scope ✓ — only
+  `leaderboard.gd` + its suite; `profile.gd` untouched as the brief preferred. Gate SUMMARY all
+  suites PASS, LEADERBOARD 19/19 with D-034's 8-12 unchanged. Probe drove the **real**
+  `_boot_restore_profile()` rather than `fetch_profile`: empty local avatar is filled from the cloud;
+  a set local avatar is never clobbered; the local pick reaches the server; an in-flight response
+  landing after a fresh pick does not overwrite it; another player's profile is ignored. Falsified by
+  deleting the empty-avatar check — only the race case goes red, so case 17 is the discriminating
+  one. A/B on the sentinel guard showed it changes nothing (23 s vs 24 s, identical error and warning
+  counts): the brief's trap text was wrong, D-037 now records the correction. Approved.
