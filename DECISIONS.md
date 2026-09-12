@@ -520,7 +520,16 @@ id instead of a file. Photo avatars would be a different project; ask before ass
 - Picker lives in the settings overlay (D-035); the title shows the current avatar next to the
   player name. Sprites load at run time via `SquishyCatalog.sprite_path(id)` and `load()`,
   never `preload()` (CLAUDE.md).
-- **Cloud (T20, not yet specified):** whether "from the cloud" means (a) this profile syncing to
-  the leaderboard server so the board shows the avatar and a reinstall restores it, or (b) loading
-  an avatar image from a URL, is **Steve's call — asked 2026-09-11, not yet answered.** Nothing in
-  T19 depends on the answer. D-026's `POST /v1/scores` contract is unchanged by T19.
+- **The catalog grows without code (Steve, 2026-09-11):** the picker enumerates *every* entry in
+  `squishies_catalog.json` at run time — not the 8 in `first_table_slots`, not a hard-coded list —
+  so dropping a new squishy into the JSON plus its PNG makes it selectable with no code change and
+  no new decision. An entry whose sprite will not load is **skipped from the picker** (one
+  `push_warning`, no error spam, same spirit as D-029's self-heal), because Steve edits the JSON by
+  hand and may add an entry before its art lands. Order in the picker follows catalog order.
+- **Cloud (T20; Steve answered 2026-09-11): sync this profile to the leaderboard server.** Not a
+  URL-loaded image. Shape, to be contracted properly when T20 is briefed: a `profiles` table keyed
+  by `player_id`, key-protected `PUT /v1/profile` and public `GET /v1/profile?player_id=`, `avatar`
+  carried on leaderboard entries and drawn on the `/` board, and the 16 PNGs served by the server.
+  Amends D-026; needs a manual Render deploy (D-028). Restoring a profile onto a *fresh* device
+  means claiming a `player_id` you no longer hold — out of scope until Steve asks, since it is an
+  identity question, not a storage one. D-026's `POST /v1/scores` contract is unchanged by T19.
