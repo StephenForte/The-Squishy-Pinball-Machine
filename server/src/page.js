@@ -29,6 +29,14 @@ function playerCountLabel(total) {
   return n === 1 ? '1 player' : `${n} players`;
 }
 
+function avatarImg(row) {
+  const avatar = typeof row.avatar === 'string' ? row.avatar : '';
+  if (!avatar) return '';
+  const src = escapeHtml(`/avatars/${avatar}.png`);
+  const alt = escapeHtml(row.name ?? '');
+  return `<img src="${src}" alt="${alt}">`;
+}
+
 function rowsHtml(entries, now) {
   const rows = Array.isArray(entries) ? entries.slice(0, 10) : [];
   if (rows.length === 0) {
@@ -41,7 +49,7 @@ function rowsHtml(entries, now) {
       const name = escapeHtml(row.name ?? '');
       const score = escapeHtml(row.score ?? '');
       const when = escapeHtml(relativeTime(row.at, now));
-      return `<tr><td class="rank">${rank}</td><td class="name">${name}</td><td class="score">${score}</td><td class="when">${when}</td></tr>`;
+      return `<tr><td class="rank">${rank}</td><td class="name">${avatarImg(row)}${name}</td><td class="score">${score}</td><td class="when">${when}</td></tr>`;
     })
     .join('');
 
@@ -52,8 +60,9 @@ function rowsHtml(entries, now) {
 }
 
 /**
- * Self-contained HTML board. Inline CSS only — no scripts, no external assets.
- * Colours are the neon_candy_baseline hex values, hard-coded (D-026 GET /).
+ * HTML board. Inline CSS, no scripts, no third-party assets (D-026 / D-037).
+ * Same-origin /avatars/<id>.png images only, and only when avatar is set.
+ * Colours are the neon_candy_baseline hex values, hard-coded.
  */
 export function renderBoard({ entries = [], total_players = 0 } = {}, now = Date.now()) {
   const count = escapeHtml(playerCountLabel(total_players));
@@ -80,6 +89,7 @@ td.rank{width:3rem;font-weight:700;color:var(--pink)}
 td.score{font-variant-numeric:tabular-nums;white-space:nowrap}
 td.when{color:var(--muted);font-size:.85rem}
 td.name{word-break:break-word}
+td.name img{display:inline-block;width:1.75rem;height:1.3rem;object-fit:contain;vertical-align:middle;margin-right:.45rem}
 tbody tr:nth-child(even) td{background:rgba(48,32,122,.4)}
 .empty{margin:0;padding:1.4rem 1rem;background:var(--panel);border-radius:.75rem;color:var(--muted)}
 </style>

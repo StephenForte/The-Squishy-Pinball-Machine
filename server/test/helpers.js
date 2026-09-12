@@ -31,6 +31,9 @@ export async function withServer(fn, options = {}) {
     dbPath: options.dbPath ?? dbPathForSuite(),
     key: options.key ?? KEY,
     limiter: options.limiter,
+    catalogPath: options.catalogPath,
+    repoRoot: options.repoRoot,
+    catalog: options.catalog,
   });
   const port = await listen(server);
   try {
@@ -71,4 +74,23 @@ export function scoreBody(overrides = {}) {
 
 export function postScore(port, body, key = KEY) {
   return request(port, 'POST', '/v1/scores', { key, body: scoreBody(body) });
+}
+
+export function profileBody(overrides = {}) {
+  return {
+    player_id: overrides.player_id ?? uuid(),
+    name: overrides.name ?? 'Natasha',
+    avatar: overrides.avatar ?? '',
+    client: overrides.client ?? 'squish/1.0',
+  };
+}
+
+export function putProfile(port, body, key = KEY) {
+  return request(port, 'PUT', '/v1/profile', { key, body: profileBody(body) });
+}
+
+export async function requestBinary(port, method, path) {
+  const res = await fetch(`http://127.0.0.1:${port}${path}`, { method });
+  const body = Buffer.from(await res.arrayBuffer());
+  return { status: res.status, headers: res.headers, body };
 }

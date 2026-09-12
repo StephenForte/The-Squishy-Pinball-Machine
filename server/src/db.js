@@ -36,6 +36,14 @@ export function openDb(dbPath) {
   db.exec(
     'CREATE INDEX IF NOT EXISTS scores_player_score ON scores (player_id, score DESC)',
   );
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS profiles (
+      player_id text primary key,
+      name text not null,
+      avatar text not null default '',
+      updated_at text not null
+    )
+  `);
   return db;
 }
 
@@ -66,6 +74,7 @@ export function insertScore(db, { player_id, name, score, client }) {
 /**
  * One row per player: best score (earliest created_at of that best) joined
  * with the player's latest name — those come from different rows.
+ * Avatar is a LEFT JOIN on profiles after that; it must not replace the name.
  */
 function boardRows(db) {
   return db
@@ -81,7 +90,8 @@ function boardRows(db) {
           LIMIT 1
         ) AS name,
         b.score,
-        b.at
+        b.at,
+        COALESCE(p.avatar, '') AS avatar
       FROM (
         SELECT s.player_id, s.score, MIN(s.created_at) AS at
         FROM scores s
@@ -92,6 +102,7 @@ function boardRows(db) {
         ) m ON m.player_id = s.player_id AND s.score = m.best
         GROUP BY s.player_id, s.score
       ) b
+      LEFT JOIN profiles p ON p.player_id = b.player_id
       ORDER BY b.score DESC, b.at ASC, b.player_id ASC
     `,
     )
@@ -105,6 +116,7 @@ function withRanks(rows) {
     name: row.name,
     score: row.score,
     at: row.at,
+    avatar: row.avatar ?? '',
   }));
 }
 
@@ -126,6 +138,7 @@ export function getLeaderboard(db, limit) {
       name: row.name,
       score: row.score,
       at: row.at,
+      avatar: row.avatar,
     })),
     total_players: ranked.length,
   };
@@ -135,5 +148,35 @@ export function getMe(db, playerId) {
   const ranked = withRanks(boardRows(db));
   const mine = ranked.find((row) => row.player_id === playerId);
   if (!mine) return null;
-  return { rank: mine.rank, best: mine.score, name: mine.name };
+  return { rank: mine.rank, best: mine.score, name: mine.name, avatar: mine.avatar };
+}
+
+export function getProfile(db, playerId) {
+  const row = db
+    .prepare(
+      'SELECT player_id, name, avatar, updated_at FROM profiles WHERE player_id = ?',
+    )
+    .get(playerId);
+  if (!row) return null;
+  return {
+    player_id: row.player_id,
+    name: row.name,
+    avatar: row.avatar,
+    updated_at: row.updated_at,
+  };
+}
+
+export function upsertProfile(db, { player_id, name, avatar }) {
+  const updated_at = new Date().toISOString();
+  db.prepare(
+    `
+    INSERT INTO profiles (player_id, name, avatar, updated_at)
+    VALUES (?, ?, ?, ?)
+    ON CONFLICT(player_id) DO UPDATE SET
+      name = excluded.name,
+      avatar = excluded.avatar,
+      updated_at = excluded.updated_at
+  `,
+  ).run(player_id, name, avatar, updated_at);
+  return getProfile(db, player_id);
 }

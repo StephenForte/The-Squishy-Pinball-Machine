@@ -56,3 +56,41 @@ export function parseScoreBody(body) {
     },
   };
 }
+
+/**
+ * Same sanitise-then-validate shape as parseScoreBody (D-026).
+ * `isKnownAvatar` is the catalog whitelist; only "" bypasses it.
+ */
+export function parseProfileBody(body, isKnownAvatar = () => false) {
+  if (body === null || typeof body !== 'object' || Array.isArray(body)) {
+    return { ok: false, error: 'invalid_json' };
+  }
+  if (!isUuidV4(body.player_id)) {
+    return { ok: false, error: 'invalid_player_id' };
+  }
+  if (typeof body.name === 'string' && /[\p{Cc}]/u.test(body.name)) {
+    return { ok: false, error: 'invalid_name' };
+  }
+  const name = sanitizeName(body.name);
+  if (!name) {
+    return { ok: false, error: 'invalid_name' };
+  }
+  if (typeof body.avatar !== 'string') {
+    return { ok: false, error: 'invalid_avatar' };
+  }
+  if (body.avatar !== '' && !isKnownAvatar(body.avatar)) {
+    return { ok: false, error: 'invalid_avatar' };
+  }
+  if (typeof body.client !== 'string' || !CLIENT.test(body.client)) {
+    return { ok: false, error: 'invalid_client' };
+  }
+  return {
+    ok: true,
+    value: {
+      player_id: normalizePlayerId(body.player_id),
+      name,
+      avatar: body.avatar,
+      client: body.client,
+    },
+  };
+}
