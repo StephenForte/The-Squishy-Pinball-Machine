@@ -1,7 +1,7 @@
 # Decisions — The Squishy Pinball Machine
 
 Numbered, append-only. Never renumber; supersede in place with date and reason.
-Workers cite these instead of re-deciding. Next free number: **D-037**.
+Workers cite these instead of re-deciding. Next free number: **D-038**.
 
 ## D-001 — Engine: Godot 4.x, GDScript (2026-09-02)
 Per PRD. Exact version to be pinned as D-006 once installed on the build machine.
@@ -533,3 +533,49 @@ id instead of a file. Photo avatars would be a different project; ask before ass
   Amends D-026; needs a manual Render deploy (D-028). Restoring a profile onto a *fresh* device
   means claiming a `player_id` you no longer hold — out of scope until Steve asks, since it is an
   identity question, not a storage one. D-026's `POST /v1/scores` contract is unchanged by T19.
+
+## D-037 — Cloud profile: `profiles` table, avatar on the board (2026-09-11; amends D-026)
+Implements the cloud half Steve chose in D-036. Split into **T20a (server)** and **T20b (client)**
+because the client needs live endpoints to test against.
+- **Storage.** New table, created by `CREATE TABLE IF NOT EXISTS` in `openDb`:
+  `profiles(player_id text primary key, name text not null, avatar text not null default '',
+  updated_at text not null)`. **`scores` is not altered** — the live Render disk holds real rows and
+  nothing about them may need backfilling. The board reads the avatar with a LEFT JOIN.
+- **`PUT /v1/profile`** — header `X-Squish-Key`, body `{player_id, name, avatar, client}`.
+  200 `{player_id, name, avatar, updated_at}`. Upsert on `player_id`. Errors mirror D-026:
+  400 `invalid_player_id` / `invalid_name` / `invalid_avatar` / `invalid_client`, 401 `unauthorized`,
+  429 `rate_limited` (the existing limiter and its 30/min per player_id, shared with `/v1/scores`).
+  `name` is sanitised exactly as D-026 does. `avatar` is `""` or an id present in the squishy
+  catalog; anything else is 400.
+- **`GET /v1/profile?player_id=<uuid v4>`** — public, no key. 200 the same object, or
+  404 `{"error":"unknown_profile"}`. 400 `invalid_player_id` for a malformed id.
+- **`avatar` is added** to every entry of `GET /v1/leaderboard` and to `GET /v1/leaderboard/me`,
+  `""` when the player has no profile row. Existing fields keep their names, types and order —
+  T13's client reads these and must not break.
+- **The catalog is the server's source of truth too.** The server reads
+  `../assets/design/squishes/squishies_catalog.json`, resolved relative to its own module, to
+  validate avatar ids. Render checks out the whole repo (D-028: build `cd server && npm ci`), so the
+  path exists in production; if it is missing the server still boots, logs once, and then rejects
+  every non-empty avatar as `invalid_avatar`. This means adding a squishy to the JSON teaches the
+  client *and* the server at once — Steve's stated workflow (D-036).
+- **`GET /avatars/<id>.png`** — serves the art from `../assets/design/squishes/art/`, but only for
+  ids the catalog lists (whitelist, never the raw path segment — no traversal, no arbitrary reads).
+  `image/png`, `Cache-Control: public, max-age=86400`. 404 for anything else, including a catalogued
+  id whose file is absent. The PNGs are **not copied into `server/`**: a copy would drift from the
+  catalog the first time Steve adds a squishy.
+- **`/` board** shows each row's avatar as a small `<img src="/avatars/<id>.png" alt="">` beside the
+  name, and nothing when the avatar is `""`. Still self-contained otherwise: inline CSS, no scripts,
+  no third-party assets, `Cache-Control: no-store` (D-026 as amended by T13a).
+- **Client sync (T20b).** `Leaderboard` gains `push_profile()` and `fetch_profile(player_id)`,
+  reusing the existing async `_http_request` and offline handling — a failed sync is quiet, never
+  blocks play, and is not retried by D-034's score schedule (a profile push is idempotent; the next
+  change re-pushes). Push on `Profile.name_changed` and `Profile.avatar_changed`, and only when the
+  name is non-empty.
+- **Conflict rule: the device wins; the cloud only fills gaps.** At boot the client fetches its
+  profile and adopts the server's avatar **only if the local avatar for the current name is empty**;
+  it never overwrites a local choice. That makes "from the cloud" mean *restore after a reinstall*
+  without one device silently undoing a change made on another. Last-write-wins would need a local
+  clock and is not worth it for a family game.
+- **Out of scope, deliberately:** claiming a profile on a *fresh* device (you would need the old
+  `player_id`, which is an identity question, not a storage one — D-036 already flags it), and any
+  upload of player-supplied images.
