@@ -40,7 +40,9 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T19 | Settings overlay (theme + icon + avatar pickers off the title) + local avatar (D-035/D-036) | 7 | merged 2026-09-11 (PR #29 → f93f1c1); Natasha play-test pending | mid-strong | T18 |
 | T20a | Server: `profiles` table, `PUT/GET /v1/profile`, avatar on the board and `/` (D-037) | 7 | merged + **deployed live** 2026-09-12 (PR #30 → 70918fe, dep-daibbvp594qs73823ssg) | mid | T19 |
 | T20b | Client: push profile on change, restore when local is empty (D-037) | 7 | merged 2026-09-12 (PR #31 → 817d295) | mid | T20a |
-| T21 | Boot reconciles profile both ways so a pre-existing avatar uploads (D-038) | 7 fix | PR #32 approved 2026-09-12 (8cb3ed7); awaiting Steve's merge | mid | T20b |
+| T21 | Boot reconciles profile both ways so a pre-existing avatar uploads (D-038) | 7 fix | merged 2026-09-12 (PR #32) | mid | T20b |
+| T22 | Flippers 5% longer: LENGTH 90→94.5, polygon scaled about the pivot (D-039) | 8 | brief written 2026-09-17; not yet dispatched | cheap-mid | — |
+| T23 | Supercharged mode: 3-ball split at streak 3, once per game (D-040) | 8 | brief written 2026-09-17; dispatch after T22 merges | mid-strong | T22 |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8 → T10 → T9 →
 **Phase 5:** T11 ∥ T12 → T11.1 (deploy) → T13.
@@ -286,6 +288,21 @@ Contract D-037. Owns `autoload/leaderboard.gd`, `autoload/profile.gd` hooks and
 `tests/leaderboard_test.gd`; the device-wins rule is the part to get right. Dispatch only once
 T20a is merged and deployed, because its cases talk to the endpoints through the local memory
 server the runner already starts.
+
+### T22 — Flippers 5% longer (Steve, 2026-09-17)
+Contract D-039. Measured before designing (see the decision): rest tip gap 53.1 px → 44.8 px against
+a 24 px ball. Owns `scenes/flipper.tscn`, `scripts/flipper.gd`; must update `tests/flipper_test.gd`
+(its HIT velocities are geometry-derived and will move). Must not touch `scenes/table.tscn` — the
+pivots stay where they are.
+
+### T23 — Supercharged mode (Steve, 2026-09-17)
+Contract D-040. Verified before designing: `Game.on_ball_drained()` decrements `balls_left` on every
+drain with only a same-frame dedupe, and `Table._on_drain_body_entered` emits `ball_drained` per
+ball, so multiball without a ball-life rule would end a game instantly. `Table` already owns
+`spawn_ball()`, the `ball` group and the Drain area, so the "only the last ball costs a life" rule
+belongs there. Owns `autoload/game.gd`, `scripts/table.gd`, `scripts/effects.gd`,
+`tests/supercharge_test.gd`; additive to `tests/game_flow.gd` only if a drain-accounting case is
+needed. Runs after T22 so it is built and soaked on the final flipper geometry.
 
 ### T9 — Test isolation (found in T8 review)
 Every `-s tests/*.gd` run uses the app's real `user://` (macOS: ~/Library/Application
@@ -627,3 +644,11 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   replacing `code == 404` with `not ok` makes an unreachable server push. The unreachable check only
   discriminates against a non-sentinel port (see D-038 testing note). Worker correctly rejected the
   brief's `ice_cube` (an app-icon id, not a squishy) — planner error, recorded. Approved.
+- 2026-09-17: T22/T23 design check on main @ 0c0cf18. Flipper tip gap measured headless from
+  `rest_rad` (53.1 px now, 44.8 px at +5%, ball 24 px) rather than estimated. `flipper.gd` mirrors
+  via the `facing` export and a shared polygon, so one scene edit covers both paddles.
+  `autoload/game.gd:71` `on_ball_drained()` costs a life per drain (same-frame dedupe only) and
+  `scripts/table.gd:28` emits `ball_drained` per ball — hence D-040's last-ball rule lives in Table.
+  `Game.streak` caps at 5 (D-017) and already emits `streak_changed`, so the 3x trigger needs no new
+  scoring concept. Sequential, not parallel: both tasks move ball physics and both must leave
+  `soak_launch`, `flipper_test` and `game_flow` green.
