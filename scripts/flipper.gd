@@ -7,7 +7,7 @@ extends AnimatableBody2D
 
 const REST_DEG := 22.0
 const SWING_DEG := 65.0
-const LENGTH := 90.0
+const LENGTH := 94.5
 const HALF_WIDTH := 8.0
 const BALL_RADIUS := 12.0
 const UP_SPEED_DEG := 915.0

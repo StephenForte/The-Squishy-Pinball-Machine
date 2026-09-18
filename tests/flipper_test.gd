@@ -10,6 +10,8 @@ const ANGLE_TOL_DEG := 3.0
 const TIP_FLIPS := 20
 const TIP_GAP_FRAMES := 40
 const MIN_UP_VY := -600.0
+const EXPECTED_HIT_VY := -1645.3
+const HIT_VY_TOL := 0.15
 const BASE_LAUNCH_COUNT := 8
 const BASE_DRAIN_FRAMES := 3000
 const BASE_FLIP_FRAMES := 600
@@ -36,6 +38,14 @@ func _run() -> void:
 	await physics_frame
 	_free_balls()
 	await process_frame
+
+	if not _test_polygons(table):
+		quit(1)
+		return
+
+	if not _test_rest_tip_gap(table):
+		quit(1)
+		return
 
 	if not await _test_rest_clears_drain(table):
 		quit(1)
@@ -75,6 +85,49 @@ func _run() -> void:
 
 	print("FLIP PASS hits=%d hold=1 tip_flips=%d oob=0" % [hits, TIP_FLIPS])
 	quit(0)
+
+
+func _test_polygons(table: Node2D) -> bool:
+	var expected := PackedVector2Array([
+		Vector2(8.4, -8),
+		Vector2(86.1, -6),
+		Vector2(94.5, 0),
+		Vector2(86.1, 6),
+		Vector2(8.4, 8),
+	])
+	for flipper_name in ["FlipperLeft", "FlipperRight"]:
+		var flipper: Node2D = table.get_node(flipper_name)
+		var collision := flipper.get_node("CollisionShape2D") as CollisionShape2D
+		var visual := flipper.get_node("Visual") as Polygon2D
+		if collision == null or visual == null:
+			print("POLYGON FAIL %s missing_node" % flipper_name)
+			return false
+		var shape := collision.shape as ConvexPolygonShape2D
+		if shape == null:
+			print("POLYGON FAIL %s not_convex" % flipper_name)
+			return false
+		if shape.points != visual.polygon:
+			print("POLYGON FAIL %s collision_visual_mismatch" % flipper_name)
+			return false
+		if shape.points != expected:
+			print("POLYGON FAIL %s points=%s" % [flipper_name, shape.points])
+			return false
+	print("POLYGON PASS")
+	return true
+
+
+func _test_rest_tip_gap(table: Node2D) -> bool:
+	var left: Node2D = table.get_node("FlipperLeft")
+	var right: Node2D = table.get_node("FlipperRight")
+	var left_tip: Vector2 = PIVOT_LEFT + Vector2.from_angle(left.rest_rad) * left.LENGTH
+	var right_tip: Vector2 = PIVOT_RIGHT + Vector2.from_angle(right.rest_rad) * right.LENGTH
+	var gap: float = left_tip.distance_to(right_tip)
+	var ball_diameter: float = left.BALL_RADIUS * 2.0
+	if gap <= ball_diameter:
+		print("GAP FAIL gap=%.1f diameter=%.1f" % [gap, ball_diameter])
+		return false
+	print("GAP PASS gap=%.1f diameter=%.1f" % [gap, ball_diameter])
+	return true
 
 
 func _test_rest_clears_drain(table: Node2D) -> bool:
@@ -271,6 +324,10 @@ func _test_hit(table: Node2D, flipper_name: String, action: StringName) -> bool:
 	var vy: float = ball.linear_velocity.y
 	if vy >= MIN_UP_VY:
 		print("HIT %s FAIL vy=%.1f" % [action, vy])
+		_release_flippers()
+		return false
+	if absf(vy - EXPECTED_HIT_VY) > HIT_VY_TOL:
+		print("HIT %s FAIL vy=%.1f expected=%.1f" % [action, vy, EXPECTED_HIT_VY])
 		_release_flippers()
 		return false
 
