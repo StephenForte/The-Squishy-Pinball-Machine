@@ -121,7 +121,9 @@ func _test_rest_tip_gap(table: Node2D) -> bool:
 	var right: Node2D = table.get_node("FlipperRight")
 	var left_tip: Vector2 = PIVOT_LEFT + Vector2.from_angle(left.rest_rad) * left.LENGTH
 	var right_tip: Vector2 = PIVOT_RIGHT + Vector2.from_angle(right.rest_rad) * right.LENGTH
-	var gap: float = left_tip.distance_to(right_tip)
+	# Signed, not distance_to: if the paddles cross, the unsigned distance is a
+	# large positive number and the drain is shut. Signed catches that.
+	var gap: float = right_tip.x - left_tip.x
 	var ball_diameter: float = left.BALL_RADIUS * 2.0
 	if gap <= ball_diameter:
 		print("GAP FAIL gap=%.1f diameter=%.1f" % [gap, ball_diameter])
