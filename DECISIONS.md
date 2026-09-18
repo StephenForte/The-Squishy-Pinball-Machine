@@ -1,7 +1,7 @@
 # Decisions — The Squishy Pinball Machine
 
 Numbered, append-only. Never renumber; supersede in place with date and reason.
-Workers cite these instead of re-deciding. Next free number: **D-039**.
+Workers cite these instead of re-deciding. Next free number: **D-041**.
 
 ## D-001 — Engine: Godot 4.x, GDScript (2026-09-02)
 Per PRD. Exact version to be pinned as D-006 once installed on the build machine.
@@ -652,3 +652,47 @@ by the planner before any fix was dispatched.
   catalog an id belongs to before naming it in a brief.
 - Self-heal available now, no code required: selecting a name re-pushes that player's profile, so
   Dad uploads as soon as Dad is chosen in-game.
+
+## D-039 — Flippers 5% longer (Steve, 2026-09-17)
+Steve: "make the paddles 5% longer." Measured before deciding, on `main` at 0c0cf18, by
+instantiating `table.tscn` headless and computing each rest tip from `rest_rad`:
+
+    length 90.0  left tip (333.4, 1153.7)  right tip (386.6, 1153.7)  gap 53.1 px
+    length 94.5  left tip (337.6, 1155.4)  right tip (382.4, 1155.4)  gap 44.8 px
+    ball diameter 24 px — it still drains, with 20.8 px of clearance
+
+- `Flipper.LENGTH` 90.0 → **94.5**. The collision polygon and the `Visual` polygon are scaled
+  **in x only, about the pivot** (×1.05): `(8,-8) (82,-6) (90,0) (82,6) (8,8)` becomes
+  `(8.4,-8) (86.1,-6) (94.5,0) (86.1,6) (8.4,8)`. `HALF_WIDTH` stays 8 — longer, not fatter.
+  `Hub` is untouched. Collision and `Visual` must stay identical to each other (D-023's "what the
+  player sees is what scores").
+- Both flippers share one scene and mirror via `facing`, so this is a single edit.
+- Swing speeds, `REST_DEG`, `SWING_DEG` and the pivot-trap constants are unchanged; this is reach
+  only, not power (that was D-019/T7d).
+- Known consequence, accepted: the drain gap narrows by ~16%, so the game gets easier. Natasha and
+  Steve retune after play if it feels wrong.
+- D-013/D-023 placement invariant still governs: idle launches must still drain or free with one
+  flip, which `soak_launch` and `flipper_test` enforce.
+
+## D-040 — Supercharged mode: three balls once per game (Steve, 2026-09-17)
+Steve: "a super charged mode where the ball splits into 3 balls, when the user gets up to 3x on the
+squishies, but only once per game."
+- **Trigger:** the D-017 bumper streak reaching **3** (the "3x" the HUD shows). `Game` fires a new
+  `supercharged()` signal the first time `streak` hits 3 in a game, and never again until
+  `restart()`. The flag lives with the run state and is cleared in `_reset_run()`, so it is once per
+  *game*, not once per ball.
+- **The split:** `Table` turns the live ball into three. The two new balls start at the live ball's
+  position, nudged apart so they do not spawn overlapping, and carry its speed on fanned headings.
+  If **no** ball is in play when the trigger fires (it can coincide with a drain), the split is
+  skipped **and the once-per-game flag is left unused**, so the player still gets their supercharge.
+- **Ball-life rule, and this is the load-bearing part:** today every drain calls
+  `Game.on_ball_drained()` and costs a life. With three balls that would end a game in a second.
+  While **more than one** ball is in play a drain costs nothing; only the drain of the **last** ball
+  reaches `Game`. This lives in `Table`, which already owns spawning, draining and the `ball` group,
+  so `Game.on_ball_drained()` keeps meaning exactly "a life was lost" and D-011/D-014 are untouched.
+  `Game`'s existing same-physics-frame dedupe stays as a second guard.
+- **Feedback:** `Effects` reacts to `supercharged` with the burst it already plays for the big-score
+  moment (D-018 display-only: no physics, never touches Table). A multiball that appears with no cue
+  reads as a bug to a seven-year-old. No new HUD element in V1.
+- Out of scope: any score multiplier while supercharged, a second supercharge per game, and
+  awarding an extra life. Scoring stays D-005/D-017.
