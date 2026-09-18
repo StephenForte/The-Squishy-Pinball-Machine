@@ -41,7 +41,7 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T20a | Server: `profiles` table, `PUT/GET /v1/profile`, avatar on the board and `/` (D-037) | 7 | merged + **deployed live** 2026-09-12 (PR #30 → 70918fe, dep-daibbvp594qs73823ssg) | mid | T19 |
 | T20b | Client: push profile on change, restore when local is empty (D-037) | 7 | merged 2026-09-12 (PR #31 → 817d295) | mid | T20a |
 | T21 | Boot reconciles profile both ways so a pre-existing avatar uploads (D-038) | 7 fix | merged 2026-09-12 (PR #32) | mid | T20b |
-| T22 | Flippers 5% longer: LENGTH 90→94.5, polygon scaled about the pivot (D-039) | 8 | brief written 2026-09-17; not yet dispatched | cheap-mid | — |
+| T22 | Flippers 5% longer: LENGTH 90→94.5, polygon scaled about the pivot (D-039) | 8 | PR #33 reviewed 2026-09-17 — changes requested (gap guard is unsigned) | cheap-mid | — |
 | T23 | Supercharged mode: 3-ball split at streak 3, once per game (D-040) | 8 | brief written 2026-09-17; dispatch after T22 merges | mid-strong | T22 |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8 → T10 → T9 →
@@ -652,3 +652,15 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   `Game.streak` caps at 5 (D-017) and already emits `streak_changed`, so the 3x trigger needs no new
   scoring concept. Sequential, not parallel: both tasks move ball physics and both must leave
   `soak_launch`, `flipper_test` and `game_flow` green.
+- 2026-09-17: T22 (PR #33, 95b3514, base bdce92e) reviewed in scratch clone. Scope ✓ (3 files,
+  table.tscn untouched). Geometry exactly to D-039; independent measurement reproduced gap 44.8 px
+  vs 24 px ball. Gate all suites PASS; soak 20/12000/oob=0; CI green (it was still running at
+  hand-back). New `EXPECTED_HIT_VY` assertion has a 0.15 px/s absolute tolerance — ran flipper_test
+  4× and got -1645.3 every time, so the tightness is safe, and shifting the constant by 0.3 makes it
+  fail. POLYGON equality check falsified successfully (2.5 px Visual drift → collision_visual_mismatch).
+  **Blocking defect:** `_test_rest_tip_gap` uses `distance_to`, so paddles that CROSS report a large
+  positive gap and pass — at LENGTH 150 the tips invert (389.1 vs 330.9) and the unsigned check
+  returns +58.2. Signed fix proven in the clone: PASS 44.8 at 94.5, FAIL -58.2 at 150. Changes
+  requested; D-039 amended with the guard requirement. Also corrected the record: main had no exact
+  velocity assertion (only the -600 floor), so the worker added a stronger check rather than
+  re-baselining one.
