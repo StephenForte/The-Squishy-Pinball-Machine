@@ -41,7 +41,7 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T20a | Server: `profiles` table, `PUT/GET /v1/profile`, avatar on the board and `/` (D-037) | 7 | merged + **deployed live** 2026-09-12 (PR #30 → 70918fe, dep-daibbvp594qs73823ssg) | mid | T19 |
 | T20b | Client: push profile on change, restore when local is empty (D-037) | 7 | merged 2026-09-12 (PR #31 → 817d295) | mid | T20a |
 | T21 | Boot reconciles profile both ways so a pre-existing avatar uploads (D-038) | 7 fix | merged 2026-09-12 (PR #32) | mid | T20b |
-| T22 | Flippers 5% longer: LENGTH 90→94.5, polygon scaled about the pivot (D-039) | 8 | PR #33 reviewed 2026-09-17 — changes requested (gap guard is unsigned) | cheap-mid | — |
+| T22 | Flippers 5% longer: LENGTH 90→94.5, polygon scaled about the pivot (D-039) | 8 | PR #33 approved 2026-09-17 (0cd66c6); awaiting Steve's merge | cheap-mid | — |
 | T23 | Supercharged mode: 3-ball split at streak 3, once per game (D-040) | 8 | brief written 2026-09-17; dispatch after T22 merges | mid-strong | T22 |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8 → T10 → T9 →
@@ -664,3 +664,8 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   requested; D-039 amended with the guard requirement. Also corrected the record: main had no exact
   velocity assertion (only the -600 floor), so the worker added a stronger check rather than
   re-baselining one.
+- 2026-09-17: T22 re-review. Worker had already pushed the signed-gap fix (0cd66c6) before the
+  planner wrote a follow-up prompt. Verified in a clone rebased onto main 40fc8f9: gate all suites
+  PASS, GAP PASS 44.8, HIT -1645.3 both sides, soak 20/12000/oob=0, CI green. Falsified again: at
+  LENGTH 150 the fixed guard now reports -58.2 and FAILS, where the unsigned version passed at
+  +58.2. Approved. T23 (supercharged mode) is unblocked once this merges.
