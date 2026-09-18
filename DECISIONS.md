@@ -673,6 +673,11 @@ instantiating `table.tscn` headless and computing each rest tip from `rest_rad`:
   Steve retune after play if it feels wrong.
 - D-013/D-023 placement invariant still governs: idle launches must still drain or free with one
   flip, which `soak_launch` and `flipper_test` enforce.
+- **Guard requirement (added at the T22 review, 2026-09-17):** the tip-gap check in `flipper_test`
+  must use the **signed** horizontal gap (`right_tip.x - left_tip.x`), not `distance_to`. Measured:
+  at `LENGTH = 150` the paddles cross (left tip x 389.1, right tip x 330.9) and the unsigned distance
+  reports a healthy **+58.2** while the drain is shut; signed reports **-58.2** and fails. Since this
+  entry invites Steve and Natasha to retune the length, the guard has to catch the overlap case.
 
 ## D-040 — Supercharged mode: three balls once per game (Steve, 2026-09-17)
 Steve: "a super charged mode where the ball splits into 3 balls, when the user gets up to 3x on the
