@@ -42,7 +42,7 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T20b | Client: push profile on change, restore when local is empty (D-037) | 7 | merged 2026-09-12 (PR #31 → 817d295) | mid | T20a |
 | T21 | Boot reconciles profile both ways so a pre-existing avatar uploads (D-038) | 7 fix | merged 2026-09-12 (PR #32) | mid | T20b |
 | T22 | Flippers 5% longer: LENGTH 90→94.5, polygon scaled about the pivot (D-039) | 8 | merged 2026-09-17 (PR #33 → 1012ee8); Steve: not too easy ✓ | cheap-mid | — |
-| T23 | Supercharged mode: 3-ball split at 3x + ball-trait layer, rainbow ×3 and one turbo (D-040/D-041) | 8 | brief rewritten 2026-09-17 with traits; ready to dispatch | strong | T22 |
+| T23 | Supercharged mode: 3-ball split at 3x + ball-trait layer, rainbow ×3 and one turbo (D-040/D-041) | 8 | PR #34 approved 2026-09-17 (af3957c); awaiting Steve's merge | strong | T22 |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8 → T10 → T9 →
 **Phase 5:** T11 ∥ T12 → T11.1 (deploy) → T13.
@@ -680,3 +680,15 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   `Visual` Polygon2D and no theming; `ball.gd` only handles CCD and `launch()`; 13 test files walk
   the `ball` group. Named the real hazard in the contract — a permanent `min_speed` floor is how a
   ball becomes undrainable, so `duration_sec` and `max_speed` are mandatory on physics traits.
+- 2026-09-17: T23 (PR #34, af3957c, base 0f46512) reviewed in scratch clone. Scope ✓ (ball.tscn not
+  even touched — the glow is built at run time). Gate all suites PASS, 18 scripts + boot,
+  supercharge_test 12/12, soak_launch 20/12000/oob=0, CI green. Probe with real drains: 3 balls,
+  rainbow×3 + turbo×1, drains 1 and 2 cost nothing with no ball_count_changed, drain 3 costs exactly
+  one, and three drains in a single physics frame cost one. Falsified by making the emit
+  unconditional → 3 lives to 0 across the same drains. Extensibility probe (Steve's actual ask): a
+  trait defined only in JSON is catalogued and applies with no code change; unknown ids still
+  refused. **Planner false alarm, recorded:** a first oob probe reported 4781 escapes; it never
+  launched the ball and counted per-ball-per-frame, and realistic runs at 3000 and 6000 frames show
+  0 distinct balls outside the playfield. **Planner error, second time:** the brief said "19 scripts
+  + boot"; the real count is 18 + boot. Count suites from a gate log, never from `ls tests/`.
+  Approved. D-041 gained the as-built notes and the `_clear_trait` limit for the next trait author.
