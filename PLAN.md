@@ -41,8 +41,8 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T20a | Server: `profiles` table, `PUT/GET /v1/profile`, avatar on the board and `/` (D-037) | 7 | merged + **deployed live** 2026-09-12 (PR #30 → 70918fe, dep-daibbvp594qs73823ssg) | mid | T19 |
 | T20b | Client: push profile on change, restore when local is empty (D-037) | 7 | merged 2026-09-12 (PR #31 → 817d295) | mid | T20a |
 | T21 | Boot reconciles profile both ways so a pre-existing avatar uploads (D-038) | 7 fix | merged 2026-09-12 (PR #32) | mid | T20b |
-| T22 | Flippers 5% longer: LENGTH 90→94.5, polygon scaled about the pivot (D-039) | 8 | PR #33 approved 2026-09-17 (0cd66c6); awaiting Steve's merge | cheap-mid | — |
-| T23 | Supercharged mode: 3-ball split at streak 3, once per game (D-040) | 8 | brief written 2026-09-17; dispatch after T22 merges | mid-strong | T22 |
+| T22 | Flippers 5% longer: LENGTH 90→94.5, polygon scaled about the pivot (D-039) | 8 | merged 2026-09-17 (PR #33 → 1012ee8); Steve: not too easy ✓ | cheap-mid | — |
+| T23 | Supercharged mode: 3-ball split at 3x + ball-trait layer, rainbow ×3 and one turbo (D-040/D-041) | 8 | brief rewritten 2026-09-17 with traits; ready to dispatch | strong | T22 |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8 → T10 → T9 →
 **Phase 5:** T11 ∥ T12 → T11.1 (deploy) → T13.
@@ -295,8 +295,12 @@ a 24 px ball. Owns `scenes/flipper.tscn`, `scripts/flipper.gd`; must update `tes
 (its HIT velocities are geometry-derived and will move). Must not touch `scenes/table.tscn` — the
 pivots stay where they are.
 
-### T23 — Supercharged mode (Steve, 2026-09-17)
-Contract D-040. Verified before designing: `Game.on_ball_drained()` decrements `balls_left` on every
+### T23 — Supercharged mode + ball traits (Steve, 2026-09-17)
+Contracts D-040 **and D-041**. Steve added rainbow glow on all three balls and turbo on one, and
+asked that it be built so similar effects can be added later — hence the trait catalog rather than
+two hard-coded effects. Verified before designing: nothing themes or decorates `Ball` today (its
+`Visual` is a fixed off-white Polygon2D), and 13 test files iterate the `ball` group, so the group
+and the node names must not move. Verified before designing: `Game.on_ball_drained()` decrements `balls_left` on every
 drain with only a same-frame dedupe, and `Table._on_drain_body_entered` emits `ball_drained` per
 ball, so multiball without a ball-life rule would end a game instantly. `Table` already owns
 `spawn_ball()`, the `ball` group and the Drain area, so the "only the last ball costs a life" rule
@@ -669,3 +673,10 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   PASS, GAP PASS 44.8, HIT -1645.3 both sides, soak 20/12000/oob=0, CI green. Falsified again: at
   LENGTH 150 the fixed guard now reports -58.2 and FAILS, where the unsigned version passed at
   +58.2. Approved. T23 (supercharged mode) is unblocked once this merges.
+- 2026-09-17: T22 merged (1012ee8); Steve play-tested and said the tighter drain is "not too easy",
+  so D-039 needs no retune. T23 re-briefed with D-041: the rainbow and turbo effects become the
+  first two entries of a ball-trait catalog, with grants keyed by event name, so later effects are a
+  JSON edit where the knob exists. Checked before designing: `ball.tscn` is a RigidBody2D with one
+  `Visual` Polygon2D and no theming; `ball.gd` only handles CCD and `launch()`; 13 test files walk
+  the `ball` group. Named the real hazard in the contract — a permanent `min_speed` floor is how a
+  ball becomes undrainable, so `duration_sec` and `max_speed` are mandatory on physics traits.
