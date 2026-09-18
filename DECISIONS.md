@@ -1,7 +1,7 @@
 # Decisions — The Squishy Pinball Machine
 
 Numbered, append-only. Never renumber; supersede in place with date and reason.
-Workers cite these instead of re-deciding. Next free number: **D-041**.
+Workers cite these instead of re-deciding. Next free number: **D-042**.
 
 ## D-001 — Engine: Godot 4.x, GDScript (2026-09-02)
 Per PRD. Exact version to be pinned as D-006 once installed on the build machine.
@@ -699,5 +699,37 @@ squishies, but only once per game."
 - **Feedback:** `Effects` reacts to `supercharged` with the burst it already plays for the big-score
   moment (D-018 display-only: no physics, never touches Table). A multiball that appears with no cue
   reads as a bug to a seven-year-old. No new HUD element in V1.
+- The three balls are marked with **ball traits** (D-041): all three rainbow, exactly one turbo.
 - Out of scope: any score multiplier while supercharged, a second supercharge per game, and
   awarding an extra life. Scoring stays D-005/D-017.
+
+## D-041 — Ball traits: a small data-driven modifier layer (Steve, 2026-09-17)
+Steve, dispatching T23: "make the balls rainbow glowing and also one super fast. Design this feature
+so we can add similar features like this later on." So the two effects are not written into the
+supercharge — they are the first two entries in a trait layer the game can grow.
+- **Catalog** `res://assets/design/ball_traits.json`, schema_version 1, same shape and loader style
+  as D-020's catalogs (a `class_name BallTraits` with a static cache, mirroring `SquishyCatalog`).
+  Each trait has `id`, `display_name`, and any of:
+  - `visual` — display only. `mode` (`rainbow`), `cycle_sec`, `glow`, `glow_scale`, `glow_alpha`.
+  - `physics` — `speed_scale` (one-off multiplier at grant), `min_speed`, `max_speed`,
+    `duration_sec`.
+  - `duration_sec: 0` means "for the life of the ball"; any positive value expires the trait.
+- **Runtime.** `Ball` gains `apply_trait(id) -> bool` (unknown id → false, no change) and a read-only
+  list of active traits. Visual work happens on a child of `Ball` and never touches the body, its
+  collider, mass or `physics_material_override` — D-018's display-only rule applies here too.
+- **Grants are data as well.** The catalog carries a `grants` map keyed by event name, e.g.
+  `"supercharge": {"all": ["rainbow"], "one": ["turbo"]}`. `Table` reads the map rather than naming
+  traits in code, so a later "make one of them huge" is a catalog edit **if** the knob already
+  exists. Be honest about the boundary: **new combinations of existing knobs are data; a genuinely
+  new kind of effect is still code.** Nobody should believe the JSON can do anything.
+- **V1 entries.** `rainbow`: visual only, hue cycling with a soft glow, `duration_sec` 0.
+  `turbo`: physics only, a one-off `speed_scale` plus a `min_speed` floor and a `max_speed`
+  ceiling, expiring after `duration_sec`.
+- **The floor is bounded on purpose.** A permanent minimum speed is how you build a ball that can
+  never drain and a game that never ends; `duration_sec` is what stops that, and the ceiling plus
+  the ball's existing `CCD_MODE_CAST_SHAPE` are what stop it tunnelling out of the table. Any new
+  physics trait must state both bounds.
+- Traits are per-ball and per-life: nothing is persisted, and `Game.restart()` needs no knowledge of
+  them because the balls themselves are freed.
+- Out of scope: traits on the launcher ball, trait stacking rules beyond "apply each in order",
+  and any HUD display of which traits are active.
