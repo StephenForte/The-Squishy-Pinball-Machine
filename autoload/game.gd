@@ -6,6 +6,7 @@ signal game_over(final_score: int, is_high_score: bool)
 signal game_restarted
 signal streak_changed(streak: int)
 signal big_score_reached(score: int)
+signal supercharged()
 
 const SAVE_PATH := "user://highscore.save"
 const BALLS_PER_GAME := 3
@@ -31,6 +32,7 @@ var high_score: int:
 var _drain_frame: int = -1
 var _streak_remaining: float = 0.0
 var _big_score_emitted: bool = false
+var _supercharged_emitted: bool = false
 
 
 func _ready() -> void:
@@ -65,6 +67,9 @@ func register_bumper_hit() -> int:
 	add_score(points)
 	streak_changed.emit(streak)
 	print("Game streak_changed streak=%d points=%d" % [streak, points])
+	if streak == 3 and not _supercharged_emitted:
+		supercharged.emit()
+		print("Game supercharged streak=%d" % streak)
 	return points
 
 
@@ -93,6 +98,10 @@ func on_ball_drained() -> void:
 	print("Game game_over final_score=%d is_high_score=%s high_score=%d" % [score, is_high, high_score])
 
 
+func note_supercharge_applied() -> void:
+	_supercharged_emitted = true
+
+
 func restart() -> void:
 	_reset_run()
 	game_restarted.emit()
@@ -113,6 +122,7 @@ func _reset_run() -> void:
 	state = READY
 	_drain_frame = -1
 	_big_score_emitted = false
+	_supercharged_emitted = false
 	_clear_streak()
 
 

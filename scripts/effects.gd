@@ -19,6 +19,8 @@ func _ready() -> void:
 	_fireworks.emitting = false
 	var game: Node = get_node("/root/Game")
 	game.big_score_reached.connect(_on_big_score_reached)
+	if game.has_signal("supercharged"):
+		game.supercharged.connect(_on_supercharged)
 	game.game_restarted.connect(_on_game_restarted)
 	for bumper in get_tree().get_nodes_in_group("bumpers"):
 		if bumper.has_signal("hit"):
@@ -64,6 +66,14 @@ func _on_bumper_hit() -> void:
 
 
 func _on_big_score_reached(_score: int) -> void:
+	_play_burst()
+
+
+func _on_supercharged() -> void:
+	_play_burst()
+
+
+func _play_burst() -> void:
 	_fireworks.restart()
 	for node in get_tree().get_nodes_in_group("squishies"):
 		if node.has_method("play_dance"):

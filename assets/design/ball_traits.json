@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "traits": [
+    {
+      "id": "rainbow",
+      "display_name": "Rainbow",
+      "duration_sec": 0,
+      "visual": {
+        "mode": "rainbow",
+        "cycle_sec": 1.25,
+        "glow": true,
+        "glow_scale": 1.65,
+        "glow_alpha": 0.4
+      }
+    },
+    {
+      "id": "turbo",
+      "display_name": "Turbo",
+      "duration_sec": 6.0,
+      "physics": {
+        "speed_scale": 1.4,
+        "min_speed": 420.0,
+        "max_speed": 2200.0,
+        "duration_sec": 6.0
+      }
+    }
+  ],
+  "grants": {
+    "supercharge": {
+      "all": ["rainbow"],
+      "one": ["turbo"]
+    }
+  }
+}
