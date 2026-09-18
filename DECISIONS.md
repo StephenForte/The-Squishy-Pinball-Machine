@@ -733,3 +733,17 @@ supercharge — they are the first two entries in a trait layer the game can gro
   them because the balls themselves are freed.
 - Out of scope: traits on the launcher ball, trait stacking rules beyond "apply each in order",
   and any HUD display of which traits are active.
+- **As built (T23, PR #34, reviewed 2026-09-17):** loader is `BallTraits` with `entry()` (`trait` is
+  a reserved word) and `load_from()` for cache reset (`reload` collides with `Resource.reload`).
+  `Ball.apply_trait()` builds the glow child at run time, so `ball.tscn` is untouched and the 13
+  suites that walk the `ball` group are unaffected. `Table` defers the split with `call_deferred`
+  and a generation guard, so bodies are never spawned during a physics query flush or after a
+  restart. `Game.note_supercharge_applied()` is what consumes the once-per-game flag, so a trigger
+  with no ball in play genuinely does not burn it. Turbo as shipped: speed_scale 1.4, min_speed 420,
+  max_speed 2200, duration 6.0 s.
+- **Known limit, for whoever adds the third trait:** `Ball._clear_trait()` switches
+  `_physics_trait_on` / `_rainbow_on` off wholesale instead of asking whether another *active* trait
+  still provides that capability, and an expiring visual trait neither restores the ball's original
+  colour nor removes the glow node. Unreachable today (rainbow never expires, turbo is the only
+  physics trait) but it is the first thing a second physics trait will trip over. Fix it when you
+  add one, not before.
