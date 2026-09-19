@@ -1,7 +1,7 @@
 # Decisions — The Squishy Pinball Machine
 
 Numbered, append-only. Never renumber; supersede in place with date and reason.
-Workers cite these instead of re-deciding. Next free number: **D-042**.
+Workers cite these instead of re-deciding. Next free number: **D-046**.
 
 ## D-001 — Engine: Godot 4.x, GDScript (2026-09-02)
 Per PRD. Exact version to be pinned as D-006 once installed on the build machine.
@@ -747,3 +747,89 @@ supercharge — they are the first two entries in a trait layer the game can gro
   colour nor removes the glow node. Unreachable today (rainbow never expires, turbo is the only
   physics trait) but it is the first thing a second physics trait will trip over. Fix it when you
   add one, not before.
+
+## D-042 — Chromebook and iPad: one web build, not two native apps (Steve, 2026-09-19)
+Steve: "if we want to deploy the pinball to a Chromebook or iPad, is that possible… we want to get
+ready." Measured on main @ 7d5bfbd before deciding:
+- **No touch input exists at all.** Six keyboard actions (`flipper_left/right`, `launch_ball`,
+  `restart`, `change_name`, `menu`) plus raw `S`/`I` keys; `grep` for `InputEventScreenTouch`,
+  `InputEventScreenDrag` and `InputEventMouseButton` across `scripts/` and `autoload/` returns
+  nothing. An iPad cannot play this today; a keyboard Chromebook can.
+- **A browser build cannot reach the leaderboard.** Live check with a foreign `Origin`:
+  `GET /v1/leaderboard` returns 200 with **no** `access-control-*` header, and the `OPTIONS`
+  preflight for `PUT /v1/profile` returns **404** (no OPTIONS route). Native clients ignore CORS;
+  browsers refuse the request.
+- **Nothing has ever been exported:** no export templates installed, and `export_presets.cfg` is
+  absent and gitignored (D-008).
+- In our favour: the game is already portrait 720×1280 with `stretch_mode=canvas_items` /
+  `aspect=keep`, which fits both devices without redesign, and `assets/` totals 6.3 MB.
+- **Decision: target the web export first**, served over HTTPS, and treat it as the delivery route
+  for *both* the Chromebook and the iPad. It needs no Apple Developer Program (99 USD/yr), no
+  Android SDK, and produces one artifact for both. Native iOS and Android remain possible later and
+  are explicitly not being built now.
+- Sequence: **T24 touch controls → T25 server CORS → T26 export pipeline.** Touch is the long pole
+  and the critical path; exporting before it is done would ship an unplayable build. Sequential, not
+  parallel — T24 is Godot-only and T25 is server-only, but the clone rule has been ignored by three
+  separate workers, so they run one at a time in the main checkout.
+- Unverified at decision time, to be settled during T26 rather than guessed: whether Godot 4.7.2
+  needs cross-origin isolation headers for this project or can ship single-threaded; whether
+  `Crypto.generate_random_bytes` (D-031 UUIDs) behaves the same in a browser; and how audio behaves
+  before the first touch, since browsers block sound until a user gesture.
+
+## D-043 — Touch controls: additive, keyboard stays first-class (2026-09-19)
+Contract for T24. The Mac build with a keyboard must play exactly as it does today; touch is added
+alongside, never instead.
+- **Flippers:** the left and right halves of the screen act as flipper zones — a touch anywhere in a
+  half holds that flipper, releasing it drops it, matching the press/hold/release feel of A and D.
+  Multi-touch must work: both flippers held at once is normal play, not an edge case.
+- **Launch:** a tap anywhere outside the flipper zones fires `launch_ball` while a ball waits in the
+  lane; the same tap dismisses the title, as Space does today.
+- **Menus and settings must be reachable without a keyboard.** Every action currently bound to a
+  bare key needs a touchable affordance: `R` restart and `Esc` menu already have buttons on Game
+  Over (D-029), `S` already has the title's `SettingsButton` (D-035), `I` and ←/→ already have
+  picker buttons (D-032/D-020). The gap is **`N` for the name prompt**, which has no button, and the
+  name prompt itself needs the on-screen keyboard to appear — on web and iOS that means the
+  `LineEdit` must take focus from a real touch.
+- **Implementation must not fight the existing input rules:** `Title` swallows synthetic actions
+  while the name entry captures (D-027/T19), `Settings` swallows `S`/Escape/R/Space/N while open
+  (D-035), and `main.gd` owns `restart`/`menu` in `_unhandled_input` (D-029). Touch handlers obey
+  the same precedence, and none of `main.gd`'s or `Title`'s existing gating may be rewritten to make
+  touch work — if it seems necessary, stop and report.
+- Emulated mouse-from-touch is not a substitute: it is single-touch, so it cannot hold both
+  flippers, which is why real touch events are required.
+- Out of scope: tilt/nudge gestures, haptics, and any change to the 720×1280 layout.
+
+## D-044 — CORS for the leaderboard, origin-allowlisted (2026-09-19)
+Contract for T25. Amends D-026, which said "CORS not needed (Godot client)" — true until the client
+runs in a browser.
+- Allowed origins come from a new env var `SQUISH_ALLOWED_ORIGINS`, a comma-separated exact-match
+  list, empty by default. **No wildcard**: the write routes carry a shared key, and `*` plus a key
+  that ships in the client is a strictly worse posture than today.
+- When the request's `Origin` matches the list: echo it in `Access-Control-Allow-Origin`, send
+  `Vary: Origin`, and allow the methods and headers the client actually uses (`GET`, `POST`, `PUT`,
+  and `Content-Type` plus `X-Squish-Key`). When it does not match, respond exactly as today and send
+  no CORS header — the browser then blocks it, which is the correct outcome.
+- Add an `OPTIONS` route for the preflight, answering 204 with the same allowlist logic. It exists
+  today only as a 404, which is what the live probe returned.
+- Everything else in D-026 is unchanged: status codes, error strings, field names, the 4 KB body
+  limit, the timing-safe key comparison, and the shared 30-per-minute per-player limiter.
+- Manual deploy after merge (D-028), then re-run the foreign-origin probe and confirm a browser
+  would now be allowed from the listed origin and still blocked from anything else.
+
+## D-045 — Web export pipeline (2026-09-19)
+Contract for T26, which is dispatched only once T24 and T25 are merged.
+- `export_presets.cfg` stays gitignored (D-008), so the preset is **documented and scripted** rather
+  than committed: a `tools/` script plus a section in the README that reproduces the export from a
+  clean checkout. A build nobody else can reproduce is not a pipeline.
+- The export must be verified by actually loading it in a browser and playing a ball with touch —
+  not by the exporter exiting zero.
+- Settle the three unknowns D-042 lists and record the answers here: threading and cross-origin
+  isolation headers, `Crypto` behaviour in the browser, and audio before the first gesture.
+- `user://` becomes browser storage, so profile, high scores, settings and app icon are per-browser
+  and vanish when site data is cleared. That is acceptable for the family build, and it is exactly
+  why the cloud profile (D-037) exists — but it must be stated in the README so nobody is surprised.
+- `DisplayServer.set_icon` (D-032) is a no-op in a browser; the page's favicon is the web equivalent
+  and is a presentation detail of the host page, not of the game.
+- Hosting is not decided here. Render already serves the leaderboard and can serve a static site, so
+  it is the obvious candidate, but whichever is chosen must be an HTTPS origin that goes into
+  `SQUISH_ALLOWED_ORIGINS` (D-044).
