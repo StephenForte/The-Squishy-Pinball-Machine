@@ -42,7 +42,10 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T20b | Client: push profile on change, restore when local is empty (D-037) | 7 | merged 2026-09-12 (PR #31 → 817d295) | mid | T20a |
 | T21 | Boot reconciles profile both ways so a pre-existing avatar uploads (D-038) | 7 fix | merged 2026-09-12 (PR #32) | mid | T20b |
 | T22 | Flippers 5% longer: LENGTH 90→94.5, polygon scaled about the pivot (D-039) | 8 | merged 2026-09-17 (PR #33 → 1012ee8); Steve: not too easy ✓ | cheap-mid | — |
-| T23 | Supercharged mode: 3-ball split at 3x + ball-trait layer, rainbow ×3 and one turbo (D-040/D-041) | 8 | PR #34 approved 2026-09-17 (af3957c); awaiting Steve's merge | strong | T22 |
+| T23 | Supercharged mode: 3-ball split at 3x + ball-trait layer, rainbow ×3 and one turbo (D-040/D-041) | 8 | merged 2026-09-19 (PR #34 → 7d5bfbd) | strong | T22 |
+| T24 | Touch controls: flipper halves, tap-to-launch, every key action reachable by finger (D-043) | 9 | brief on request; dispatch first — critical path | strong | — |
+| T25 | Server CORS: origin allowlist + OPTIONS preflight so a browser build can reach the board (D-044) | 9 | brief on request; after T24, needs a manual deploy | cheap-mid | — |
+| T26 | Web export pipeline: reproducible build, browser-verified, three unknowns settled (D-045) | 9 | brief on request; last — needs T24 and T25 merged | mid | T24, T25 |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8 → T10 → T9 →
 **Phase 5:** T11 ∥ T12 → T11.1 (deploy) → T13.
@@ -71,6 +74,19 @@ Opening the project in the editor imports implicitly.
   merge that touches `server/**`, the planner runs `trigger_deploy` (or Steve clicks Manual
   Deploy) and verifies `/healthz` + `/`. The two README probe comments (08150a6, 2e49dc0) are
   harmless and can be removed in any later server PR.
+
+- **OPEN, needs Steve — the write key in a public web build.** `Leaderboard.KEY` ships inside the
+  client. On the Mac that is obscurity and D-026 accepted it. In a browser build anyone who opens
+  the download can read it and post fake scores to the family board, and there is still no delete
+  endpoint (D-026 scope). This does **not** block T24, T25 or T26; it blocks making the web build's
+  URL public. Options, planner's recommendation first:
+  1. **Accept and add cleanup** — keep the key, add an admin-only delete/reset route behind a
+     *second* key that never ships in the client, plus per-IP rate limiting. Cheapest, and it means
+     a griefed board is repairable rather than permanent.
+  2. Keep the build's URL unlisted and change nothing. Obscurity again, and one shared link ends it.
+  3. Stop the client writing directly: scores go through something that authenticates a player.
+     Real security, and a much larger project than the game itself.
+  Steve decides; if option 1, it becomes T27 and lands before the URL is shared.
 
 ## Task details
 
@@ -307,6 +323,27 @@ ball, so multiball without a ball-life rule would end a game instantly. `Table` 
 belongs there. Owns `autoload/game.gd`, `scripts/table.gd`, `scripts/effects.gd`,
 `tests/supercharge_test.gd`; additive to `tests/game_flow.gd` only if a drain-accounting case is
 needed. Runs after T22 so it is built and soaked on the final flipper geometry.
+
+### T24 — Touch controls (Steve, 2026-09-19)
+Contract D-043. Critical path for both target devices. Measured before designing: zero touch or
+mouse handling exists in `scripts/` or `autoload/`; input is six actions plus the bare `S` and `I`
+keys. Owns `scenes/table.tscn` touch zones or a new overlay scene, `scripts/` input handling, and a
+new suite. Additive: `scenes/ui/title.tscn` (an `N`-equivalent button, the one key action with no
+on-screen affordance). Must not rewrite `main.gd`'s `restart`/`menu` gating (D-029) or `Title`'s
+name-capture swallowing (D-027/T19) — touch obeys the same precedence or the task stops and reports.
+The hard part is multi-touch: emulated mouse-from-touch is single-touch and cannot hold both
+flippers, so real `InputEventScreenTouch` handling is required.
+
+### T25 — Server CORS (Steve, 2026-09-19)
+Contract D-044, amending D-026. Verified live before designing: `GET /v1/leaderboard` with a foreign
+`Origin` returns 200 and no `access-control-*` header; the `PUT /v1/profile` preflight returns 404.
+Owns `server/**` only. Planner deploys and re-probes after merge (D-028).
+
+### T26 — Web export pipeline (Steve, 2026-09-19)
+Contract D-045. Dispatched only after T24 and T25 merge, because exporting before touch works ships
+an unplayable build. Owns `tools/`, `README.md`, and whatever `project.godot` web settings the
+export genuinely needs. `export_presets.cfg` stays gitignored (D-008), so the preset is scripted and
+documented rather than committed. Settles the three unknowns D-042 lists.
 
 ### T9 — Test isolation (found in T8 review)
 Every `-s tests/*.gd` run uses the app's real `user://` (macOS: ~/Library/Application
@@ -692,3 +729,12 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   0 distinct balls outside the playfield. **Planner error, second time:** the brief said "19 scripts
   + boot"; the real count is 18 + boot. Count suites from a gate log, never from `ls tests/`.
   Approved. D-041 gained the as-built notes and the `_clear_trait` limit for the next trait author.
+- 2026-09-19: Steve asked whether a Chromebook or iPad deploy is possible and wants to get ready.
+  Assessed against main @ 7d5bfbd rather than from memory: no touch input anywhere (grep for the
+  three touch/mouse event classes returns nothing across scripts/ and autoload/); a live
+  foreign-origin probe showed the leaderboard sends no CORS header and has no OPTIONS route, so a
+  browser build cannot reach it; no export templates installed and no export presets. In our favour,
+  the game is already portrait 720×1280 keep-aspect and assets total 6.3 MB. D-042 chooses one web
+  build for both devices over two native apps; D-043/D-044/D-045 contract the three tasks.
+  Phase 9 is T24 → T25 → T26, sequential. The shipped write key in a public build is logged as an
+  open item for Steve — it blocks sharing the URL, not the tasks.
