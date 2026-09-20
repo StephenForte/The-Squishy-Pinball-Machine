@@ -43,7 +43,7 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T21 | Boot reconciles profile both ways so a pre-existing avatar uploads (D-038) | 7 fix | merged 2026-09-12 (PR #32) | mid | T20b |
 | T22 | Flippers 5% longer: LENGTH 90→94.5, polygon scaled about the pivot (D-039) | 8 | merged 2026-09-17 (PR #33 → 1012ee8); Steve: not too easy ✓ | cheap-mid | — |
 | T23 | Supercharged mode: 3-ball split at 3x + ball-trait layer, rainbow ×3 and one turbo (D-040/D-041) | 8 | merged 2026-09-19 (PR #34 → 7d5bfbd) | strong | T22 |
-| T24 | Touch controls: flipper halves, tap-to-launch, every key action reachable by finger (D-043) | 9 | PR #35 RED at 07dff17 — honest test now fails; worker owns the fix | strong | — |
+| T24 | Touch controls: flipper halves, tap-to-launch, every key action reachable by finger (D-043) | 9 | PR #35 approved 2026-09-20 (a971825); awaiting Steve's merge | strong | — |
 | T25 | Server CORS: origin allowlist + OPTIONS preflight so a browser build can reach the board (D-044) | 9 | brief on request; after T24, needs a manual deploy | cheap-mid | — |
 | T26 | Web export pipeline: reproducible build, browser-verified, three unknowns settled (D-045) | 9 | brief on request; last — needs T24 and T25 merged | mid | T24, T25 |
 | T27 | Admin cleanup + per-IP limiting so a griefed board is repairable (D-046) | 9 | brief on request; before the web URL is shared | mid | T25 |
@@ -773,3 +773,14 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   another round trip. Still unsettled and worth a windowed run: whether a real window ever routes a
   ScreenTouch to the unguarded paths at all, in which case this is a headless artefact and the test
   setup is what needs changing.
+- 2026-09-20: T24 re-checked at a971825 and **approved**. The worker extended `_over_interactive_ui`
+  to all three touch paths and fixed case 12 by clearing the Game Over overlay case 9 leaves up
+  (RestartButton's bottom edge y=960 coincides with LEFT_ZONE) — a better diagnosis than the
+  planner's guess about Title's buttons. Gate green, TOUCH 12/12, CI green. **The assertion is
+  demonstrably live:** it failed at 07dff17 and passes at a971825, red-then-green on real commits.
+  Planner's own probe still disagreed; two hypotheses for the mechanism (unguarded
+  `_handle_mouse_event`, then `_prefer_screen_touch` being set only inside the skipped function)
+  were both patched and produced *identical* results, and the probe also failed checks the suite
+  passes deterministically — so the probe was the unreliable element and no further round trip was
+  spent on it. Recorded in D-043 as an open item for a real tablet during T26. Standing lesson,
+  now twice earned: headless cannot adjudicate touch/GUI input routing.
