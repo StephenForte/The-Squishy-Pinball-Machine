@@ -1,7 +1,7 @@
 # Decisions — The Squishy Pinball Machine
 
 Numbered, append-only. Never renumber; supersede in place with date and reason.
-Workers cite these instead of re-deciding. Next free number: **D-046**.
+Workers cite these instead of re-deciding. Next free number: **D-047**.
 
 ## D-001 — Engine: Godot 4.x, GDScript (2026-09-02)
 Per PRD. Exact version to be pinned as D-006 once installed on the build machine.
@@ -833,3 +833,27 @@ Contract for T26, which is dispatched only once T24 and T25 are merged.
 - Hosting is not decided here. Render already serves the leaderboard and can serve a static site, so
   it is the obvious candidate, but whichever is chosen must be an HTTPS origin that goes into
   `SQUISH_ALLOWED_ORIGINS` (D-044).
+
+## D-046 — The public web build keeps its write key; the board becomes repairable (Steve, 2026-09-19)
+Steve chose the planner's option 1 for the open item logged under D-042. The client key stays; what
+changes is that a griefed board stops being permanent.
+- **Accepted risk, stated plainly:** `Leaderboard.KEY` ships inside the web build and anyone who
+  opens the download can read it and post scores as any `player_id` they like. This is a family
+  game with a four-row board, so the cost of a fake row is a laugh and a cleanup, not an incident.
+  D-026's "obscurity, not security" stands and is now a deliberate choice for the public build too.
+- **Admin routes, behind a second key that never ships in the client.** New env var
+  `SQUISH_ADMIN_KEY`, read from the `X-Squish-Admin` header, compared with the same timing-safe
+  comparison as the write key. If the env var is empty the admin routes are **disabled entirely**
+  and answer 404 — a blank key must never mean "open".
+  - `DELETE /v1/scores/:id` removes one score row, 404 if it does not exist.
+  - `DELETE /v1/profile/:player_id` removes one profile row.
+  - `POST /v1/admin/reset` wipes the `scores` and `profiles` tables. It must require a confirmation
+    field in the body, because a bare curl typo should not erase Natasha's 14 300.
+  Every admin route returns JSON in D-026's shape and is excluded from CORS entirely — admin is a
+  curl-from-a-terminal path, never a browser one.
+- **Per-IP rate limiting on the write routes**, alongside the existing per-`player_id` limiter,
+  since a forged `player_id` sidesteps the per-player one completely. The client address comes from
+  the socket, and behind Render's proxy from the left-most entry of `X-Forwarded-For`; treat a
+  missing address as one shared bucket rather than as unlimited.
+- Out of scope: authenticating players, signing scores, and any admin UI. The delete routes are the
+  cleanup mechanism D-026 said we lacked.
