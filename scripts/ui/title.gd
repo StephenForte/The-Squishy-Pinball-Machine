@@ -8,6 +8,7 @@ var _flippers_enabled := true
 @onready var _top_five_label: Label = $TopFiveLabel
 @onready var _avatar_view: TextureRect = $AvatarView
 @onready var _settings_button: Button = $SettingsButton
+@onready var _name_button: Button = $NameButton
 @onready var _settings: Control = $Settings
 
 var _leaderboard: Node
@@ -28,6 +29,8 @@ func _ready() -> void:
 		profile.avatar_changed.connect(_on_avatar_changed)
 	_settings_button.focus_mode = Control.FOCUS_NONE
 	_settings_button.pressed.connect(_open_settings)
+	_name_button.focus_mode = Control.FOCUS_NONE
+	_name_button.pressed.connect(_open_name)
 	_refresh_name_ui(String(profile.player_name))
 	_refresh_avatar()
 	if _leaderboard != null:
@@ -68,6 +71,10 @@ func _apply_theme(_id: String = "") -> void:
 	_settings_button.add_theme_stylebox_override("hover", style)
 	_settings_button.add_theme_stylebox_override("pressed", style)
 	_settings_button.add_theme_color_override("font_color", theme_node.color("text_on_color"))
+	_name_button.add_theme_stylebox_override("normal", style)
+	_name_button.add_theme_stylebox_override("hover", style)
+	_name_button.add_theme_stylebox_override("pressed", style)
+	_name_button.add_theme_color_override("font_color", theme_node.color("text_on_color"))
 
 
 func _on_name_changed(new_name: String) -> void:
@@ -139,6 +146,8 @@ func _refresh_name_ui(player_name: String) -> void:
 	_player_name_label.text = "Playing as %s · N to change" % player_name if named else ""
 	_player_name_label.visible = named
 	$PlayHintLabel.visible = named
+	if _name_button != null:
+		_name_button.visible = named
 	if named:
 		if _name_entry.visible:
 			_name_entry.visible = false
@@ -172,6 +181,12 @@ func _placeholder_texture() -> Texture2D:
 	img.fill(Color(0.18, 0.16, 0.22, 0.9))
 	_placeholder_avatar = ImageTexture.create_from_image(img)
 	return _placeholder_avatar
+
+
+func _open_name() -> void:
+	if _dismissed or _is_capturing_name():
+		return
+	_name_entry.open()
 
 
 func _open_settings() -> void:
