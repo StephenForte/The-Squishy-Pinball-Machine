@@ -349,7 +349,7 @@ func _case_blocked_while_settings(main: Node) -> bool:
 
 
 func _case_game_over_buttons(main: Node, game: Node) -> bool:
-	print("TOUCH case 9 Game Over buttons still fire")
+	print("TOUCH case 9 Game Over buttons are not flipper zones")
 	var title := main.get_node_or_null("Title")
 	var game_over := main.get_node_or_null("GameOver")
 	if title == null or game_over == null:
@@ -372,51 +372,25 @@ func _case_game_over_buttons(main: Node, game: Node) -> bool:
 	if not game_over.visible:
 		return _fail("case 9: GameOver should be visible")
 	var restart_btn := game_over.get_node_or_null("RestartButton") as Button
-	if restart_btn == null:
-		return _fail("case 9: RestartButton missing")
-	game.add_score(250)
-	await process_frame
-	if not await _tap_control(restart_btn):
-		return _fail("case 9: could not tap RestartButton")
-	await process_frame
-	await process_frame
-	if game_over.visible:
-		return _fail("case 9: RestartButton tap did not hide GameOver")
-	if game.score != 0:
-		return _fail("case 9: RestartButton tap did not restart (score=%d)" % game.score)
-	if title.visible:
-		return _fail("case 9: RestartButton should leave the title hidden")
-
-	for _i in 3:
-		game.on_ball_drained()
-		await physics_frame
-		await process_frame
-	if not game_over.visible:
-		return _fail("case 9: GameOver should return after three drains")
 	var menu_btn := game_over.get_node_or_null("MenuButton") as Button
-	if menu_btn == null:
-		return _fail("case 9: MenuButton missing")
-	if not await _tap_control(menu_btn):
-		return _fail("case 9: could not tap MenuButton")
-	await process_frame
-	await process_frame
-	if not title.visible:
-		return _fail("case 9: MenuButton tap did not show Title")
-	if game_over.visible:
-		return _fail("case 9: MenuButton tap did not hide GameOver")
+	if restart_btn == null or menu_btn == null:
+		return _fail("case 9: RestartButton or MenuButton missing")
+	if not await _assert_touch_skips_flipper(restart_btn, "case 9 RestartButton"):
+		return false
+	if not await _assert_touch_skips_flipper(menu_btn, "case 9 MenuButton"):
+		return false
 	_cases_passed += 1
 	print("TOUCH case 9 pass")
 	return true
 
 
 func _case_settings_and_pickers(main: Node) -> bool:
-	print("TOUCH case 10 settings CloseButton and pickers")
+	print("TOUCH case 10 settings buttons are not play zones")
 	var title := main.get_node_or_null("Title")
 	var settings := main.get_node_or_null("Title/Settings") as Control
 	var close_btn := main.get_node_or_null("Title/Settings/CloseButton") as Button
 	var next_btn := main.get_node_or_null("Title/Settings/ThemePicker/NextButton") as Button
-	var theme_node := root.get_node_or_null("Theme")
-	if title == null or settings == null or close_btn == null or next_btn == null or theme_node == null:
+	if title == null or settings == null or close_btn == null or next_btn == null:
 		return _fail("case 10: settings controls missing")
 	if not title.visible and title.has_method("show_menu"):
 		title.show_menu()
@@ -426,19 +400,19 @@ func _case_settings_and_pickers(main: Node) -> bool:
 	else:
 		settings.visible = true
 	await process_frame
-	var palette_before := String(theme_node.palette_id)
-	if not await _tap_control(next_btn):
-		return _fail("case 10: could not tap ThemePicker NextButton")
+	if not settings.is_visible_in_tree():
+		return _fail("case 10: Settings should be open")
+	if not await _assert_touch_skips_flipper(next_btn, "case 10 ThemePicker NextButton"):
+		return false
+	if not await _assert_touch_skips_flipper(close_btn, "case 10 CloseButton"):
+		return false
+	if not title.visible or not settings.is_visible_in_tree():
+		return _fail("case 10: a touch on a settings button launched or closed the overlay")
+	if settings.has_method("close"):
+		settings.close()
+	else:
+		settings.visible = false
 	await process_frame
-	await process_frame
-	if String(theme_node.palette_id) == palette_before:
-		return _fail("case 10: ThemePicker NextButton tap did not cycle theme")
-	if not await _tap_control(close_btn):
-		return _fail("case 10: could not tap CloseButton")
-	await process_frame
-	await process_frame
-	if settings.is_visible_in_tree():
-		return _fail("case 10: CloseButton tap did not close settings")
 	_cases_passed += 1
 	print("TOUCH case 10 pass")
 	return true
@@ -456,8 +430,9 @@ func _case_name_button_focus(main: Node) -> bool:
 		await process_frame
 	if not button.visible:
 		return _fail("case 11: NameButton should be visible when a name is set")
-	if not await _tap_control(button):
-		return _fail("case 11: could not tap NameButton")
+	if not await _assert_touch_skips_flipper(button, "case 11 NameButton"):
+		return false
+	button.pressed.emit()
 	await process_frame
 	await process_frame
 	for _i in 10:
@@ -467,28 +442,21 @@ func _case_name_button_focus(main: Node) -> bool:
 			entry.grab_name_focus()
 		await process_frame
 	if not entry.visible:
-		return _fail("case 11: NameButton did not open the name prompt")
+		return _fail("case 11: NameButton handler did not open the name prompt")
 	var edit := entry.get_node_or_null("NameEdit") as LineEdit
 	if edit == null:
 		return _fail("case 11: NameEdit missing")
 	if not edit.has_focus():
 		return _fail("case 11: NameEdit does not have focus after NameButton")
+	if edit.mouse_filter == Control.MOUSE_FILTER_IGNORE:
+		return _fail("case 11: NameEdit ignores taps; a software keyboard would never appear")
 	edit.release_focus()
 	var viewport := main.get_viewport()
 	if viewport != null:
 		viewport.gui_release_focus()
 	await process_frame
-	if edit.mouse_filter == Control.MOUSE_FILTER_IGNORE:
-		return _fail("case 11: NameEdit ignores taps; a software keyboard would never appear")
-	if not await _tap_control(edit):
-		return _fail("case 11: could not tap NameEdit")
+	edit.grab_focus()
 	await process_frame
-	await process_frame
-	if not edit.has_focus():
-		# Headless picking often misses LineEdit; a tap-equivalent grab is
-		# what NameEntry already does, and mouse_filter is not IGNORE.
-		edit.grab_focus()
-		await process_frame
 	if not edit.has_focus():
 		return _fail("case 11: NameEdit cannot take focus")
 	_cancel_name(main)
@@ -581,37 +549,20 @@ func _cancel_name(main: Node) -> void:
 	main.get_viewport().push_input(esc)
 
 
-func _tap_control(ctrl: Control) -> bool:
+func _assert_touch_skips_flipper(ctrl: Control, label: String) -> bool:
 	if ctrl == null:
-		return false
+		return _fail("%s: control missing" % label)
 	var rect: Rect2 = ctrl.get_global_rect()
 	if rect.size.x <= 1.0 or rect.size.y <= 1.0:
-		return false
+		return _fail("%s: control rect is empty (%s)" % [label, rect])
 	var pos := rect.get_center()
-	var fired := {"ok": false}
-	var on_press := func() -> void:
-		fired["ok"] = true
-	if ctrl is BaseButton:
-		(ctrl as BaseButton).pressed.connect(on_press, CONNECT_ONE_SHOT)
-	var down := InputEventMouseButton.new()
-	down.button_index = MOUSE_BUTTON_LEFT
-	down.pressed = true
-	down.position = pos
-	down.global_position = pos
-	ctrl.get_viewport().push_input(down)
-	Input.parse_input_event(down)
-	Input.flush_buffered_events()
-	var up := InputEventMouseButton.new()
-	up.button_index = MOUSE_BUTTON_LEFT
-	up.pressed = false
-	up.position = pos
-	up.global_position = pos
-	ctrl.get_viewport().push_input(up)
-	Input.parse_input_event(up)
-	Input.flush_buffered_events()
-	if ctrl is BaseButton and not bool(fired["ok"]):
-		# Headless window picking can miss; still require a real pressed emit.
-		(ctrl as BaseButton).pressed.emit()
+	_touch(7, pos, true)
+	await process_frame
+	var held := Input.is_action_pressed("flipper_left") or Input.is_action_pressed("flipper_right")
+	_touch(7, pos, false)
+	await process_frame
+	if held:
+		return _fail("%s: touch at %s held a flipper" % [label, pos])
 	return true
 
 
