@@ -111,4 +111,13 @@ focus_mode = 0
 theme_override_font_sizes/font_size = 32
 text = "Settings  S"
 
+[node name="NameButton" type="Button" parent="."]
+offset_left = 248.0
+offset_top = 980.0
+offset_right = 352.0
+offset_bottom = 1100.0
+focus_mode = 0
+theme_override_font_sizes/font_size = 22
+text = "Name  N"
+
 [node name="Settings" parent="." instance=ExtResource("5_settings")]
