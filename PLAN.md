@@ -46,6 +46,7 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T24 | Touch controls: flipper halves, tap-to-launch, every key action reachable by finger (D-043) | 9 | brief on request; dispatch first — critical path | strong | — |
 | T25 | Server CORS: origin allowlist + OPTIONS preflight so a browser build can reach the board (D-044) | 9 | brief on request; after T24, needs a manual deploy | cheap-mid | — |
 | T26 | Web export pipeline: reproducible build, browser-verified, three unknowns settled (D-045) | 9 | brief on request; last — needs T24 and T25 merged | mid | T24, T25 |
+| T27 | Admin cleanup + per-IP limiting so a griefed board is repairable (D-046) | 9 | brief on request; before the web URL is shared | mid | T25 |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8 → T10 → T9 →
 **Phase 5:** T11 ∥ T12 → T11.1 (deploy) → T13.
@@ -75,18 +76,10 @@ Opening the project in the editor imports implicitly.
   Deploy) and verifies `/healthz` + `/`. The two README probe comments (08150a6, 2e49dc0) are
   harmless and can be removed in any later server PR.
 
-- **OPEN, needs Steve — the write key in a public web build.** `Leaderboard.KEY` ships inside the
-  client. On the Mac that is obscurity and D-026 accepted it. In a browser build anyone who opens
-  the download can read it and post fake scores to the family board, and there is still no delete
-  endpoint (D-026 scope). This does **not** block T24, T25 or T26; it blocks making the web build's
-  URL public. Options, planner's recommendation first:
-  1. **Accept and add cleanup** — keep the key, add an admin-only delete/reset route behind a
-     *second* key that never ships in the client, plus per-IP rate limiting. Cheapest, and it means
-     a griefed board is repairable rather than permanent.
-  2. Keep the build's URL unlisted and change nothing. Obscurity again, and one shared link ends it.
-  3. Stop the client writing directly: scores go through something that authenticates a player.
-     Real security, and a much larger project than the game itself.
-  Steve decides; if option 1, it becomes T27 and lands before the URL is shared.
+- **Resolved 2026-09-19 (Steve): option 1.** The write key stays in the client; the board becomes
+  repairable instead. Admin-only delete and reset routes behind a second key that never ships, plus
+  per-IP rate limiting on the write routes. Contracted as **D-046**, task **T27**, which must land
+  before the web build's URL is shared with anyone.
 
 ## Task details
 
@@ -323,6 +316,13 @@ ball, so multiball without a ball-life rule would end a game instantly. `Table` 
 belongs there. Owns `autoload/game.gd`, `scripts/table.gd`, `scripts/effects.gd`,
 `tests/supercharge_test.gd`; additive to `tests/game_flow.gd` only if a drain-accounting case is
 needed. Runs after T22 so it is built and soaked on the final flipper geometry.
+
+### T27 — Admin cleanup and per-IP limiting (Steve, 2026-09-19)
+Contract D-046. Owns `server/**` only; pairs naturally with T25 since both are server work and both
+need one manual deploy. Verified before designing: `index.js` has a single `createRateLimiter`
+keyed on `player_id` (30/60 s) and one `keysMatch` timing-safe comparison against `SQUISH_KEY`;
+there is no delete route of any kind, which is why the stray "Smoke Test" row from D-028 is still
+on the live board. Gates the sharing of the web URL, not T24/T25/T26.
 
 ### T24 — Touch controls (Steve, 2026-09-19)
 Contract D-043. Critical path for both target devices. Measured before designing: zero touch or
@@ -738,3 +738,8 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   build for both devices over two native apps; D-043/D-044/D-045 contract the three tasks.
   Phase 9 is T24 → T25 → T26, sequential. The shipped write key in a public build is logged as an
   open item for Steve — it blocks sharing the URL, not the tasks.
+- 2026-09-19: Steve took option 1 on the write-key question. D-046 written, T27 added to Phase 9.
+  The key stays public by decision; the mitigations are admin-only delete/reset behind a second key
+  that never ships plus per-IP limiting, so a forged `player_id` cannot sidestep the limiter and a
+  junk row can actually be removed. Note for T27: a blank `SQUISH_ADMIN_KEY` must disable the admin
+  routes, not open them.
