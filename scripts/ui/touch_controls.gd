@@ -73,9 +73,15 @@ func _input(event: InputEvent) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	# A real window never lands a button-center ScreenTouch here: GUI pick
+	# delivers it to the button. Headless `-s` has a 0×0 window, so pick is
+	# dead and the same event falls through. Guard both so the test and a
+	# device agree. Do not mark the event handled — buttons still need it.
 	if event is InputEventScreenTouch:
 		var touch := event as InputEventScreenTouch
-		_handle_screen_touch(touch.index, _to_play(touch.position), touch.pressed)
+		var local := _to_play(touch.position)
+		if not _over_interactive_ui(local):
+			_handle_screen_touch(touch.index, local, touch.pressed)
 		return
 	if event is InputEventScreenDrag:
 		var drag := event as InputEventScreenDrag
@@ -88,7 +94,9 @@ func _unhandled_input(event: InputEvent) -> void:
 func _on_play_gui_input(event: InputEvent) -> void:
 	if event is InputEventScreenTouch:
 		var touch := event as InputEventScreenTouch
-		_handle_screen_touch(touch.index, _to_play(touch.position), touch.pressed)
+		var local := _to_play(touch.position)
+		if not _over_interactive_ui(local):
+			_handle_screen_touch(touch.index, local, touch.pressed)
 		return
 	if event is InputEventScreenDrag:
 		var drag := event as InputEventScreenDrag

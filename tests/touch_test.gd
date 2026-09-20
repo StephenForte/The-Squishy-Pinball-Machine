@@ -472,6 +472,14 @@ func _case_restart_clears_touch(main: Node, game: Node) -> bool:
 	var flipper := main.get_node_or_null("Table/FlipperLeft")
 	if title == null or flipper == null:
 		return _fail("case 12: Title or flipper missing")
+	var game_over := main.get_node_or_null("GameOver")
+	if game_over != null and game_over.visible:
+		# Case 9 leaves Game Over up. RestartButton's bottom edge is y=960,
+		# the same as LEFT_ZONE; a headless _to_play lands on 959.9999 and
+		# the button-skip guard then correctly refuses the "playfield" hold.
+		game.restart()
+		await process_frame
+		await process_frame
 	if title.visible:
 		_touch(0, LAUNCH_ZONE, true)
 		_touch(0, LAUNCH_ZONE, false)
