@@ -43,7 +43,7 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T21 | Boot reconciles profile both ways so a pre-existing avatar uploads (D-038) | 7 fix | merged 2026-09-12 (PR #32) | mid | T20b |
 | T22 | Flippers 5% longer: LENGTH 90→94.5, polygon scaled about the pivot (D-039) | 8 | merged 2026-09-17 (PR #33 → 1012ee8); Steve: not too easy ✓ | cheap-mid | — |
 | T23 | Supercharged mode: 3-ball split at 3x + ball-trait layer, rainbow ×3 and one turbo (D-040/D-041) | 8 | merged 2026-09-19 (PR #34 → 7d5bfbd) | strong | T22 |
-| T24 | Touch controls: flipper halves, tap-to-launch, every key action reachable by finger (D-043) | 9 | brief on request; dispatch first — critical path | strong | — |
+| T24 | Touch controls: flipper halves, tap-to-launch, every key action reachable by finger (D-043) | 9 | PR #35 reviewed 2026-09-19 — changes requested (button test cannot fail) | strong | — |
 | T25 | Server CORS: origin allowlist + OPTIONS preflight so a browser build can reach the board (D-044) | 9 | brief on request; after T24, needs a manual deploy | cheap-mid | — |
 | T26 | Web export pipeline: reproducible build, browser-verified, three unknowns settled (D-045) | 9 | brief on request; last — needs T24 and T25 merged | mid | T24, T25 |
 | T27 | Admin cleanup + per-IP limiting so a griefed board is repairable (D-046) | 9 | brief on request; before the web URL is shared | mid | T25 |
@@ -743,3 +743,19 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   that never ships plus per-IP limiting, so a forged `player_id` cannot sidestep the limiter and a
   junk row can actually be removed. Note for T27: a blank `SQUISH_ADMIN_KEY` must disable the admin
   routes, not open them.
+- 2026-09-19: T24 (PR #35, fa368d9, base 35a9ba5) reviewed in scratch clone. Scope ✓ — none of the
+  protected input files touched; TouchControls at layer 12 under Title 15 and GameOver 20. Gate all
+  suites PASS, 19 scripts + boot, touch_test 12/12, menu_test 5/5, CI green. Planner probe with
+  synthesized `InputEventScreenTouch`: two fingers hold both flippers, lifting one leaves the other,
+  and the mixed case (keyboard A held, touch down+up, flipper still held, drops only on key release)
+  all behave correctly — the action-driving approach works. **Changes requested for one reason:**
+  `_tap_control` in touch_test emits `pressed` itself when the synthetic tap misses, so every
+  "the button still works" assertion passes even if the touch layer swallowed the tap. That is the
+  unquittable-tablet case, on a platform nobody can hand-test yet.
+  **Unsettled, and deliberately not prescribed:** `_over_interactive_ui` is applied in `_input` only,
+  while `_unhandled_input` and `_on_play_gui_input` handle the same touch unguarded; headless, a
+  touch on RestartButton/MenuButton does hold a flipper. The planner tried adding the guard to
+  `_unhandled_input`, it did not behave as predicted, and a real window routes GUI input differently
+  (0×0 headless window misroutes to PlayArea) — so the diagnosis is unproven and the worker was
+  asked to settle it with a windowed run rather than being handed a fix. Lesson: headless GUI
+  picking cannot adjudicate input routing; only a real window can.
