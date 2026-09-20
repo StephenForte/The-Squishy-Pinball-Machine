@@ -797,6 +797,20 @@ alongside, never instead.
   touch work — if it seems necessary, stop and report.
 - Emulated mouse-from-touch is not a substitute: it is single-touch, so it cannot hold both
   flippers, which is why real touch events are required.
+- **As built (T24, PR #35, reviewed 2026-09-20):** `TouchControls` is a CanvasLayer at layer 12,
+  under Title (15) and GameOver (20); it drives the existing actions with
+  `Input.action_press/release` so `flipper.gd`, `launcher.gd`, `main.gd`, `title.gd` and
+  `settings.gd` are all untouched, and it never marks an event handled. `_over_interactive_ui`
+  skips a touch that lands on a visible `BaseButton`/`LineEdit` in Title or GameOver, and it is
+  applied on **all three** touch entry points — `_input`, `_unhandled_input` and
+  `_on_play_gui_input`. Bottom half is the flipper band, split left/right; above it is launch.
+- **Open until a real device (D-042's unknown, do not re-litigate headless):** `_handle_mouse_event`
+  is the one path with no button guard, and the planner could not establish whether it matters. At
+  the T24 review a probe showed a first-of-session touch on a Game Over button still holding a
+  flipper while `_over_interactive_ui` returned true, but two different hypotheses for the mechanism
+  both failed to reproduce, and the same probe failed checks the suite passes deterministically —
+  so the probe, not the code, was unreliable. Settle it on a tablet during T26; if the mouse path
+  needs the same guard it is a two-line follow-up with hardware to check against.
 - Out of scope: tilt/nudge gestures, haptics, and any change to the 720×1280 layout.
 
 ## D-044 — CORS for the leaderboard, origin-allowlisted (2026-09-19)
