@@ -43,7 +43,7 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T21 | Boot reconciles profile both ways so a pre-existing avatar uploads (D-038) | 7 fix | merged 2026-09-12 (PR #32) | mid | T20b |
 | T22 | Flippers 5% longer: LENGTH 90→94.5, polygon scaled about the pivot (D-039) | 8 | merged 2026-09-17 (PR #33 → 1012ee8); Steve: not too easy ✓ | cheap-mid | — |
 | T23 | Supercharged mode: 3-ball split at 3x + ball-trait layer, rainbow ×3 and one turbo (D-040/D-041) | 8 | merged 2026-09-19 (PR #34 → 7d5bfbd) | strong | T22 |
-| T24 | Touch controls: flipper halves, tap-to-launch, every key action reachable by finger (D-043) | 9 | PR #35 reviewed 2026-09-19 — changes requested (button test cannot fail) | strong | — |
+| T24 | Touch controls: flipper halves, tap-to-launch, every key action reachable by finger (D-043) | 9 | PR #35 RED at 07dff17 — honest test now fails; worker owns the fix | strong | — |
 | T25 | Server CORS: origin allowlist + OPTIONS preflight so a browser build can reach the board (D-044) | 9 | brief on request; after T24, needs a manual deploy | cheap-mid | — |
 | T26 | Web export pipeline: reproducible build, browser-verified, three unknowns settled (D-045) | 9 | brief on request; last — needs T24 and T25 merged | mid | T24, T25 |
 | T27 | Admin cleanup + per-IP limiting so a griefed board is repairable (D-046) | 9 | brief on request; before the web URL is shared | mid | T25 |
@@ -759,3 +759,17 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   (0×0 headless window misroutes to PlayArea) — so the diagnosis is unproven and the worker was
   asked to settle it with a windowed run rather than being handed a fix. Lesson: headless GUI
   picking cannot adjudicate input routing; only a real window can.
+- 2026-09-20: T24 status check at 07dff17. The worker replaced the tautological `_tap_control` with
+  `_assert_touch_skips_flipper`, exactly as asked — and the gate is now **red**:
+  `TOUCH FAIL case 9 RestartButton: touch at (210.0, 920.0) held a flipper`, full gate EXIT=1. So
+  the behaviour the planner could not confirm last round is real headless, and the worker's own
+  honest assertion is what proved it. Controller unchanged; `_over_interactive_ui` still guards
+  `_input` only. Planner tried the obvious fix (same guard on `_unhandled_input` and
+  `_on_play_gui_input`): cases 9-11 pass and **case 12 breaks** —
+  `left should be held before restart` — most likely because with the Title visible the guard walks
+  Title's own `NameButton`/`SettingsButton`, both of which sit inside the lower flipper band, so a
+  legitimate playfield touch is refused. Handed that to the worker as a lead, **not** a prescribed
+  fix: the planner has now built two incomplete models of this routing and a third guess would cost
+  another round trip. Still unsettled and worth a windowed run: whether a real window ever routes a
+  ScreenTouch to the unguarded paths at all, in which case this is a headless artefact and the test
+  setup is what needs changing.
