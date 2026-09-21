@@ -8,6 +8,7 @@ signal submitted(result: Dictionary)
 signal offline(reason: String)
 signal submit_attempted(token: int, attempt: int)
 signal profile_synced(profile: Dictionary)
+signal restore_finished(ok: bool, reason: String)
 
 const BASE_URL := "https://squish-leaderboard.onrender.com"
 const KEY := "a419f5979f6891504b3af89a20e13125"
@@ -74,6 +75,19 @@ func fetch_profile(player_id: String, from_boot: bool = false) -> void:
 		return
 	var url := "%s/v1/profile?player_id=%s" % [_base_url(), player_id]
 	_http_request(HTTPClient.METHOD_GET, url, "", _on_fetch_profile_finished.bind(player_id, from_boot))
+
+
+## User-initiated transfer. Own callback: the boot reconcilers all no-op when
+## data.player_id != the id this device already holds (D-048).
+func restore_profile(player_id: String) -> void:
+	var id := player_id.strip_edges()
+	if id.is_empty():
+		return
+	if _profile_http_skipped():
+		restore_finished.emit(false, "offline")
+		return
+	var url := "%s/v1/profile?player_id=%s" % [_base_url(), id]
+	_http_request(HTTPClient.METHOD_GET, url, "", _on_restore_profile_finished)
 
 
 func fetch_top(limit: int) -> void:
@@ -154,6 +168,37 @@ func _on_fetch_profile_finished(ok: bool, code: int, parsed: Variant, _reason: S
 	if from_boot:
 		_reconcile_boot_divergence(data)
 	profile_synced.emit(data)
+
+
+func _on_restore_profile_finished(ok: bool, code: int, parsed: Variant, _reason: String) -> void:
+	# Check 404 before `not ok` — `_on_http_completed` reports every non-2xx
+	# as ok == false. Transport failure is code 0, never a 404.
+	if code == 404:
+		restore_finished.emit(false, "not_found")
+		return
+	if not ok:
+		restore_finished.emit(false, "offline")
+		return
+	if typeof(parsed) != TYPE_DICTIONARY:
+		restore_finished.emit(false, "offline")
+		return
+	var data: Dictionary = parsed
+	var profile := get_node_or_null("/root/Profile")
+	if profile == null or not profile.has_method("adopt_identity"):
+		restore_finished.emit(false, "offline")
+		return
+	var adopted := false
+	_suppress_profile_push = true
+	adopted = bool(profile.adopt_identity(
+		String(data.get("player_id", "")),
+		String(data.get("name", "")),
+		String(data.get("avatar", ""))
+	))
+	_suppress_profile_push = false
+	if adopted:
+		restore_finished.emit(true, "")
+	else:
+		restore_finished.emit(false, "offline")
 
 
 func _reconcile_boot_missing_cloud(requested_id: String) -> void:

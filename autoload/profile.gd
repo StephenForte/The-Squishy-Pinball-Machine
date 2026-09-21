@@ -109,6 +109,29 @@ func set_avatar(id: String) -> bool:
 	return true
 
 
+## Adopt a cloud identity onto this device (D-048). Overwrites any existing
+## players[key] for that name; the previous local id is dropped, not merged.
+func adopt_identity(id: String, name: String, avatar: String) -> bool:
+	if not _is_uuid_v4(id):
+		return false
+	var cleaned := _sanitize_name(name)
+	if cleaned.is_empty():
+		return false
+	var key := _name_key(cleaned)
+	player_id = id
+	player_name = cleaned
+	players[key] = id
+	if _is_catalog_avatar(avatar):
+		avatars[key] = avatar
+		avatar_id = avatar
+	else:
+		avatar_id = _avatar_for_key(key)
+	_save()
+	name_changed.emit(player_name)
+	avatar_changed.emit(avatar_id)
+	return true
+
+
 func _avatar_for_key(key: String) -> String:
 	var id := String(avatars.get(key, ""))
 	if not _is_catalog_avatar(id):
