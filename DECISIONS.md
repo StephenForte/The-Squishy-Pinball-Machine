@@ -1,7 +1,7 @@
 # Decisions — The Squishy Pinball Machine
 
 Numbered, append-only. Never renumber; supersede in place with date and reason.
-Workers cite these instead of re-deciding. Next free number: **D-047**.
+Workers cite these instead of re-deciding. Next free number: **D-048**.
 
 ## D-001 — Engine: Godot 4.x, GDScript (2026-09-02)
 Per PRD. Exact version to be pinned as D-006 once installed on the build machine.
@@ -885,3 +885,25 @@ changes is that a griefed board stops being permanent.
   missing address as one shared bucket rather than as unlimited.
 - Out of scope: authenticating players, signing scores, and any admin UI. The delete routes are the
   cleanup mechanism D-026 said we lacked.
+
+## D-047 — Admin score listing, so a row can actually be deleted (planner, 2026-09-21)
+Found while trying to use T27's cleanup on the live board: `DELETE /v1/scores/:id` works, but a
+score row `id` is not obtainable anywhere. Leaderboard entries expose `rank, player_id, name,
+score, at, avatar` and nothing else, and there is no admin listing. The stray "Smoke Test" row
+(D-028) therefore still cannot be removed without guessing an integer against live data, which
+risks deleting one of the family's real scores. This is a hole in **D-046, the planner's own
+contract** — it specified delete-by-id and never said how an id would be found.
+- **`GET /v1/admin/scores`** — admin-gated, returns **raw score rows**, newest first:
+  `{"rows": [{"id", "player_id", "name", "score", "client", "created_at"}], "total"}`.
+  Optional `player_id` (uuid v4, else 400 `invalid_player_id`) filters to one player; optional
+  `limit` uses D-026's existing `parseLimit` bounds rather than a new rule.
+- Raw rows, not board rows, deliberately: the board collapses to one entry per player (their best),
+  while deletion targets a specific row and a player may have many. A board entry cannot identify
+  what to delete.
+- **Identical gate to every other admin route (D-046):** a blank `SQUISH_ADMIN_KEY` makes it 404
+  like the rest; a missing or wrong `X-Squish-Admin` is 401; the write key must not work; it is
+  excluded from CORS and answers no preflight.
+- **No change to any public route.** `/v1/leaderboard`, `/v1/leaderboard/me`, `/v1/profile` and `/`
+  keep their exact field names and shapes — the shipped Godot client parses them (D-026).
+- Acceptance is operational, not just green tests: after deploy the planner can list the rows, find
+  the Smoke Test row, delete it by id, and see it gone from the board.
