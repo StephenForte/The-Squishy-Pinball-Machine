@@ -371,6 +371,11 @@ not the global identifier — the global is unavailable when a `-s` test preload
   admin routes return **404 even with a guessed `X-Squish-Admin` header** — D-046's central
   requirement, confirmed in production; `POST /v1/scores` without a key still 401; `/` and
   `/avatars/*.png` unchanged.
+- **Deploy 2026-09-21 (T28, planner):** `trigger_deploy` on merge commit 4d8e2c2 →
+  `dep-dao9v13tqb8s73egd4n0`, live in ~40 s. Smoke: `/healthz` ok; board intact (Natasha and Dad
+  tied on 14 300); `GET /v1/admin/scores` answers **401** without a header, with a wrong key, and
+  with the *write* key in `X-Squish-Admin`, and sends no CORS header — the D-046 gate covers the new
+  route in production. Public routes unchanged.
 - **`SQUISH_ALLOWED_ORIGINS` is deliberately still unset.** There is no web build yet, so there is
   no origin to allow and guessing one would be worse than empty. It gets set during T26, to
   whatever origin actually hosts the build.
