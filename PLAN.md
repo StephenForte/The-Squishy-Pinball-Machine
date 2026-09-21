@@ -840,3 +840,14 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   (seeded Smoke Test + Natasha → list → match by name → delete by id → board down to Natasha only)
   and handed Steve a single ready-to-paste command that prompts for the key, matches on the name
   rather than a typed id, and therefore cannot delete the wrong row. Phase 9 now has only T26 left.
+- 2026-09-21: **Planner error on the cleanup command.** The first command handed to Steve listed
+  `/v1/admin/scores?limit=50` and matched on the name; it returned `found 0`. Cause, reproduced on a
+  throwaway DB seeded with 71 rows: the list is newest-first and `parseLimit` caps at 50, so the
+  Smoke Test row (2026-09-08, the oldest) falls off the page once the family has posted more than
+  50 scores — which they have. The planner's original test used a 2-row database, which could never
+  surface it. A second repro attempt posted 60 scores over HTTP and only 31 landed because T27's new
+  per-IP limiter (60/60 s) throttled it — so the rows had to be written straight through `db.js`.
+  **Fix:** target `?player_id=deadbeef-0000-4000-8000-000000000001` (recorded in D-028) instead of
+  paging by name; row count then does not matter. Verified: broken form finds 0 of 71, filtered form
+  finds and deletes it and the board drops a player. Lesson for any future admin-cleanup command:
+  filter by the identifier, never page-and-match, and seed the test with more rows than the page cap.
