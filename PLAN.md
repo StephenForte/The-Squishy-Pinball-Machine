@@ -45,7 +45,7 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T23 | Supercharged mode: 3-ball split at 3x + ball-trait layer, rainbow ×3 and one turbo (D-040/D-041) | 8 | merged 2026-09-19 (PR #34 → 7d5bfbd) | strong | T22 |
 | T24 | Touch controls: flipper halves, tap-to-launch, every key action reachable by finger (D-043) | 9 | merged 2026-09-20 (PR #35 → c79a934) | strong | — |
 | T25 | Server CORS: origin allowlist + OPTIONS preflight so a browser build can reach the board (D-044) | 9 | merged + **deployed live** 2026-09-21 (PR #36 → 3fc6560) | cheap-mid | — |
-| T26 | Web export pipeline: reproducible build, browser-verified, three unknowns settled (D-045) | 9 | merged 2026-09-21 (PR #38 → e36f055); hosting pending — Steve creates the static site | mid | T24, T25 |
+| T26 | Web export pipeline: reproducible build, browser-verified, three unknowns settled (D-045) | 9 | done 2026-09-21 (PR #38 → e36f055); hosted at https://the-squishy-pinball-machine.onrender.com | mid | T24, T25 |
 | T27 | Admin cleanup + per-IP limiting so a griefed board is repairable (D-046) | 9 | merged + **deployed live** 2026-09-21 (PR #36 → 3fc6560) | mid | T25 |
 | T28 | Admin score listing so a row can be found and deleted (D-047) | 9 | **done** 2026-09-21 — merged, deployed, Smoke Test row deleted | cheap | T27 |
 
@@ -889,3 +889,29 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
 - **Then:** Steve reports the site URL → planner sets `SQUISH_ALLOWED_ORIGINS` on
   `srv-dag8rnrl550s73a9unm0` (D-044) and re-runs the origin probe → the board should load in the
   browser instead of showing "Leaderboard offline" → iPad test closes D-043's open input path.
+- 2026-09-21: **Hosting is live — Phase 9 is complete.** Steve created the static site in the
+  dashboard and pasted the build command; the first deploy failed only because the create form did
+  not carry the command through (`Empty build command; skipping build`). With the command set, the
+  build went green in **39 seconds** — the 1.3 GB template download is a non-issue on Render's
+  builder network, so the GitHub Actions fallback stays unbuilt. Recorded rather than assumed: the
+  service is `srv-daoak3n40ujc73ei35pg`, name **`The-Squishy-Pinball-Machine`** (not `squish-pinball`
+  as handed over), origin `https://the-squishy-pinball-machine.onrender.com`, publish `export/web`,
+  auto-deploy off.
+- 2026-09-21: Planner verified the deploy independently rather than trusting the `live` status, since
+  39 s is implausibly fast for that build: all five exported assets return 200 with real sizes
+  (`index.wasm` 39.5 MB, `index.pck` 6.1 MB, `index.js` 280 KB). The artifact is a genuine export,
+  not a stale or empty publish.
+- 2026-09-21: `SQUISH_ALLOWED_ORIGINS` set on `srv-dag8rnrl550s73a9unm0` to the site origin (D-044).
+  The allowlist was **empty** beforehand — probed five candidate origins, all denied — so nothing was
+  clobbered. After redeploy the origin probe passes and fails closed on the two cases that matter:
+  the scheme downgrade (`http://…`) and the suffix attack
+  (`https://the-squishy-pinball-machine.onrender.com.evil.example`) both get no `ACAO` header,
+  confirming exact-match rather than prefix-match.
+- 2026-09-21: **End-to-end proven in a browser.** The game boots from Render and the title screen
+  renders the live board (Natasha 14300, Dad 14300, T13 1313) — identical to the API response, so the
+  cross-origin fetch succeeded rather than falling back to "Leaderboard offline". Console clean, no
+  errors. **Still not verified:** gameplay via synthetic input (automation cannot reach the wasm
+  canvas) and the real iPad, which remains the one test that closes D-043's open input path
+  (`_handle_mouse_event` is the only touch entry point without the interactive-UI guard).
+- **Next:** the URL is now shareable. Open items are Natasha's play-test of the Phase 6/7 features
+  and the iPad test; neither blocks anything already merged.
