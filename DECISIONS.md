@@ -336,9 +336,12 @@ not the global identifier — the global is unavailable when a `-s` test preload
   wrong key → 401; invalid body → 400; POST `Smoke Test` 1 pt → 201 rank 1 in 76 ms; `/me` → 200;
   board lists it. Redeploy triggered via connector: ~30 s of 502 (single instance with a disk,
   no zero-downtime), then 200 and the entry **survived** — persistence proven.
-- Known: one permanent `Smoke Test` / 1-point entry (player_id deadbeef-0000-4000-8000-000000000001)
-  exists on the real board; there is no delete endpoint (D-026 scope). Remove via SSH/sqlite if it
-  ever bothers anyone.
+- ~~Known: one permanent `Smoke Test` / 1-point entry existed on the real board with no delete
+  endpoint.~~ **Resolved 2026-09-21.** T27 added the admin delete route, T28 made the row's id
+  discoverable, and Steve ran the cleanup with his own key (`deleted id 1 Smoke Test 1`). Verified
+  live: the board is 3 players (Natasha 14 300, Dad 14 300, T13 1313), the HTML page shows the same
+  three, and `/v1/leaderboard/me?player_id=deadbeef-…-0001` returns `unknown_player`. The board was
+  un-editable for 13 days; it no longer is.
 - Ops notes: deploys cause ~30 s downtime; the client (T13) must treat 5xx/timeouts as
   "offline" and retry later.
 - **Correction 2026-09-09:** auto-deploy has NOT fired for any push since creation (last deploy
