@@ -47,7 +47,7 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T25 | Server CORS: origin allowlist + OPTIONS preflight so a browser build can reach the board (D-044) | 9 | merged + **deployed live** 2026-09-21 (PR #36 → 3fc6560) | cheap-mid | — |
 | T26 | Web export pipeline: reproducible build, browser-verified, three unknowns settled (D-045) | 9 | brief on request; last — needs T24 and T25 merged | mid | T24, T25 |
 | T27 | Admin cleanup + per-IP limiting so a griefed board is repairable (D-046) | 9 | merged + **deployed live** 2026-09-21 (PR #36 → 3fc6560) | mid | T25 |
-| T28 | Make a score row deletable: no way to discover a score `id` through the API (found at the T27 deploy) | 9 | not started — small; needed before the Smoke Test row can go | cheap | T27 |
+| T28 | Admin score listing so a row can be found and deleted (D-047) | 9 | brief written 2026-09-21; ready to dispatch | cheap | T27 |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8 → T10 → T9 →
 **Phase 5:** T11 ∥ T12 → T11.1 (deploy) → T13.
@@ -324,6 +324,12 @@ need one manual deploy. Verified before designing: `index.js` has a single `crea
 keyed on `player_id` (30/60 s) and one `keysMatch` timing-safe comparison against `SQUISH_KEY`;
 there is no delete route of any kind, which is why the stray "Smoke Test" row from D-028 is still
 on the live board. Gates the sharing of the web URL, not T24/T25/T26.
+
+### T28 — Admin score listing (planner gap, 2026-09-21)
+Contract D-047. Owns `server/**` only. Verified before designing: board entries carry no row id
+(`['at','avatar','name','player_id','rank','score']` from the live service) and `grep` finds no
+admin list route. Small, but it sits on the admin boundary, so every D-046 gate case is re-asserted.
+Planner deploys after merge, then removes the Smoke Test row — which is the acceptance test.
 
 ### T24 — Touch controls (Steve, 2026-09-19)
 Contract D-043. Critical path for both target devices. Measured before designing: zero touch or
@@ -811,3 +817,7 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   score. This is a hole in the planner's D-046 contract, not in the worker's execution — the brief
   specified delete-by-id and never asked how an id would be discovered. T28: expose the id to an
   authenticated admin (an admin-only list route, or the id on board entries), then delete the row.
+- 2026-09-21: Steve set `SQUISH_ADMIN_KEY` in Render. Verified live: all three admin routes now
+  answer **401** without a header and **401** with a wrong key, where they answered 404 before the
+  key existed. The gate is working end to end in production. Board unchanged (Natasha and Dad tied
+  on 14 300). T28 briefed to close the id-discovery gap.
