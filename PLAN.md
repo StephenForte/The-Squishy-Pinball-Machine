@@ -43,10 +43,10 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T21 | Boot reconciles profile both ways so a pre-existing avatar uploads (D-038) | 7 fix | merged 2026-09-12 (PR #32) | mid | T20b |
 | T22 | Flippers 5% longer: LENGTH 90→94.5, polygon scaled about the pivot (D-039) | 8 | merged 2026-09-17 (PR #33 → 1012ee8); Steve: not too easy ✓ | cheap-mid | — |
 | T23 | Supercharged mode: 3-ball split at 3x + ball-trait layer, rainbow ×3 and one turbo (D-040/D-041) | 8 | merged 2026-09-19 (PR #34 → 7d5bfbd) | strong | T22 |
-| T24 | Touch controls: flipper halves, tap-to-launch, every key action reachable by finger (D-043) | 9 | PR #35 approved 2026-09-20 (a971825); awaiting Steve's merge | strong | — |
-| T25 | Server CORS: origin allowlist + OPTIONS preflight so a browser build can reach the board (D-044) | 9 | brief on request; after T24, needs a manual deploy | cheap-mid | — |
+| T24 | Touch controls: flipper halves, tap-to-launch, every key action reachable by finger (D-043) | 9 | merged 2026-09-20 (PR #35 → c79a934) | strong | — |
+| T25 | Server CORS: origin allowlist + OPTIONS preflight so a browser build can reach the board (D-044) | 9 | PR #36 approved 2026-09-21 (f4875c3, with T27); awaiting merge + deploy | cheap-mid | — |
 | T26 | Web export pipeline: reproducible build, browser-verified, three unknowns settled (D-045) | 9 | brief on request; last — needs T24 and T25 merged | mid | T24, T25 |
-| T27 | Admin cleanup + per-IP limiting so a griefed board is repairable (D-046) | 9 | brief on request; before the web URL is shared | mid | T25 |
+| T27 | Admin cleanup + per-IP limiting so a griefed board is repairable (D-046) | 9 | PR #36 approved 2026-09-21 (f4875c3, with T25); awaiting merge + deploy | mid | T25 |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8 → T10 → T9 →
 **Phase 5:** T11 ∥ T12 → T11.1 (deploy) → T13.
@@ -784,3 +784,18 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   passes deterministically — so the probe was the unreliable element and no further round trip was
   spent on it. Recorded in D-043 as an open item for a real tablet during T26. Standing lesson,
   now twice earned: headless cannot adjudicate touch/GUI input routing.
+- 2026-09-21: T25+T27 (PR #36, f4875c3, base c79a934) reviewed in scratch clone. Scope ✓ server-only.
+  Server suite 47/20 → 66/28, Godot gate all suites PASS, CI green. Planner ran 28 security checks
+  against a live instance, all passing: blank admin key 404s every admin route (including with a
+  guessed header); no cross-grant either way between the write and admin keys; reset needs
+  confirmation and deletes nothing without it; targeted deletes leave the rest intact; CORS echoes
+  only exact listed origins with Vary, sends nothing for unlisted ones, never on admin routes, and
+  treats `*` as no match; one address posting as 80 distinct players got limited at 60/60 s while a
+  second address was unaffected. **Falsified both guards:** removing the `!ctx.adminKey` early
+  return and letting an empty expected key compare equal makes a guessed header return **200 and
+  wipe the board** — the shipped code returns 404. Treating `*` as a wildcard likewise turns the
+  CORS check red. Approved.
+  Post-merge sequence: planner triggers the Render deploy and sets `SQUISH_ALLOWED_ORIGINS`;
+  **Steve sets `SQUISH_ADMIN_KEY` himself** (a credential the planner will not generate or enter).
+  Until he does, admin routes must 404 — the planner verifies exactly that. Then the stray
+  "Smoke Test" row from D-028 can finally be deleted.
