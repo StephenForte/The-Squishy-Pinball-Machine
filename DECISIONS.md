@@ -362,6 +362,20 @@ not the global identifier — the global is unavailable when a `-s` test preload
   `/avatars/bear_bounce.png` 200 image/png 62263 B, 228×167; `/v1/profile` GET unknown → 404
   `unknown_profile`, malformed → 400; PUT without/with a wrong key → 401; `POST /v1/scores`
   unchanged. No production rows were written by the smoke check.
+- **Deploy 2026-09-21 (T25+T27, planner):** `trigger_deploy` on merge commit 3fc6560 →
+  `dep-dao7s5ek1f9s73b0r7dg`, live in ~40 s with the usual ~20 s of 502. Smoke:
+  `/healthz` `{"ok":true,"store":"sqlite"}`; the board survived with all four players (Natasha and
+  Dad now tied on 14 300, avatars coffee_cuppa and berry_bounce); with `SQUISH_ALLOWED_ORIGINS`
+  unset there is **no** access-control header on any response and `OPTIONS /v1/profile` answers 204
+  with no CORS header — fail-closed as D-044 requires; with `SQUISH_ADMIN_KEY` unset all three
+  admin routes return **404 even with a guessed `X-Squish-Admin` header** — D-046's central
+  requirement, confirmed in production; `POST /v1/scores` without a key still 401; `/` and
+  `/avatars/*.png` unchanged.
+- **`SQUISH_ALLOWED_ORIGINS` is deliberately still unset.** There is no web build yet, so there is
+  no origin to allow and guessing one would be worse than empty. It gets set during T26, to
+  whatever origin actually hosts the build.
+- **`SQUISH_ADMIN_KEY` is Steve's to set.** The planner does not generate or enter credentials.
+  Until he sets it the admin routes stay disabled, which is the correct resting state.
 - **Edge note (measured 2026-09-12):** Render fronts the service with Cloudflare, which rejects a
   percent-encoded traversal (`/avatars/%2e%2e%2f…`) with its own **400** before the app is reached;
   the app returns 404 for the same path locally. Two independent rejections — do not mistake the 400
