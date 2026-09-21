@@ -30,6 +30,7 @@ var _submitted_tokens: Dictionary = {}
 var _submit_state: Dictionary = {}
 var _hooked_titles: Dictionary = {}
 var _fetch_gen: int = 0
+var _restore_gen: int = 0
 var _profile_push_count: int = 0
 ## Set while adopting a cloud avatar so set_avatar does not fire a PUT (D-038).
 var _suppress_profile_push: bool = false
@@ -83,11 +84,13 @@ func restore_profile(player_id: String) -> void:
 	var id := player_id.strip_edges()
 	if id.is_empty():
 		return
+	_restore_gen += 1
+	var gen := _restore_gen
 	if _profile_http_skipped():
 		restore_finished.emit(false, "offline")
 		return
 	var url := "%s/v1/profile?player_id=%s" % [_base_url(), id]
-	_http_request(HTTPClient.METHOD_GET, url, "", _on_restore_profile_finished)
+	_http_request(HTTPClient.METHOD_GET, url, "", _on_restore_profile_finished.bind(gen))
 
 
 func fetch_top(limit: int) -> void:
@@ -170,7 +173,9 @@ func _on_fetch_profile_finished(ok: bool, code: int, parsed: Variant, _reason: S
 	profile_synced.emit(data)
 
 
-func _on_restore_profile_finished(ok: bool, code: int, parsed: Variant, _reason: String) -> void:
+func _on_restore_profile_finished(ok: bool, code: int, parsed: Variant, _reason: String, gen: int) -> void:
+	if gen != _restore_gen:
+		return
 	# Check 404 before `not ok` — `_on_http_completed` reports every non-2xx
 	# as ok == false. Transport failure is code 0, never a 404.
 	if code == 404:

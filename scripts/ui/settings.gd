@@ -73,6 +73,7 @@ func open() -> void:
 func close() -> void:
 	visible = false
 	_set_code_visible(false)
+	_set_restore_busy(false)
 	_release_restore_focus()
 
 
@@ -188,10 +189,12 @@ func _on_restore_pressed() -> void:
 	if leaderboard == null or not leaderboard.has_method("restore_profile"):
 		_set_status("couldn't reach the leaderboard")
 		return
+	_set_restore_busy(true)
 	leaderboard.restore_profile(raw)
 
 
 func _on_restore_finished(ok: bool, reason: String) -> void:
+	_set_restore_busy(false)
 	if ok:
 		_set_status("")
 		if _restore_edit != null:
@@ -207,6 +210,13 @@ func _on_restore_finished(ok: bool, reason: String) -> void:
 func _set_status(message: String) -> void:
 	if _status_label != null:
 		_status_label.text = message
+
+
+func _set_restore_busy(busy: bool) -> void:
+	if _restore_button != null:
+		_restore_button.disabled = busy
+	if _restore_edit != null:
+		_restore_edit.editable = not busy
 
 
 func _release_restore_focus() -> void:

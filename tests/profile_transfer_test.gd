@@ -58,6 +58,8 @@ func _run() -> void:
 		return
 	if not _case_5_round_trip_survives_reload():
 		return
+	if not _case_5b_stale_restore_ignored():
+		return
 
 	if String(_profile.player_name).is_empty():
 		_profile.call("set_name", "Dad")
@@ -175,7 +177,7 @@ func _case_3_404_does_not_adopt() -> bool:
 	var before_id := String(_profile.player_id)
 	var before_players: Dictionary = _profile.players.duplicate(true)
 	_reset_restore_flags()
-	_leaderboard._on_restore_profile_finished(false, 404, null, "http_404")
+	_finish_restore(false, 404, null, "http_404")
 	if not _got_restore:
 		return _fail("case 3: restore_finished did not fire")
 	if _restore_ok or _restore_reason != "not_found":
@@ -196,7 +198,7 @@ func _case_4_restore_does_not_put() -> bool:
 	OS.set_environment("SQUISH_LEADERBOARD_URL", LIVE_COUNT_URL)
 	var before := int(_leaderboard._profile_push_count)
 	_reset_restore_flags()
-	_leaderboard._on_restore_profile_finished(true, 200, {
+	_finish_restore(true, 200, {
 		"player_id": CLOUD_ID,
 		"name": "Dad",
 		"avatar": "bear_bounce",
@@ -231,6 +233,34 @@ func _case_5_round_trip_survives_reload() -> bool:
 		return _fail("case 5: profile.save player_id %s want %s" % [disk.get("player_id", ""), CLOUD_ID])
 	_cases_passed += 1
 	print("TRANSFER case 5 pass")
+	return true
+
+
+func _case_5b_stale_restore_ignored() -> bool:
+	print("TRANSFER case 5b stale restore ignored")
+	if not bool(_profile.adopt_identity(OTHER_ID, "Dad", "frog_gus")):
+		return _fail("case 5b: setup adopt failed")
+	var before_id := String(_profile.player_id)
+	_leaderboard._restore_gen += 1
+	var stale: int = int(_leaderboard._restore_gen)
+	_leaderboard._restore_gen += 1
+	_reset_restore_flags()
+	_leaderboard._on_restore_profile_finished(true, 200, {
+		"player_id": CLOUD_ID,
+		"name": "Dad",
+		"avatar": "bear_bounce",
+	}, "", stale)
+	if _got_restore:
+		return _fail("case 5b: stale restore_finished should be dropped")
+	if String(_profile.player_id) != before_id:
+		return _fail("case 5b: stale success adopted %s" % _profile.player_id)
+	_finish_restore(false, 404, null, "http_404")
+	if not _got_restore or _restore_ok or _restore_reason != "not_found":
+		return _fail("case 5b: current 404 should still surface")
+	if String(_profile.player_id) != before_id:
+		return _fail("case 5b: current 404 changed player_id")
+	_cases_passed += 1
+	print("TRANSFER case 5b pass")
 	return true
 
 
@@ -296,12 +326,12 @@ func _case_7_restore_messages(main: Node) -> bool:
 	if status.text != "that code doesn't look right":
 		return _fail("case 7: bad uuid message '%s'" % status.text)
 	_reset_restore_flags()
-	_leaderboard._on_restore_profile_finished(false, 404, null, "http_404")
+	_finish_restore(false, 404, null, "http_404")
 	await process_frame
 	if status.text != "no profile found":
 		return _fail("case 7: 404 message '%s'" % status.text)
 	_reset_restore_flags()
-	_leaderboard._on_restore_profile_finished(false, 0, null, "unreachable")
+	_finish_restore(false, 0, null, "unreachable")
 	await process_frame
 	if status.text != "couldn't reach the leaderboard":
 		return _fail("case 7: offline message '%s'" % status.text)
@@ -326,7 +356,7 @@ func _case_8_success_reflects(main: Node) -> bool:
 	OS.set_environment("SQUISH_LEADERBOARD_URL", LIVE_COUNT_URL)
 	var before := int(_leaderboard._profile_push_count)
 	_reset_restore_flags()
-	_leaderboard._on_restore_profile_finished(true, 200, {
+	_finish_restore(true, 200, {
 		"player_id": CLOUD_ID,
 		"name": "Dad",
 		"avatar": "bear_bounce",
@@ -469,6 +499,11 @@ func _reset_restore_flags() -> void:
 	_got_restore = false
 	_restore_ok = false
 	_restore_reason = ""
+
+
+func _finish_restore(ok: bool, code: int, parsed: Variant, reason: String) -> void:
+	_leaderboard._restore_gen += 1
+	_leaderboard._on_restore_profile_finished(ok, code, parsed, reason, int(_leaderboard._restore_gen))
 
 
 func _fail(message: String) -> bool:
