@@ -47,7 +47,7 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T25 | Server CORS: origin allowlist + OPTIONS preflight so a browser build can reach the board (D-044) | 9 | merged + **deployed live** 2026-09-21 (PR #36 → 3fc6560) | cheap-mid | — |
 | T26 | Web export pipeline: reproducible build, browser-verified, three unknowns settled (D-045) | 9 | brief on request; last — needs T24 and T25 merged | mid | T24, T25 |
 | T27 | Admin cleanup + per-IP limiting so a griefed board is repairable (D-046) | 9 | merged + **deployed live** 2026-09-21 (PR #36 → 3fc6560) | mid | T25 |
-| T28 | Admin score listing so a row can be found and deleted (D-047) | 9 | merged + **deployed live** 2026-09-21 (PR #37 → 4d8e2c2); Smoke Test row awaits Steve's key | cheap | T27 |
+| T28 | Admin score listing so a row can be found and deleted (D-047) | 9 | **done** 2026-09-21 — merged, deployed, Smoke Test row deleted | cheap | T27 |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8 → T10 → T9 →
 **Phase 5:** T11 ∥ T12 → T11.1 (deploy) → T13.
@@ -851,3 +851,10 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   paging by name; row count then does not matter. Verified: broken form finds 0 of 71, filtered form
   finds and deletes it and the board drops a player. Lesson for any future admin-cleanup command:
   filter by the identifier, never page-and-match, and seed the test with more rows than the page cap.
+- 2026-09-21: **T28 acceptance met.** Steve ran the corrected cleanup with his own key:
+  `deleted id 1 Smoke Test 1`. Planner verified live — 3 players (Natasha 14 300, Dad 14 300,
+  T13 1313), the HTML page shows the same three, `/v1/leaderboard/me` for the smoke player returns
+  `unknown_player`, service healthy. The stray row seeded at the first deploy on 2026-09-08 is gone
+  after 13 days, closing the gap D-026 opened by shipping no delete path. T25, T27 and T28 are all
+  merged, deployed and proven in production. **Phase 9 has only T26 (web export) left**, which is
+  also where D-043's open touch-routing question gets settled on real hardware.
