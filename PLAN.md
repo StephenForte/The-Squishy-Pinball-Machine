@@ -45,7 +45,7 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T23 | Supercharged mode: 3-ball split at 3x + ball-trait layer, rainbow ×3 and one turbo (D-040/D-041) | 8 | merged 2026-09-19 (PR #34 → 7d5bfbd) | strong | T22 |
 | T24 | Touch controls: flipper halves, tap-to-launch, every key action reachable by finger (D-043) | 9 | merged 2026-09-20 (PR #35 → c79a934) | strong | — |
 | T25 | Server CORS: origin allowlist + OPTIONS preflight so a browser build can reach the board (D-044) | 9 | merged + **deployed live** 2026-09-21 (PR #36 → 3fc6560) | cheap-mid | — |
-| T26 | Web export pipeline: reproducible build, browser-verified, three unknowns settled (D-045) | 9 | brief on request; last — needs T24 and T25 merged | mid | T24, T25 |
+| T26 | Web export pipeline: reproducible build, browser-verified, three unknowns settled (D-045) | 9 | PR #38 approved 2026-09-21 (a7572f8); awaiting merge, then host + origins | mid | T24, T25 |
 | T27 | Admin cleanup + per-IP limiting so a griefed board is repairable (D-046) | 9 | merged + **deployed live** 2026-09-21 (PR #36 → 3fc6560) | mid | T25 |
 | T28 | Admin score listing so a row can be found and deleted (D-047) | 9 | **done** 2026-09-21 — merged, deployed, Smoke Test row deleted | cheap | T27 |
 
@@ -858,3 +858,15 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   after 13 days, closing the gap D-026 opened by shipping no delete path. T25, T27 and T28 are all
   merged, deployed and proven in production. **Phase 9 has only T26 (web export) left**, which is
   also where D-043's open touch-routing question gets settled on real hardware.
+- 2026-09-21: T26 (PR #38, a7572f8, base d786238) reviewed in scratch clone. Scope ✓ — 5 files, no
+  export artifacts/presets/templates committed, D-008 rules intact. Gate all suites PASS,
+  EXPORT_WEB 3/3, CI green. **Planner reproduced the export from a clean clone byte-for-byte**
+  (index.wasm 39 514 754, index.pck 6 059 924, 44 MB) and **loaded it in a second browser**:
+  renders, canvas 2048×1536, `crossOriginIsolated === false`, `SharedArrayBuffer === undefined` —
+  independently confirming no isolation headers are required. Blocked leaderboard behaves as
+  designed: CORS refusal in the console, "Leaderboard offline" on screen, 3 errors not a hot loop.
+  A 264-message WebGL warning flood turned out to be the planner's own hidden browser pane
+  (zero-size framebuffer); once visible, none. `export_web_test` case 3 is a real adversarial
+  fail-closed check. Approved. **Not verified:** gameplay via synthetic input (automation cannot
+  reach the wasm canvas) and the real iPad. Worker's recommended host: a Render static site beside
+  the leaderboard.
