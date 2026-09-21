@@ -30,7 +30,11 @@ export async function withServer(fn, options = {}) {
   const server = createServer({
     dbPath: options.dbPath ?? dbPathForSuite(),
     key: options.key ?? KEY,
+    adminKey: options.adminKey ?? '',
+    allowedOrigins: options.allowedOrigins ?? [],
     limiter: options.limiter,
+    ipLimiter: options.ipLimiter,
+    addressFor: options.addressFor,
     catalogPath: options.catalogPath,
     repoRoot: options.repoRoot,
     catalog: options.catalog,
@@ -60,7 +64,7 @@ export async function request(port, method, path, { key, body, headers } = {}) {
   } catch {
     json = text;
   }
-  return { status: res.status, json };
+  return { status: res.status, json, headers: res.headers };
 }
 
 export function scoreBody(overrides = {}) {

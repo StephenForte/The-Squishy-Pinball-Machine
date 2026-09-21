@@ -180,3 +180,24 @@ export function upsertProfile(db, { player_id, name, avatar }) {
   ).run(player_id, name, avatar, updated_at);
   return getProfile(db, player_id);
 }
+
+export function deleteScore(db, id) {
+  const row = db.prepare('SELECT id FROM scores WHERE id = ?').get(id);
+  if (!row) return false;
+  db.prepare('DELETE FROM scores WHERE id = ?').run(id);
+  return true;
+}
+
+export function deleteProfile(db, playerId) {
+  const row = db
+    .prepare('SELECT player_id FROM profiles WHERE player_id = ?')
+    .get(playerId);
+  if (!row) return false;
+  db.prepare('DELETE FROM profiles WHERE player_id = ?').run(playerId);
+  return true;
+}
+
+export function resetAll(db) {
+  db.exec('DELETE FROM scores');
+  db.exec('DELETE FROM profiles');
+}
