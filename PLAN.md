@@ -44,9 +44,10 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T22 | Flippers 5% longer: LENGTH 90→94.5, polygon scaled about the pivot (D-039) | 8 | merged 2026-09-17 (PR #33 → 1012ee8); Steve: not too easy ✓ | cheap-mid | — |
 | T23 | Supercharged mode: 3-ball split at 3x + ball-trait layer, rainbow ×3 and one turbo (D-040/D-041) | 8 | merged 2026-09-19 (PR #34 → 7d5bfbd) | strong | T22 |
 | T24 | Touch controls: flipper halves, tap-to-launch, every key action reachable by finger (D-043) | 9 | merged 2026-09-20 (PR #35 → c79a934) | strong | — |
-| T25 | Server CORS: origin allowlist + OPTIONS preflight so a browser build can reach the board (D-044) | 9 | PR #36 approved 2026-09-21 (f4875c3, with T27); awaiting merge + deploy | cheap-mid | — |
+| T25 | Server CORS: origin allowlist + OPTIONS preflight so a browser build can reach the board (D-044) | 9 | merged + **deployed live** 2026-09-21 (PR #36 → 3fc6560) | cheap-mid | — |
 | T26 | Web export pipeline: reproducible build, browser-verified, three unknowns settled (D-045) | 9 | brief on request; last — needs T24 and T25 merged | mid | T24, T25 |
-| T27 | Admin cleanup + per-IP limiting so a griefed board is repairable (D-046) | 9 | PR #36 approved 2026-09-21 (f4875c3, with T25); awaiting merge + deploy | mid | T25 |
+| T27 | Admin cleanup + per-IP limiting so a griefed board is repairable (D-046) | 9 | merged + **deployed live** 2026-09-21 (PR #36 → 3fc6560) | mid | T25 |
+| T28 | Make a score row deletable: no way to discover a score `id` through the API (found at the T27 deploy) | 9 | not started — small; needed before the Smoke Test row can go | cheap | T27 |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8 → T10 → T9 →
 **Phase 5:** T11 ∥ T12 → T11.1 (deploy) → T13.
@@ -799,3 +800,14 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   **Steve sets `SQUISH_ADMIN_KEY` himself** (a credential the planner will not generate or enter).
   Until he does, admin routes must 404 — the planner verifies exactly that. Then the stray
   "Smoke Test" row from D-028 can finally be deleted.
+- 2026-09-21: T25+T27 deployed and smoke-checked live (see the D-028 deploy record). Board intact
+  across the deploy; CORS sends nothing while the allowlist is unset; **admin routes 404 in
+  production even with a guessed header**, which is the whole point of D-046 and is now confirmed
+  on the real service rather than only in tests.
+- 2026-09-21: **Gap found at deploy, opened as T28.** `DELETE /v1/scores/:id` works, but a score
+  row `id` is not exposed anywhere: leaderboard entries carry only rank, player_id, name, score, at
+  and avatar, and there is no admin list route. So the stray "Smoke Test" row from D-028 still
+  cannot be removed without guessing an integer against live data, which risks deleting a real
+  score. This is a hole in the planner's D-046 contract, not in the worker's execution — the brief
+  specified delete-by-id and never asked how an id would be discovered. T28: expose the id to an
+  authenticated admin (an admin-only list route, or the id on board entries), then delete the row.
