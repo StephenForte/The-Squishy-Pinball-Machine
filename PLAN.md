@@ -48,7 +48,7 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T26 | Web export pipeline: reproducible build, browser-verified, three unknowns settled (D-045) | 9 | done 2026-09-21 (PR #38 → e36f055); hosted at https://the-squishy-pinball-machine.onrender.com | mid | T24, T25 |
 | T27 | Admin cleanup + per-IP limiting so a griefed board is repairable (D-046) | 9 | merged + **deployed live** 2026-09-21 (PR #36 → 3fc6560) | mid | T25 |
 | T28 | Admin score listing so a row can be found and deleted (D-047) | 9 | **done** 2026-09-21 — merged, deployed, Smoke Test row deleted | cheap | T27 |
-| T29 | Profile transfer: show this device’s player id, restore an existing identity by pasting it (D-048) | 10 | not started | cheap-mid | T20b |
+| T29 | Profile transfer: show this device’s player id, restore an existing identity by pasting it (D-048) | 10 | reviewed + approved 2026-09-20 (PR #39, efa1520) — awaiting merge | cheap-mid | T20b |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8 → T10 → T9 →
 **Phase 5:** T11 ∥ T12 → T11.1 (deploy) → T13.
@@ -933,3 +933,25 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   (`_handle_mouse_event` is the only touch entry point without the interactive-UI guard).
 - **Next:** the URL is now shareable. Open items are Natasha's play-test of the Phase 6/7 features
   and the iPad test; neither blocks anything already merged.
+- 2026-09-20: T29 (PR #39, efa1520, base 93b6c0d) reviewed in a scratch clone, deleted after. Scope
+  ✓ — exactly 6 files, no `server/**`, no planner docs. Gate re-run independently: **24 PASS**,
+  zero FAIL lines. **Approved, no blocking defects.**
+- 2026-09-20: What the review actually tested, since the suite has a deliberate blind spot —
+  `restore_profile` short-circuits on the runner sentinel, so no test exercises real HTTP.
+  (a) The field-name risk that would pass every test and fail 100% in production: live
+  `GET /v1/profile` returns exactly `player_id`, `name`, `avatar`, matching what `adopt_identity`
+  reads. (b) End-to-end restore against a local server on a private port in an isolated user dir —
+  real GET adopts, `players[key]` is overwritten, push count unchanged (no PUT-back), real 404
+  returns `not_found` without mutating identity. (c) The disabled-field lock path: `_on_http_watchdog`
+  always invokes the callback, so `restore_finished` cannot fail to fire. (d) Layout verified
+  numerically rather than visually — ThisDevice 986–1062 and RestoreProfile 1068–1144 sit in the gap
+  between ThemePicker (ends 980) and IconPicker (starts 1150), inside the 1280 viewport, no overlap.
+- **Footgun found while probing, pre-existing and untouched by T29:** calling `profile.set_name(...)`
+  on a **`Node`-typed** reference binds to the *native* `Node.set_name`, renaming `/root/Profile` to
+  `/root/<name>` so every later `get_node_or_null("/root/Profile")` returns null. A consequence of
+  D-027’s override, noted in `profile.gd`. It cost the planner one wrong bug diagnosis; any test or
+  probe that sets a name must type the reference as the Profile script or set the fields directly.
+- Planner error worth recording: the T29 brief enumerated the gate baseline as “16 other `*_test.gd`,
+  expect 22”. The measured baseline was 21 lines under a grep that excluded `quit-after-300` and
+  `boot-check`; the full runner reports 23 before this task and 24 after. The worker counted
+  correctly and was not misled, but the brief’s enumeration was wrong.
