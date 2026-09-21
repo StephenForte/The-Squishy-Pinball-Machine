@@ -11,6 +11,7 @@ import {
   getMe,
   getProfile,
   insertScore,
+  listScores,
   openDb,
   resetAll,
   storeLabel,
@@ -81,6 +82,9 @@ function isAdminOptionsPath(path) {
 }
 
 function matchAdminRoute(method, path) {
+  if (method === 'GET' && path === '/v1/admin/scores') {
+    return { action: 'list_scores' };
+  }
   if (method === 'DELETE') {
     const score = /^\/v1\/scores\/([^/]+)$/.exec(path);
     if (score) return { action: 'delete_score', id: score[1] };
@@ -259,6 +263,22 @@ async function handleAdmin(req, res, ctx, route) {
       return;
     }
     send(res, 200, { ok: true });
+    return;
+  }
+
+  if (route.action === 'list_scores') {
+    const url = new URL(req.url, 'http://localhost');
+    const playerIdRaw = url.searchParams.get('player_id');
+    let playerId = null;
+    if (playerIdRaw !== null) {
+      if (!isUuidV4(playerIdRaw)) {
+        send(res, 400, { error: 'invalid_player_id' });
+        return;
+      }
+      playerId = normalizePlayerId(playerIdRaw);
+    }
+    const limit = parseLimit(url.searchParams.get('limit'));
+    send(res, 200, listScores(ctx.db, { playerId, limit }));
     return;
   }
 

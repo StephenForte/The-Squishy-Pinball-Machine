@@ -181,6 +181,46 @@ export function upsertProfile(db, { player_id, name, avatar }) {
   return getProfile(db, player_id);
 }
 
+/**
+ * Raw score rows, newest first (created_at then id). `total` is the matching
+ * row count, not the page size — deletion targets a row, not a board entry.
+ */
+export function listScores(db, { playerId = null, limit } = {}) {
+  const count = playerId
+    ? db.prepare('SELECT COUNT(*) AS total FROM scores WHERE player_id = ?').get(playerId)
+    : db.prepare('SELECT COUNT(*) AS total FROM scores').get();
+  const stmt = playerId
+    ? db.prepare(
+        `
+        SELECT id, player_id, name, score, client, created_at
+        FROM scores
+        WHERE player_id = ?
+        ORDER BY created_at DESC, id DESC
+        LIMIT ?
+      `,
+      )
+    : db.prepare(
+        `
+        SELECT id, player_id, name, score, client, created_at
+        FROM scores
+        ORDER BY created_at DESC, id DESC
+        LIMIT ?
+      `,
+      );
+  const raw = playerId ? stmt.all(playerId, limit) : stmt.all(limit);
+  return {
+    rows: raw.map((row) => ({
+      id: Number(row.id),
+      player_id: row.player_id,
+      name: row.name,
+      score: Number(row.score),
+      client: row.client,
+      created_at: row.created_at,
+    })),
+    total: Number(count.total),
+  };
+}
+
 export function deleteScore(db, id) {
   const row = db.prepare('SELECT id FROM scores WHERE id = ?').get(id);
   if (!row) return false;

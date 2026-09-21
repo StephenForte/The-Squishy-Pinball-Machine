@@ -1,7 +1,7 @@
 # Squish leaderboard server
 
 Node 24 HTTP service for the shared leaderboard (D-026), cloud profiles (D-037),
-CORS for a browser build (D-044), and admin cleanup (D-046).
+CORS for a browser build (D-044), and admin cleanup (D-046 / D-047).
 Zero npm dependencies: `node:http` + `node:sqlite`. Schema and indexes are
 created on boot. `scores` is never altered; `profiles` is added with
 `CREATE TABLE IF NOT EXISTS`.
@@ -66,7 +66,7 @@ answer a preflight.
   a missing address shares one `unknown` bucket. This is a speed bump, not
   authorization — `X-Forwarded-For` is client-controlled on a direct connection.
 
-## Routes (D-026, amended by D-037, D-044, D-046)
+## Routes (D-026, amended by D-037, D-044, D-046, D-047)
 
 - `GET /` → HTML top-10 board (same data as `/v1/leaderboard`; `Cache-Control: no-store`). Each row's avatar is a same-origin `<img src="/avatars/<id>.png">` when set.
 - `GET /healthz` → `{ ok, store }` (`memory` when `DB_PATH=:memory:`, otherwise `sqlite`)
@@ -78,6 +78,7 @@ answer a preflight.
 - `GET /avatars/<id>.png` → catalogued art only (`image/png`, `Cache-Control: public, max-age=86400`). The id is looked up in `assets/design/squishes/squishies_catalog.json`; the file path comes from that entry, never from the URL segment. PNGs stay in the repo — they are not copied into `server/`.
 
 - `OPTIONS` on the public routes above → `204` when CORS applies (or without CORS headers for an unlisted origin).
+- `GET /v1/admin/scores` → `200` `{ rows, total }` (admin, D-047). Raw score rows, newest first (`created_at` then `id` as stored): `{ id, player_id, name, score, client, created_at }`. Optional `player_id` (uuid v4, else `400` `invalid_player_id`); optional `limit` uses the same 1..50 clamp as the public board. `total` is the matching row count, not the page size. This is how a delete target is found — the public board has no row `id`.
 - `DELETE /v1/scores/:id` → `200` `{ ok: true }` (admin). `404` if the row does not exist.
 - `DELETE /v1/profile/:player_id` → `200` `{ ok: true }` (admin). `404` unknown; `400` `invalid_player_id` for a malformed uuid. Scores for that player stay.
 - `POST /v1/admin/reset` → `200` `{ ok: true }` (admin). Body must include `"confirm":"RESET"` or the request is `400` `confirmation_required` and nothing is deleted.
