@@ -47,7 +47,7 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T25 | Server CORS: origin allowlist + OPTIONS preflight so a browser build can reach the board (D-044) | 9 | merged + **deployed live** 2026-09-21 (PR #36 → 3fc6560) | cheap-mid | — |
 | T26 | Web export pipeline: reproducible build, browser-verified, three unknowns settled (D-045) | 9 | brief on request; last — needs T24 and T25 merged | mid | T24, T25 |
 | T27 | Admin cleanup + per-IP limiting so a griefed board is repairable (D-046) | 9 | merged + **deployed live** 2026-09-21 (PR #36 → 3fc6560) | mid | T25 |
-| T28 | Admin score listing so a row can be found and deleted (D-047) | 9 | brief written 2026-09-21; ready to dispatch | cheap | T27 |
+| T28 | Admin score listing so a row can be found and deleted (D-047) | 9 | PR #37 approved 2026-09-21 (6841ece); awaiting merge + deploy | cheap | T27 |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8 → T10 → T9 →
 **Phase 5:** T11 ∥ T12 → T11.1 (deploy) → T13.
@@ -821,3 +821,15 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   answer **401** without a header and **401** with a wrong key, where they answered 404 before the
   key existed. The gate is working end to end in production. Board unchanged (Natasha and Dad tied
   on 14 300). T28 briefed to close the id-discovery gap.
+- 2026-09-21: T28 (PR #37, 6841ece, base 13a4758) reviewed in scratch clone. Scope ✓ server-only.
+  Server suite 66/28 → 74/29, Godot gate all suites PASS, CI green. 21 planner checks passed: blank
+  admin key → 404 byte-identical to an unknown admin path; no/wrong/WRITE key → 401; no CORS header
+  or preflight even from a listed origin while public routes still get theirs; **the full round trip
+  works** — list returns integer ids, DELETE accepts exactly those ids, the row disappears from both
+  the admin list and the public board; a 3-row player lists 3 rows while the board shows them once;
+  player_id filter, 400 on a bad uuid, limit paging with `total` as the match count, newest first.
+  **Falsified:** moving the route into the public dispatch ahead of the gate makes an
+  unauthenticated GET return 200 with every row — registering it inside `matchAdminRoute` is what
+  prevents that. The ADMIN_PATHS test change is a strengthening (new route joins the existing D-046
+  gate table; nothing removed). Approved. Planner deploys after merge, then removes the Smoke Test
+  row — that deletion is T28's acceptance test.
