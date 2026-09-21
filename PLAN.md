@@ -47,7 +47,7 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T25 | Server CORS: origin allowlist + OPTIONS preflight so a browser build can reach the board (D-044) | 9 | merged + **deployed live** 2026-09-21 (PR #36 → 3fc6560) | cheap-mid | — |
 | T26 | Web export pipeline: reproducible build, browser-verified, three unknowns settled (D-045) | 9 | brief on request; last — needs T24 and T25 merged | mid | T24, T25 |
 | T27 | Admin cleanup + per-IP limiting so a griefed board is repairable (D-046) | 9 | merged + **deployed live** 2026-09-21 (PR #36 → 3fc6560) | mid | T25 |
-| T28 | Admin score listing so a row can be found and deleted (D-047) | 9 | PR #37 approved 2026-09-21 (6841ece); awaiting merge + deploy | cheap | T27 |
+| T28 | Admin score listing so a row can be found and deleted (D-047) | 9 | merged + **deployed live** 2026-09-21 (PR #37 → 4d8e2c2); Smoke Test row awaits Steve's key | cheap | T27 |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8 → T10 → T9 →
 **Phase 5:** T11 ∥ T12 → T11.1 (deploy) → T13.
@@ -833,3 +833,10 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   prevents that. The ADMIN_PATHS test change is a strengthening (new route joins the existing D-046
   gate table; nothing removed). Approved. Planner deploys after merge, then removes the Smoke Test
   row — that deletion is T28's acceptance test.
+- 2026-09-21: T28 deployed and smoke-checked (see the D-028 deploy record). The list route is live
+  and gated in production: 401 with no header, a wrong key, or the write key; no CORS header.
+  **The Smoke Test row is still there** — deleting it needs the admin key, which only Steve holds,
+  so the planner tested the exact cleanup pipeline against a throwaway local server instead
+  (seeded Smoke Test + Natasha → list → match by name → delete by id → board down to Natasha only)
+  and handed Steve a single ready-to-paste command that prompts for the key, matches on the name
+  rather than a typed id, and therefore cannot delete the wrong row. Phase 9 now has only T26 left.
