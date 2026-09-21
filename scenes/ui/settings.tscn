@@ -46,3 +46,130 @@ text = "Close"
 [node name="ThemePicker" parent="." instance=ExtResource("2_theme")]
 
 [node name="IconPicker" parent="." instance=ExtResource("3_icon")]
+
+[node name="ThisDevice" type="Control" parent="."]
+layout_mode = 0
+offset_left = 80.0
+offset_top = 986.0
+offset_right = 640.0
+offset_bottom = 1062.0
+mouse_filter = 0
+
+[node name="Caption" type="Label" parent="ThisDevice"]
+layout_mode = 0
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 200.0
+offset_bottom = 20.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 0.92, 0.35, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 4
+theme_override_font_sizes/font_size = 16
+text = "This device"
+vertical_alignment = 1
+
+[node name="NameLabel" type="Label" parent="ThisDevice"]
+layout_mode = 0
+offset_left = 210.0
+offset_top = 0.0
+offset_right = 560.0
+offset_bottom = 20.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 4
+theme_override_font_sizes/font_size = 16
+horizontal_alignment = 2
+vertical_alignment = 1
+
+[node name="ShowCodeToggle" type="Button" parent="ThisDevice"]
+layout_mode = 0
+offset_left = 0.0
+offset_top = 22.0
+offset_right = 280.0
+offset_bottom = 48.0
+focus_mode = 0
+theme_override_font_sizes/font_size = 16
+text = "Show transfer code"
+
+[node name="CodeLabel" type="Label" parent="ThisDevice"]
+visible = false
+layout_mode = 0
+offset_left = 0.0
+offset_top = 50.0
+offset_right = 400.0
+offset_bottom = 74.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 4
+theme_override_font_sizes/font_size = 14
+vertical_alignment = 1
+
+[node name="CopyButton" type="Button" parent="ThisDevice"]
+visible = false
+layout_mode = 0
+offset_left = 410.0
+offset_top = 50.0
+offset_right = 560.0
+offset_bottom = 74.0
+focus_mode = 0
+theme_override_font_sizes/font_size = 16
+text = "Copy"
+
+[node name="RestoreProfile" type="Control" parent="."]
+layout_mode = 0
+offset_left = 80.0
+offset_top = 1068.0
+offset_right = 640.0
+offset_bottom = 1144.0
+mouse_filter = 0
+
+[node name="Caption" type="Label" parent="RestoreProfile"]
+layout_mode = 0
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 560.0
+offset_bottom = 18.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 0.92, 0.35, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 4
+theme_override_font_sizes/font_size = 16
+text = "Restore profile"
+vertical_alignment = 1
+
+[node name="CodeEdit" type="LineEdit" parent="RestoreProfile"]
+layout_mode = 0
+offset_left = 0.0
+offset_top = 20.0
+offset_right = 400.0
+offset_bottom = 48.0
+focus_mode = 1
+theme_override_font_sizes/font_size = 14
+placeholder_text = "paste transfer code"
+max_length = 40
+
+[node name="RestoreButton" type="Button" parent="RestoreProfile"]
+layout_mode = 0
+offset_left = 410.0
+offset_top = 20.0
+offset_right = 560.0
+offset_bottom = 48.0
+focus_mode = 0
+theme_override_font_sizes/font_size = 16
+text = "Restore"
+
+[node name="StatusLabel" type="Label" parent="RestoreProfile"]
+layout_mode = 0
+offset_left = 0.0
+offset_top = 50.0
+offset_right = 560.0
+offset_bottom = 74.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 4
+theme_override_font_sizes/font_size = 14
+vertical_alignment = 1
