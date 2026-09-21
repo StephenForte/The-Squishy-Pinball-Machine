@@ -58,6 +58,15 @@ menu={
 ]
 }
 
+[rendering]
+
+; Required by the Web preset when vram_texture_compression/for_mobile is on
+; (EditorExportPlatformWeb::has_valid_project_configuration). Without it Godot
+; refuses to export. iPad browsers need ETC2/ASTC; Chromebooks use S3TC/BPTC
+; from the desktop flag. Desktop play is unchanged — this only adds a second
+; imported compression variant (T26 / D-045).
+textures/vram_compression/import_etc2_astc=true
+
 [physics]
 
 common/physics_ticks_per_second=120
