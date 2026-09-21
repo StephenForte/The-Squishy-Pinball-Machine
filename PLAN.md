@@ -48,6 +48,7 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T26 | Web export pipeline: reproducible build, browser-verified, three unknowns settled (D-045) | 9 | done 2026-09-21 (PR #38 → e36f055); hosted at https://the-squishy-pinball-machine.onrender.com | mid | T24, T25 |
 | T27 | Admin cleanup + per-IP limiting so a griefed board is repairable (D-046) | 9 | merged + **deployed live** 2026-09-21 (PR #36 → 3fc6560) | mid | T25 |
 | T28 | Admin score listing so a row can be found and deleted (D-047) | 9 | **done** 2026-09-21 — merged, deployed, Smoke Test row deleted | cheap | T27 |
+| T29 | Profile transfer: show this device’s player id, restore an existing identity by pasting it (D-048) | 10 | not started | cheap-mid | T20b |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8 → T10 → T9 →
 **Phase 5:** T11 ∥ T12 → T11.1 (deploy) → T13.
@@ -330,6 +331,23 @@ Contract D-047. Owns `server/**` only. Verified before designing: board entries 
 (`['at','avatar','name','player_id','rank','score']` from the live service) and `grep` finds no
 admin list route. Small, but it sits on the admin boundary, so every D-046 gate case is re-asserted.
 Planner deploys after merge, then removes the Smoke Test row — which is the acceptance test.
+
+### T29 — Profile transfer by player id (production finding, 2026-09-20)
+Contract D-048. Found in production, not in review: the hour the web build went live it produced a
+**second "Dad"** on the board (`6a7a41f5…` 7600 beside `b8aa808f…` 14300). Verified before
+designing, so the worker does not re-derive it: `autoload/profile.gd:40-46` keys identity off
+`players[name_key] → uuid` in `user://profile.save`; `server/src/index.js:461` keys
+`GET /v1/profile` **by** `player_id`; `autoload/leaderboard.gd:70` already has
+`fetch_profile(player_id, from_boot)`; and `grep` finds no id display or restore anywhere in
+`scripts/ui/`. So cloud sync can restore a name and avatar for an id you hold and can never
+recover the id — a new device is permanently a new player.
+Owns `autoload/profile.gd`, `autoload/leaderboard.gd`, `scripts/ui/settings.gd`,
+`scenes/ui/settings.tscn` and a new `tests/profile_transfer_test.gd`. **No server change** — the
+route it needs already exists and shipped.
+The trap is the existing reconcilers: `_adopt_cloud_avatar_if_local_empty` and both
+`_reconcile_boot_*` guard on `data.player_id == profile.player_id`, so a fetch for an id the device
+does **not** yet hold is silently ignored by all three. Restore therefore needs its own callback,
+not a reuse of `_on_fetch_profile_finished`’s adopt path.
 
 ### T24 — Touch controls (Steve, 2026-09-19)
 Contract D-043. Critical path for both target devices. Measured before designing: zero touch or
