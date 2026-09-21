@@ -859,8 +859,25 @@ Contract for T26, which is dispatched only once T24 and T25 are merged.
   clean checkout. A build nobody else can reproduce is not a pipeline.
 - The export must be verified by actually loading it in a browser and playing a ball with touch —
   not by the exporter exiting zero.
-- Settle the three unknowns D-042 lists and record the answers here: threading and cross-origin
-  isolation headers, `Crypto` behaviour in the browser, and audio before the first gesture.
+- **The three unknowns are settled (T26, verified twice — worker in Chromium, planner in a second
+  browser):** (1) **No cross-origin isolation headers are needed.** The build runs with
+  `crossOriginIsolated === false` and `SharedArrayBuffer === undefined`, served by a plain
+  `python3 -m http.server`; the preset disables threads and `export_web_test` case 2 asserts that.
+  The host therefore needs no COOP/COEP. (2) **`Crypto.generate_random_bytes` works in the
+  browser** — a new name minted an identity and survived a reload with its high score, so D-031's
+  UUIDs are safe on web. (3) **Audio is fine before the first gesture** because the title plays
+  nothing; the first sound is a flipper or bumper after the player has already clicked, so no
+  autoplay warning appears.
+- **As built (T26):** `tools/export_web.sh` generates the gitignored preset and exports to
+  `export/web/`; output is reproducible byte-for-byte from a clean clone (index.wasm 39 514 754,
+  index.pck 6 059 924, 44 MB). `project.godot` gained
+  `rendering/textures/vram_compression/import_etc2_astc=true`, which Godot 4.7.2 requires before
+  it will export Web with mobile VRAM; desktop play is unaffected. Missing templates fail the
+  export closed with a message naming the zip, asserted adversarially by `export_web_test` case 3.
+- **Known and harmless:** a hidden browser tab gives WebGL a zero-size framebuffer and Godot
+  emits a burst of `GL_INVALID_FRAMEBUFFER_OPERATION` warnings until the browser silences them.
+  Observed at the T26 review with `document.visibilityState === 'hidden'`; once visible, ten
+  seconds produced none. Do not chase it as a rendering bug.
 - `user://` becomes browser storage, so profile, high scores, settings and app icon are per-browser
   and vanish when site data is cleared. That is acceptable for the family build, and it is exactly
   why the cloud profile (D-037) exists — but it must be stated in the README so nobody is surprised.
