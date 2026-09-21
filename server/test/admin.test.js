@@ -18,10 +18,13 @@ const ADMIN_KEY = 'admin-secret';
 const ORIGIN = 'https://play.example';
 
 const ADMIN_PATHS = [
+  ['GET', '/v1/admin/scores'],
   ['DELETE', '/v1/scores/1'],
   ['DELETE', `/v1/profile/${NATASHA}`],
   ['POST', '/v1/admin/reset'],
 ];
+
+const ROW_KEYS = ['client', 'created_at', 'id', 'name', 'player_id', 'score'];
 
 function corsNames(headers) {
   return [...headers.keys()].filter((name) => name.startsWith('access-control-'));
@@ -289,7 +292,241 @@ describe('admin routes are excluded from CORS', () => {
       });
       assert.equal(preflightReset.status, 404);
       assert.equal(corsNames(preflightReset.headers).length, 0);
+
+      const preflightList = await request(port, 'OPTIONS', '/v1/admin/scores', {
+        headers: { Origin: ORIGIN },
+      });
+      assert.equal(preflightList.status, 404);
+      assert.equal(corsNames(preflightList.headers).length, 0);
     }, { adminKey: ADMIN_KEY, allowedOrigins: [ORIGIN] });
+  });
+});
+
+describe('GET /v1/admin/scores (D-047)', () => {
+  it('blank admin key → GET /v1/admin/scores 404, indistinguishable from an unknown path', async () => {
+    await withServer(async ({ port }) => {
+      await postScore(port, { player_id: NATASHA, name: 'Natasha', score: 14300 });
+
+      const unknown = await request(port, 'GET', '/v1/admin/does-not-exist');
+      const noHeader = await request(port, 'GET', '/v1/admin/scores');
+      const withHeader = await request(port, 'GET', '/v1/admin/scores', {
+        headers: { 'X-Squish-Admin': ADMIN_KEY },
+      });
+      const writeAsAdmin = await request(port, 'GET', '/v1/admin/scores', {
+        headers: { 'X-Squish-Admin': WRITE_KEY },
+      });
+
+      for (const res of [unknown, noHeader, withHeader, writeAsAdmin]) {
+        assert.equal(res.status, 404);
+        assert.equal(res.json.error, 'not_found');
+        assert.equal(res.headers.get('access-control-allow-origin'), null);
+      }
+    });
+  });
+
+  it('key set: no header, wrong key, and the write key in X-Squish-Admin are 401', async () => {
+    await withServer(async ({ port }) => {
+      const missing = await request(port, 'GET', '/v1/admin/scores');
+      const wrong = await request(port, 'GET', '/v1/admin/scores', {
+        headers: { 'X-Squish-Admin': 'nope' },
+      });
+      const writeKey = await request(port, 'GET', '/v1/admin/scores', {
+        headers: { 'X-Squish-Admin': WRITE_KEY },
+      });
+      for (const res of [missing, wrong, writeKey]) {
+        assert.equal(res.status, 401);
+        assert.equal(res.json.error, 'unauthorized');
+      }
+    }, { adminKey: ADMIN_KEY });
+  });
+
+  it('lists every raw row with its id; those ids are the ones DELETE /v1/scores/:id accepts', async () => {
+    await withServer(async ({ port }) => {
+      await postScore(port, { player_id: NATASHA, name: 'Natasha', score: 14300 });
+      await postScore(port, { player_id: STEVE, name: 'Dad', score: 14300 });
+      await postScore(port, { player_id: PIP, name: 'Smoke Test', score: 1, client: 'squish/test' });
+
+      const listed = await request(port, 'GET', '/v1/admin/scores', {
+        headers: { 'X-Squish-Admin': ADMIN_KEY },
+      });
+      assert.equal(listed.status, 200);
+      assert.equal(listed.json.total, 3);
+      assert.equal(listed.json.rows.length, 3);
+      for (const row of listed.json.rows) {
+        assert.deepEqual(Object.keys(row).sort(), ROW_KEYS);
+        assert.equal(typeof row.id, 'number');
+        assert.equal(typeof row.created_at, 'string');
+      }
+
+      const smoke = listed.json.rows.find((row) => row.name === 'Smoke Test');
+      assert.ok(smoke);
+      assert.equal(smoke.player_id, PIP);
+      assert.equal(smoke.score, 1);
+      assert.equal(smoke.client, 'squish/test');
+
+      const deleted = await request(port, 'DELETE', `/v1/scores/${smoke.id}`, {
+        headers: { 'X-Squish-Admin': ADMIN_KEY },
+      });
+      assert.equal(deleted.status, 200);
+      assert.deepEqual(deleted.json, { ok: true });
+
+      const again = await request(port, 'GET', '/v1/admin/scores', {
+        headers: { 'X-Squish-Admin': ADMIN_KEY },
+      });
+      assert.equal(again.status, 200);
+      assert.equal(again.json.total, 2);
+      assert.equal(again.json.rows.length, 2);
+      assert.equal(again.json.rows.some((row) => row.id === smoke.id), false);
+      assert.equal(again.json.rows.some((row) => row.name === 'Smoke Test'), false);
+    }, { adminKey: ADMIN_KEY });
+  });
+
+  it('returns newest first, and total is the row count rather than the page size', async () => {
+    await withServer(async ({ port }) => {
+      await postScore(port, { player_id: NATASHA, name: 'First', score: 1 });
+      await postScore(port, { player_id: STEVE, name: 'Second', score: 2 });
+      await postScore(port, { player_id: PIP, name: 'Third', score: 3 });
+
+      const page = await request(port, 'GET', '/v1/admin/scores?limit=2', {
+        headers: { 'X-Squish-Admin': ADMIN_KEY },
+      });
+      assert.equal(page.status, 200);
+      assert.equal(page.json.total, 3);
+      assert.equal(page.json.rows.length, 2);
+      assert.equal(page.json.rows[0].name, 'Third');
+      assert.equal(page.json.rows[1].name, 'Second');
+      assert.ok(page.json.rows[0].id > page.json.rows[1].id);
+      assert.ok(page.json.rows[0].created_at >= page.json.rows[1].created_at);
+    }, { adminKey: ADMIN_KEY });
+  });
+
+  it('player_id filters to that player; a malformed uuid is 400 invalid_player_id', async () => {
+    await withServer(async ({ port }) => {
+      await postScore(port, { player_id: NATASHA, name: 'Natasha', score: 100 });
+      await postScore(port, { player_id: NATASHA, name: 'Natasha', score: 200 });
+      await postScore(port, { player_id: STEVE, name: 'Dad', score: 300 });
+
+      const filtered = await request(port, 'GET', `/v1/admin/scores?player_id=${NATASHA}`, {
+        headers: { 'X-Squish-Admin': ADMIN_KEY },
+      });
+      assert.equal(filtered.status, 200);
+      assert.equal(filtered.json.total, 2);
+      assert.equal(filtered.json.rows.length, 2);
+      assert.ok(filtered.json.rows.every((row) => row.player_id === NATASHA));
+
+      const upper = await request(port, 'GET', `/v1/admin/scores?player_id=${NATASHA.toUpperCase()}`, {
+        headers: { 'X-Squish-Admin': ADMIN_KEY },
+      });
+      assert.equal(upper.status, 200);
+      assert.equal(upper.json.total, 2);
+
+      const bad = await request(port, 'GET', '/v1/admin/scores?player_id=not-a-uuid', {
+        headers: { 'X-Squish-Admin': ADMIN_KEY },
+      });
+      assert.equal(bad.status, 400);
+      assert.equal(bad.json.error, 'invalid_player_id');
+
+      const notV4 = await request(
+        port,
+        'GET',
+        '/v1/admin/scores?player_id=11111111-1111-1111-8111-111111111111',
+        { headers: { 'X-Squish-Admin': ADMIN_KEY } },
+      );
+      assert.equal(notV4.status, 400);
+      assert.equal(notV4.json.error, 'invalid_player_id');
+    }, { adminKey: ADMIN_KEY });
+  });
+
+  it('limit clamps via the existing parseLimit, including values below and above its bounds', async () => {
+    await withServer(async ({ port }) => {
+      for (let i = 0; i < 51; i += 1) {
+        const posted = await postScore(port, { player_id: NATASHA, name: 'N', score: i });
+        assert.equal(posted.status, 201);
+      }
+
+      const below = await request(port, 'GET', '/v1/admin/scores?limit=0', {
+        headers: { 'X-Squish-Admin': ADMIN_KEY },
+      });
+      assert.equal(below.status, 200);
+      assert.equal(below.json.rows.length, 1);
+      assert.equal(below.json.total, 51);
+
+      const above = await request(port, 'GET', '/v1/admin/scores?limit=100', {
+        headers: { 'X-Squish-Admin': ADMIN_KEY },
+      });
+      assert.equal(above.status, 200);
+      assert.equal(above.json.rows.length, 50);
+      assert.equal(above.json.total, 51);
+
+      const omitted = await request(port, 'GET', '/v1/admin/scores', {
+        headers: { 'X-Squish-Admin': ADMIN_KEY },
+      });
+      assert.equal(omitted.json.rows.length, 10);
+      assert.equal(omitted.json.total, 51);
+    }, {
+      adminKey: ADMIN_KEY,
+      limiter: { allow: () => true },
+      ipLimiter: { allow: () => true },
+    });
+  });
+
+  it('never sends a CORS header, even from a listed origin, and answers no preflight', async () => {
+    await withServer(async ({ port }) => {
+      await postScore(port, { player_id: NATASHA, name: 'Natasha', score: 100 });
+
+      const listed = await request(port, 'GET', '/v1/admin/scores', {
+        headers: { Origin: ORIGIN, 'X-Squish-Admin': ADMIN_KEY },
+      });
+      assert.equal(listed.status, 200);
+      assert.equal(listed.headers.get('access-control-allow-origin'), null);
+      assert.equal(corsNames(listed.headers).length, 0);
+
+      const preflight = await request(port, 'OPTIONS', '/v1/admin/scores', {
+        headers: {
+          Origin: ORIGIN,
+          'Access-Control-Request-Method': 'GET',
+          'Access-Control-Request-Headers': 'X-Squish-Admin',
+        },
+      });
+      assert.equal(preflight.status, 404);
+      assert.equal(preflight.json.error, 'not_found');
+      assert.equal(corsNames(preflight.headers).length, 0);
+    }, { adminKey: ADMIN_KEY, allowedOrigins: [ORIGIN] });
+  });
+
+  it('a player with several score rows lists all of them; the board still shows only their best', async () => {
+    await withServer(async ({ port }) => {
+      await postScore(port, { player_id: NATASHA, name: 'Natasha', score: 100 });
+      await postScore(port, { player_id: NATASHA, name: 'Natasha', score: 500 });
+      await postScore(port, { player_id: NATASHA, name: 'Natasha', score: 50 });
+      await postScore(port, { player_id: STEVE, name: 'Dad', score: 200 });
+
+      const listed = await request(port, 'GET', '/v1/admin/scores', {
+        headers: { 'X-Squish-Admin': ADMIN_KEY },
+      });
+      assert.equal(listed.status, 200);
+      assert.equal(listed.json.total, 4);
+      assert.equal(listed.json.rows.length, 4);
+      const natashaRows = listed.json.rows.filter((row) => row.player_id === NATASHA);
+      assert.equal(natashaRows.length, 3);
+      assert.deepEqual(natashaRows.map((row) => row.score).sort((a, b) => a - b), [50, 100, 500]);
+
+      const board = await request(port, 'GET', '/v1/leaderboard');
+      assert.equal(board.status, 200);
+      assert.equal(board.json.total_players, 2);
+      assert.equal(board.json.entries.length, 2);
+      const natashaBoard = board.json.entries.find((entry) => entry.player_id === NATASHA);
+      assert.equal(natashaBoard.score, 500);
+      assert.deepEqual(Object.keys(natashaBoard).sort(), [
+        'at',
+        'avatar',
+        'name',
+        'player_id',
+        'rank',
+        'score',
+      ]);
+      assert.equal(Object.hasOwn(natashaBoard, 'id'), false);
+    }, { adminKey: ADMIN_KEY });
   });
 });
 
