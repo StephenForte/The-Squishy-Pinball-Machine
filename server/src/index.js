@@ -3,13 +3,109 @@ import { existsSync, readFileSync } from 'node:fs';
 import http from 'node:http';
 import { pathToFileURL } from 'node:url';
 import { createCatalog } from './catalog.js';
-import { closeDb, getLeaderboard, getMe, getProfile, insertScore, openDb, storeLabel, upsertProfile } from './db.js';
+import {
+  closeDb,
+  deleteProfile,
+  deleteScore,
+  getLeaderboard,
+  getMe,
+  getProfile,
+  insertScore,
+  openDb,
+  resetAll,
+  storeLabel,
+  upsertProfile,
+} from './db.js';
 import { renderBoard } from './page.js';
 import { isUuidV4, normalizePlayerId, parseLimit, parseProfileBody, parseScoreBody } from './validate.js';
 
 const BODY_LIMIT = 4096;
 const RATE_WINDOW_MS = 60_000;
 const RATE_MAX = 30;
+/** Per-IP write ceiling (D-046). Wider than per-player so two people on one NAT can each post. */
+const IP_RATE_WINDOW_MS = 60_000;
+const IP_RATE_MAX = 60;
+const RESET_CONFIRM = 'RESET';
+
+const PUBLIC_CORS_PATHS = new Set([
+  '/',
+  '/healthz',
+  '/v1/scores',
+  '/v1/leaderboard',
+  '/v1/leaderboard/me',
+  '/v1/profile',
+]);
+
+export function parseAllowedOrigins(raw) {
+  const parts = Array.isArray(raw)
+    ? raw
+    : typeof raw === 'string'
+      ? raw.split(',')
+      : [];
+  return parts
+    .map((s) => (typeof s === 'string' ? s.trim() : ''))
+    .filter((s) => s !== '' && s !== '*');
+}
+
+export function originAllowed(origin, allowed) {
+  if (typeof origin !== 'string' || origin === '' || origin === '*') return false;
+  if (!Array.isArray(allowed) || allowed.length === 0) return false;
+  return allowed.includes(origin);
+}
+
+export function clientAddress(req, addressFor) {
+  if (typeof addressFor === 'function') {
+    const injected = addressFor(req);
+    if (typeof injected === 'string' && injected !== '') return injected;
+    return 'unknown';
+  }
+  const xff = req.headers['x-forwarded-for'];
+  if (typeof xff === 'string') {
+    const left = xff.split(',')[0].trim();
+    if (left) return left;
+  }
+  const addr = req.socket && req.socket.remoteAddress;
+  if (typeof addr === 'string' && addr !== '') return addr;
+  return 'unknown';
+}
+
+function isPublicCorsPath(path) {
+  return PUBLIC_CORS_PATHS.has(path) || path.startsWith('/avatars/');
+}
+
+function isAdminOptionsPath(path) {
+  if (path === '/v1/admin/reset' || path.startsWith('/v1/admin/')) return true;
+  if (/^\/v1\/scores\/[^/]+$/.test(path)) return true;
+  if (/^\/v1\/profile\/[^/]+$/.test(path)) return true;
+  return false;
+}
+
+function matchAdminRoute(method, path) {
+  if (method === 'DELETE') {
+    const score = /^\/v1\/scores\/([^/]+)$/.exec(path);
+    if (score) return { action: 'delete_score', id: score[1] };
+    const profile = /^\/v1\/profile\/([^/]+)$/.exec(path);
+    if (profile) return { action: 'delete_profile', playerId: profile[1] };
+  }
+  if (method === 'POST' && path === '/v1/admin/reset') {
+    return { action: 'reset' };
+  }
+  return null;
+}
+
+function corsHeaders(req, allowedOrigins, { preflight = false } = {}) {
+  const origin = req.headers.origin;
+  if (!originAllowed(origin, allowedOrigins)) return {};
+  const headers = {
+    'access-control-allow-origin': origin,
+    vary: 'Origin',
+  };
+  if (preflight) {
+    headers['access-control-allow-methods'] = 'GET, POST, PUT';
+    headers['access-control-allow-headers'] = 'Content-Type, X-Squish-Key';
+  }
+  return headers;
+}
 
 export function createRateLimiter({ windowMs = RATE_WINDOW_MS, max = RATE_MAX } = {}) {
   const hits = new Map();
@@ -40,31 +136,42 @@ function keysMatch(provided, expected) {
   return timingSafeEqual(a, b);
 }
 
-function send(res, status, body) {
+function send(res, status, body, extraHeaders = {}) {
   const payload = JSON.stringify(body);
   res.writeHead(status, {
     'content-type': 'application/json; charset=utf-8',
     'content-length': Buffer.byteLength(payload),
+    ...extraHeaders,
   });
   res.end(payload);
 }
 
-function sendHtml(res, status, html) {
+function sendHtml(res, status, html, extraHeaders = {}) {
   res.writeHead(status, {
     'content-type': 'text/html; charset=utf-8',
     'cache-control': 'no-store',
     'content-length': Buffer.byteLength(html),
+    ...extraHeaders,
   });
   res.end(html);
 }
 
-function sendPng(res, data) {
+function sendPng(res, data, extraHeaders = {}) {
   res.writeHead(200, {
     'content-type': 'image/png',
     'cache-control': 'public, max-age=86400',
     'content-length': data.length,
+    ...extraHeaders,
   });
   res.end(data);
+}
+
+function sendEmpty(res, status, extraHeaders = {}) {
+  res.writeHead(status, {
+    'content-length': 0,
+    ...extraHeaders,
+  });
+  res.end();
 }
 
 function readBody(req, limit = BODY_LIMIT) {
@@ -112,26 +219,50 @@ function readBody(req, limit = BODY_LIMIT) {
   });
 }
 
-async function handle(req, res, ctx) {
-  const url = new URL(req.url, 'http://localhost');
-  const path = url.pathname;
+function allowWrite(req, ctx, playerId) {
+  if (!ctx.limiter.allow(playerId)) return false;
+  const addr = clientAddress(req, ctx.addressFor);
+  return ctx.ipLimiter.allow(addr);
+}
 
-  if (req.method === 'GET' && path === '/') {
-    sendHtml(res, 200, renderBoard(getLeaderboard(ctx.db, 10)));
+async function handleAdmin(req, res, ctx, route) {
+  if (!ctx.adminKey) {
+    send(res, 404, { error: 'not_found' });
+    return;
+  }
+  if (!keysMatch(req.headers['x-squish-admin'], ctx.adminKey)) {
+    send(res, 401, { error: 'unauthorized' });
     return;
   }
 
-  if (req.method === 'GET' && path === '/healthz') {
-    send(res, 200, { ok: true, store: ctx.store });
-    return;
-  }
-
-  if (req.method === 'POST' && path === '/v1/scores') {
-    if (!keysMatch(req.headers['x-squish-key'], ctx.key)) {
-      send(res, 401, { error: 'unauthorized' });
+  if (route.action === 'delete_score') {
+    const id = Number(route.id);
+    if (!Number.isInteger(id) || id < 1 || String(id) !== route.id) {
+      send(res, 404, { error: 'not_found' });
       return;
     }
+    if (!deleteScore(ctx.db, id)) {
+      send(res, 404, { error: 'not_found' });
+      return;
+    }
+    send(res, 200, { ok: true });
+    return;
+  }
 
+  if (route.action === 'delete_profile') {
+    if (!isUuidV4(route.playerId)) {
+      send(res, 400, { error: 'invalid_player_id' });
+      return;
+    }
+    if (!deleteProfile(ctx.db, normalizePlayerId(route.playerId))) {
+      send(res, 404, { error: 'not_found' });
+      return;
+    }
+    send(res, 200, { ok: true });
+    return;
+  }
+
+  if (route.action === 'reset') {
     let raw;
     try {
       raw = await readBody(req);
@@ -152,46 +283,122 @@ async function handle(req, res, ctx) {
       return;
     }
 
-    const parsed = parseScoreBody(body);
-    if (!parsed.ok) {
-      send(res, 400, { error: parsed.error });
+    if (
+      body === null ||
+      typeof body !== 'object' ||
+      Array.isArray(body) ||
+      body.confirm !== RESET_CONFIRM
+    ) {
+      send(res, 400, { error: 'confirmation_required' });
       return;
     }
 
-    if (!ctx.limiter.allow(parsed.value.player_id)) {
-      send(res, 429, { error: 'rate_limited' });
+    resetAll(ctx.db);
+    send(res, 200, { ok: true });
+  }
+}
+
+async function handle(req, res, ctx) {
+  const url = new URL(req.url, 'http://localhost');
+  const path = url.pathname;
+  const admin = matchAdminRoute(req.method, path);
+
+  if (req.method === 'OPTIONS') {
+    if (isAdminOptionsPath(path)) {
+      send(res, 404, { error: 'not_found' });
+      return;
+    }
+    if (isPublicCorsPath(path)) {
+      sendEmpty(res, 204, corsHeaders(req, ctx.allowedOrigins, { preflight: true }));
+      return;
+    }
+    send(res, 404, { error: 'not_found' });
+    return;
+  }
+
+  if (admin) {
+    await handleAdmin(req, res, ctx, admin);
+    return;
+  }
+
+  const cors = corsHeaders(req, ctx.allowedOrigins);
+
+  if (req.method === 'GET' && path === '/') {
+    sendHtml(res, 200, renderBoard(getLeaderboard(ctx.db, 10)), cors);
+    return;
+  }
+
+  if (req.method === 'GET' && path === '/healthz') {
+    send(res, 200, { ok: true, store: ctx.store }, cors);
+    return;
+  }
+
+  if (req.method === 'POST' && path === '/v1/scores') {
+    if (!keysMatch(req.headers['x-squish-key'], ctx.key)) {
+      send(res, 401, { error: 'unauthorized' }, cors);
+      return;
+    }
+
+    let raw;
+    try {
+      raw = await readBody(req);
+    } catch (err) {
+      if (err.code === 'body_too_large') {
+        send(res, 400, { error: 'body_too_large' }, cors);
+        return;
+      }
+      send(res, 400, { error: 'invalid_json' }, cors);
+      return;
+    }
+
+    let body;
+    try {
+      body = JSON.parse(raw.toString('utf8'));
+    } catch {
+      send(res, 400, { error: 'invalid_json' }, cors);
+      return;
+    }
+
+    const parsed = parseScoreBody(body);
+    if (!parsed.ok) {
+      send(res, 400, { error: parsed.error }, cors);
+      return;
+    }
+
+    if (!allowWrite(req, ctx, parsed.value.player_id)) {
+      send(res, 429, { error: 'rate_limited' }, cors);
       return;
     }
 
     const result = insertScore(ctx.db, parsed.value);
-    send(res, 201, result);
+    send(res, 201, result, cors);
     return;
   }
 
   if (req.method === 'GET' && path === '/v1/leaderboard') {
     const limit = parseLimit(url.searchParams.get('limit'));
-    send(res, 200, getLeaderboard(ctx.db, limit));
+    send(res, 200, getLeaderboard(ctx.db, limit), cors);
     return;
   }
 
   if (req.method === 'GET' && path === '/v1/leaderboard/me') {
     const playerId = url.searchParams.get('player_id');
     if (!isUuidV4(playerId)) {
-      send(res, 400, { error: 'invalid_player_id' });
+      send(res, 400, { error: 'invalid_player_id' }, cors);
       return;
     }
     const me = getMe(ctx.db, normalizePlayerId(playerId));
     if (!me) {
-      send(res, 404, { error: 'unknown_player' });
+      send(res, 404, { error: 'unknown_player' }, cors);
       return;
     }
-    send(res, 200, me);
+    send(res, 200, me, cors);
     return;
   }
 
   if (req.method === 'PUT' && path === '/v1/profile') {
     if (!keysMatch(req.headers['x-squish-key'], ctx.key)) {
-      send(res, 401, { error: 'unauthorized' });
+      send(res, 401, { error: 'unauthorized' }, cors);
       return;
     }
 
@@ -200,10 +407,10 @@ async function handle(req, res, ctx) {
       raw = await readBody(req);
     } catch (err) {
       if (err.code === 'body_too_large') {
-        send(res, 400, { error: 'body_too_large' });
+        send(res, 400, { error: 'body_too_large' }, cors);
         return;
       }
-      send(res, 400, { error: 'invalid_json' });
+      send(res, 400, { error: 'invalid_json' }, cors);
       return;
     }
 
@@ -211,78 +418,96 @@ async function handle(req, res, ctx) {
     try {
       body = JSON.parse(raw.toString('utf8'));
     } catch {
-      send(res, 400, { error: 'invalid_json' });
+      send(res, 400, { error: 'invalid_json' }, cors);
       return;
     }
 
     const parsed = parseProfileBody(body, (id) => ctx.catalog.has(id));
     if (!parsed.ok) {
-      send(res, 400, { error: parsed.error });
+      send(res, 400, { error: parsed.error }, cors);
       return;
     }
 
-    if (!ctx.limiter.allow(parsed.value.player_id)) {
-      send(res, 429, { error: 'rate_limited' });
+    if (!allowWrite(req, ctx, parsed.value.player_id)) {
+      send(res, 429, { error: 'rate_limited' }, cors);
       return;
     }
 
     const result = upsertProfile(ctx.db, parsed.value);
-    send(res, 200, result);
+    send(res, 200, result, cors);
     return;
   }
 
   if (req.method === 'GET' && path === '/v1/profile') {
     const playerId = url.searchParams.get('player_id');
     if (!isUuidV4(playerId)) {
-      send(res, 400, { error: 'invalid_player_id' });
+      send(res, 400, { error: 'invalid_player_id' }, cors);
       return;
     }
     const profile = getProfile(ctx.db, normalizePlayerId(playerId));
     if (!profile) {
-      send(res, 404, { error: 'unknown_profile' });
+      send(res, 404, { error: 'unknown_profile' }, cors);
       return;
     }
-    send(res, 200, profile);
+    send(res, 200, profile, cors);
     return;
   }
 
   if (req.method === 'GET' && path.startsWith('/avatars/')) {
     const match = /^\/avatars\/([^/]+)\.png$/.exec(path);
     if (!match) {
-      send(res, 404, { error: 'not_found' });
+      send(res, 404, { error: 'not_found' }, cors);
       return;
     }
     const id = match[1];
     if (!ctx.catalog.has(id)) {
-      send(res, 404, { error: 'not_found' });
+      send(res, 404, { error: 'not_found' }, cors);
       return;
     }
     const filePath = ctx.catalog.pathFor(id);
     if (!filePath || !existsSync(filePath)) {
-      send(res, 404, { error: 'not_found' });
+      send(res, 404, { error: 'not_found' }, cors);
       return;
     }
     try {
-      sendPng(res, readFileSync(filePath));
+      sendPng(res, readFileSync(filePath), cors);
     } catch {
-      send(res, 404, { error: 'not_found' });
+      send(res, 404, { error: 'not_found' }, cors);
     }
     return;
   }
 
-  send(res, 404, { error: 'not_found' });
+  send(res, 404, { error: 'not_found' }, cors);
 }
 
 export function createServer(options = {}) {
   const dbPath = options.dbPath ?? process.env.DB_PATH ?? ':memory:';
   const key = options.key ?? process.env.SQUISH_KEY ?? '';
+  const adminKey = options.adminKey ?? process.env.SQUISH_ADMIN_KEY ?? '';
+  const allowedOrigins = parseAllowedOrigins(
+    options.allowedOrigins ?? process.env.SQUISH_ALLOWED_ORIGINS,
+  );
   const db = openDb(dbPath);
   const limiter = options.limiter ?? createRateLimiter();
+  const ipLimiter = options.ipLimiter ?? createRateLimiter({
+    windowMs: IP_RATE_WINDOW_MS,
+    max: IP_RATE_MAX,
+  });
   const catalog = options.catalog ?? createCatalog({
     catalogPath: options.catalogPath,
     repoRoot: options.repoRoot,
   });
-  const ctx = { db, key, limiter, store: storeLabel(dbPath), catalog };
+  const ctx = {
+    db,
+    key,
+    adminKey,
+    allowedOrigins,
+    limiter,
+    ipLimiter,
+    addressFor: options.addressFor,
+    store: storeLabel(dbPath),
+    catalog,
+  };
 
   const server = http.createServer((req, res) => {
     handle(req, res, ctx).catch(() => {
