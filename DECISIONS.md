@@ -932,3 +932,35 @@ contract** — it specified delete-by-id and never said how an id would be found
   keep their exact field names and shapes — the shipped Godot client parses them (D-026).
 - Acceptance is operational, not just green tests: after deploy the planner can list the rows, find
   the Smoke Test row, delete it by id, and see it gone from the board.
+
+## D-048 — Profile transfer by player id (planner, 2026-09-20)
+Found in production the hour the web build went live: Steve played a browser game and the board
+showed **two players named "Dad"** — `b8aa808f…` (desktop, 14300) and `6a7a41f5…` (web, 7600). Not
+a leaderboard defect; the ranking is correct best-per-player. It is structural. Identity **is** the
+UUID in `user://profile.save` (D-031), a fresh device has no file, and `GET /v1/profile` is keyed
+**by** `player_id` — so cloud sync (D-037) restores a name and avatar *for an id you already hold*
+and can never recover the id itself. Nothing in Settings displays or accepts an id, so today there
+is no recovery path at all and every new device is permanently a new player. The iPad would have
+made a third Dad.
+- **Identity stays the local UUID. No accounts, no server changes.** Restore is a client-side
+  adoption of an existing id, using the existing `GET /v1/profile?player_id=` route unchanged.
+- **Settings shows the current id** in a "This device" section, **hidden behind a `Show transfer
+  code` toggle and revealed only on press**, with a `Copy` button. Hidden by default because the
+  title screen gets screenshotted and this string is a credential.
+- **Settings accepts an id** in a `Restore profile` field. On submit: validate UUID v4 locally →
+  `GET /v1/profile` → on success adopt `player_id`, `name` and `avatar` onto this device.
+- **Adoption overwrites, it does not merge.** `players[name_key] = restored_id` replaces any
+  existing mapping for that name, and the device's previous id for that name is dropped. Scores
+  already posted under the dropped id remain on the board under it — restoring does not retroact.
+  Merging two ids' history is explicitly out of scope; the operator deletes strays with D-047.
+- **404 must not adopt.** A valid-format id with no cloud profile is `no profile found`. Adopting a
+  nameless id would write an unkeyable entry into `players`.
+- **Three distinct failure states, all surfaced in the overlay**, never a silent no-op:
+  `that code doesn't look right` (not UUID v4), `no profile found` (404),
+  `couldn't reach the leaderboard` (transport failure or any other non-2xx). Empty or
+  whitespace-only input is a no-op, not an error.
+- **Restore must not PUT back what it just GET'd.** Reuse `_suppress_profile_push`; adoption emits
+  `name_changed`/`avatar_changed` and those handlers would otherwise push the value just read.
+- **Accepted risk, documented rather than mitigated:** the id is a bearer credential — anyone
+  holding it can post scores as that player. Proportionate for a family-scale game; real accounts
+  are not.
