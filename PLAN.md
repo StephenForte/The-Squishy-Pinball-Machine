@@ -52,9 +52,11 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T30 | **iPhone unlock:** play must not require a name; visible Play button; touch-correct control hints (D-049) | 10 | reviewed + approved 2026-09-25 (PR #40, 5328f77) — awaiting merge | cheap-mid | — |
 | T31 | Text entry without a hardware keyboard: virtual keyboard + visible confirm, name and D-048 restore field (D-049) | 10 | **done** 2026-09-26 — merged (PR #41), deployed, keyboard confirmed live on iPhone | mid | T30 |
 | T32 | **Game over unusable on touch:** Restart/Menu invisible (no StyleBoxFlat) + invite a name so a score can be saved (D-051) | 10 | reviewed + approved 2026-09-26 (PR #42, 04df0f0) — awaiting merge | cheap-mid | — |
-| T33 | Board reports "Leaderboard offline" and an empty list after the server answered 200 (D-051) | 10 | not started | mid | — |
+| T33 | Board reports "Leaderboard offline" and an empty list after the server answered 200 (D-051) | 10 | not started — **lead:** a rejected CORS preflight produces this exact message (D-054) | mid | — |
 | T34 | Title name never commits on a phone: confirm sits in the opposite corner from the field; commit on blur/return (D-051) | 10 | **unblocked** 2026-09-26 — T32 answered the NameEntry question: fix the title prompt in place, do not reuse it | cheap-mid | T32 |
 | T35 | Profile transfer unusable on a phone: restore field sits under the keyboard and there is no paste path (D-048, D-051) | 10 | reviewed + approved 2026-09-26 (PR #43, 6f2fc56) — awaiting merge | mid | — |
+| T36 | Server: names are unique and resolve to one player; merge the two Dads (D-053) | 11 | not started | mid | — |
+| T37 | Client: typing a name claims that player; remove the transfer/restore UI entirely (D-053) | 11 | not started | mid | T36 |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8 → T10 → T9 →
 **Phase 5:** T11 ∥ T12 → T11.1 (deploy) → T13.
@@ -1148,3 +1150,21 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   `leaderboard._restore_gen` directly to retire an in-flight restore — a private field of a file it
   does not own. It works and `settings_pages` case 6 covers it, so it is not a defect, but anyone
   reworking the restore generation logic must keep that external writer in mind.
+- 2026-09-26: **Steve rejected the transfer-code UX after using it on a phone.** "xfer is bad UX...
+  it took 10 tries and then failed." Two rounds of work (T29, T35) made that code *reachable* without
+  ever making it *usable* — the planner reviewed reachability both times. D-053 replaces it: the name
+  is the identity, unique across the board, unauthenticated for now, password later. T29's and T35's
+  transfer UI is removed rather than left dead. → T36 (server), T37 (client).
+- 2026-09-26: **Why the paste actually failed, from the server log rather than from the symptom.**
+  The iPhone's `/v1/profile` preflights returned 330 bytes at 22:03 and **133 bytes at 22:08 and
+  22:10, with no GET following the short ones**. Reproduced against production: an allowed origin
+  gets 416 header bytes, while a disallowed origin, a `null` origin and a missing origin all get 219.
+  So the browser blocked those requests at preflight and the client showed the generic "couldn't
+  reach the leaderboard". Render does not log the `Origin` header, so **what the origin was is
+  unknown and is not guessed at**. → D-054, and a strong lead for T33, whose symptom is the same
+  message.
+- 2026-09-26: Sequencing note — D-053 makes D-054 more urgent, not less: claiming a name needs a
+  round trip, so an origin the allowlist does not recognise would stop a player claiming their own
+  name. T33 should land before or with T37.
+- 2026-09-26: Planner judgement recorded for objection — for the Dad merge, the canonical id is
+  `b8aa808f...` because it holds the 14300 and the real history; `86f2ea8f...` (2000) is the stray.
