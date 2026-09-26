@@ -164,7 +164,10 @@ func _refresh_name_ui(player_name: String) -> void:
 			_name_entry.visible = false
 		_name_entry.release_name_focus()
 	else:
-		_name_entry.open()
+		# D-050: focusing the field raises the OS keyboard. On a touch device
+		# that happens on load and can cover the title before Play is pressed.
+		var grab_focus := not DisplayServer.is_touchscreen_available()
+		_name_entry.open(grab_focus)
 
 
 func _refresh_avatar() -> void:
@@ -300,9 +303,8 @@ func _apply_control_hints() -> void:
 		label.text = _TOUCH_CONTROLS_TEXT
 
 
-## Fresh devices auto-focus the name field, and launch_ball is still swallowed
-## while that focus is held. A Play press leaves the field, then uses the same
-## launch action that dismisses the title.
+## launch_ball is swallowed while the name field is focused. A Play press
+## leaves the field, then uses the same launch action that dismisses the title.
 func _on_play_pressed() -> void:
 	if _dismissed:
 		return

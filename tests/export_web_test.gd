@@ -82,6 +82,7 @@ func _case_2_write_preset() -> bool:
 		"html/export_icon=true": true,
 		"progressive_web_app/enabled=false": true,
 		"progressive_web_app/ensure_cross_origin_isolation_headers=false": true,
+		"html/experimental_virtual_keyboard=true": true,
 		"export_path=": true,
 	}
 	for key in required:
@@ -89,6 +90,8 @@ func _case_2_write_preset() -> bool:
 			return _fail("case 2: generated preset missing %s" % String(key))
 	if text.contains("variant/thread_support=true"):
 		return _fail("case 2: generated preset enabled threads")
+	if text.contains("html/experimental_virtual_keyboard=false"):
+		return _fail("case 2: generated preset left the virtual keyboard off")
 	print("EXPORT_WEB case 2 PASS")
 	return true
 

@@ -9,6 +9,7 @@ offset_left = 80.0
 offset_top = 600.0
 offset_right = 640.0
 offset_bottom = 760.0
+clip_contents = false
 mouse_filter = 0
 script = ExtResource("1_name")
 
@@ -37,7 +38,18 @@ theme_override_colors/font_placeholder_color = Color(1, 1, 0.88, 0.45)
 theme_override_font_sizes/font_size = 32
 alignment = 1
 max_length = 16
-placeholder_text = "Name (Enter to confirm)"
+placeholder_text = "Your name"
 caret_blink = true
 context_menu_enabled = false
 select_all_on_focus = true
+
+[node name="ConfirmButton" type="Button" parent="."]
+layout_mode = 0
+offset_left = 496.0
+offset_top = -552.0
+offset_right = 624.0
+offset_bottom = -408.0
+focus_mode = 0
+custom_minimum_size = Vector2(128, 128)
+theme_override_font_sizes/font_size = 32
+text = "Done"

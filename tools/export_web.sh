@@ -126,6 +126,8 @@ write_preset() {
 	local rel_html
 	rel_html="$(relpath_from_root "$out_html")"
 
+	# D-050: touch browsers only build the hidden input when this flag is on.
+	# That input is what iOS attaches a keyboard to. Leave it true.
 	mkdir -p "$(dirname "$PRESET_PATH")"
 	cat > "$PRESET_PATH" <<EOF
 [preset.0]
@@ -161,7 +163,7 @@ html/custom_html_shell=""
 html/head_include="<meta name=\\"description\\" content=\\"Natasha's virtual pinball machine\\">"
 html/canvas_resize_policy=2
 html/focus_canvas_on_start=true
-html/experimental_virtual_keyboard=false
+html/experimental_virtual_keyboard=true
 progressive_web_app/enabled=false
 progressive_web_app/ensure_cross_origin_isolation_headers=false
 progressive_web_app/offline_page=""
