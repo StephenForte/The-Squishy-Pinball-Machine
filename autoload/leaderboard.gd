@@ -30,6 +30,10 @@ var _submitted_tokens: Dictionary = {}
 var _submit_state: Dictionary = {}
 var _hooked_titles: Dictionary = {}
 var _fetch_gen: int = 0
+## Generation that already applied a readable board. A later callback for
+## that same generation (watchdog timeout after the body, or the reverse)
+## must not paint offline over it.
+var _fetch_ok_gen: int = -1
 var _restore_gen: int = 0
 var _profile_push_count: int = 0
 ## Set while adopting a cloud avatar so set_avatar does not fire a PUT (D-038).
@@ -98,7 +102,10 @@ func fetch_top(limit: int) -> void:
 	var gen := _fetch_gen
 	var clamped := clampi(limit, 1, 50)
 	var url := "%s/v1/leaderboard?limit=%d" % [_base_url(), clamped]
-	_http_request(HTTPClient.METHOD_GET, url, "", _on_fetch_finished.bind(gen))
+	# Late 2xx is accepted only here. Submit keeps the first callback so a
+	# watchdog timeout still schedules D-034's retry and a late 201 cannot
+	# land twice.
+	_http_request(HTTPClient.METHOD_GET, url, "", _on_fetch_finished.bind(gen), false, true)
 
 
 func submit(score: int) -> void:
@@ -391,6 +398,11 @@ func _on_retry_timeout(token: int) -> void:
 func _on_fetch_finished(ok: bool, code: int, parsed: Variant, reason: String, gen: int) -> void:
 	if gen != _fetch_gen:
 		return
+	# This generation already applied a body. The watchdog (or HTTPRequest's
+	# own timer) can still call back afterwards; that must not clear the
+	# board or re-show offline.
+	if gen == _fetch_ok_gen:
+		return
 	if not ok:
 		offline.emit(reason)
 		return
@@ -402,9 +414,34 @@ func _on_fetch_finished(ok: bool, code: int, parsed: Variant, reason: String, ge
 	if typeof(entries) != TYPE_ARRAY:
 		offline.emit("bad_json")
 		return
+	_fetch_ok_gen = gen
 	last_entries = entries.duplicate(true)
 	last_total_players = int(data.get("total_players", last_entries.size()))
 	board_updated.emit(last_entries, last_total_players)
+
+
+## Short line for a fetch/submit failure. The signal reason stays precise;
+## this is only the sentence a player reads. Wording is provisional.
+func offline_line(reason: String) -> String:
+	match reason:
+		"timeout":
+			return "The leaderboard took too long"
+		"unreachable":
+			return "Can't reach the leaderboard"
+		"no_network":
+			return "No connection to the leaderboard"
+		"request_failed":
+			return "The leaderboard blocked the answer"
+		"bad_json":
+			return "The leaderboard sent a blank answer"
+	if reason.begins_with("http_"):
+		var digits := reason.substr(5)
+		var code := digits.to_int()
+		if code >= 500:
+			return "The leaderboard had a problem (%s)" % digits
+		if code >= 400:
+			return "The leaderboard said no (%s)" % digits
+	return "Leaderboard offline"
 
 
 func _on_submit_finished(ok: bool, code: int, parsed: Variant, reason: String, token: int) -> void:
@@ -451,7 +488,7 @@ func _write_key() -> String:
 	return env
 
 
-func _http_request(method: int, url: String, body: String, callback: Callable, with_key: bool = false) -> void:
+func _http_request(method: int, url: String, body: String, callback: Callable, with_key: bool = false, accept_late_success: bool = false) -> void:
 	var http := HTTPRequest.new()
 	http.timeout = REQUEST_TIMEOUT
 	add_child(http)
@@ -460,7 +497,7 @@ func _http_request(method: int, url: String, body: String, callback: Callable, w
 		headers.append("X-Squish-Key: %s" % _write_key())
 	var state := {"done": false, "http": http}
 	http.request_completed.connect(
-		_on_http_completed.bind(callback, state),
+		_on_http_completed.bind(callback, state, accept_late_success),
 		CONNECT_ONE_SHOT
 	)
 	var tree := get_tree()
@@ -493,22 +530,24 @@ func _on_http_completed(
 	_headers: PackedStringArray,
 	body: PackedByteArray,
 	callback: Callable,
-	state: Dictionary
+	state: Dictionary,
+	accept_late_success: bool = false
 ) -> void:
 	var http: HTTPRequest = state.get("http") as HTTPRequest
-	if bool(state.get("done", false)):
-		if http != null and is_instance_valid(http):
-			http.queue_free()
-		return
-	state.done = true
+	var already := bool(state.get("done", false))
+	if not already:
+		state.done = true
 	if http != null and is_instance_valid(http):
 		http.queue_free()
-	var reason := _result_reason(result, response_code)
-	if result != HTTPRequest.RESULT_SUCCESS:
-		callback.call(false, response_code, null, reason)
+	var success := result == HTTPRequest.RESULT_SUCCESS and response_code >= 200 and response_code < 300
+	# Godot defers request_completed. The watchdog can set done and report
+	# timeout in that gap, after the 2xx body was already copied into the
+	# deferred call. A fetch still applies that body. Submit does not opt
+	# in: its first callback owns the D-034 retry.
+	if already and not (accept_late_success and success):
 		return
-	if response_code < 200 or response_code >= 300:
-		callback.call(false, response_code, null, reason)
+	if not success:
+		callback.call(false, response_code, null, _result_reason(result, response_code))
 		return
 	var text := body.get_string_from_utf8()
 	var parsed: Variant = JSON.parse_string(text) if not text.is_empty() else {}
