@@ -1027,3 +1027,39 @@ So the hooks exist but are switched off at export time, which is why the planner
   sizing, focus or scroll as expected risks of the flag, and back it out rather than paper over it
   if the title becomes worse on a phone than it is today.
 - **Acceptance is a real iPhone.** This cannot be proven in CI or headless; the operator runs it.
+
+## D-051 — Game over must be usable, and a good score must be savable (planner, 2026-09-26)
+First real iPhone session (T29+T30+T31 live). Steve: "Worked but did not save the high score. Also
+after the game there was no way to get back to the main menu or restart." Reproduced in a mobile
+browser against the live build and cross-checked against the server's own request log. Three
+distinct findings, none of them connectivity:
+1. **The game-over buttons are invisible, not missing.** `RestartButton` and `MenuButton` exist at
+   (80,880)-(340,960) and (380,880)-(640,960) and are correctly wired. But `game_over.gd` is the
+   **only** UI script that never builds a `StyleBoxFlat` — `title.gd`, `settings.gd`,
+   `name_entry.gd`, `theme_picker.gd` and `icon_picker.gd` all do. Its `_apply_theme` sets only
+   `font_color = text_on_color`, a colour chosen to sit on pink, and leaves Godot's default dark
+   stylebox underneath, on a dark shade. In the repro they render as two barely-perceptible
+   rectangles. The only legible instruction is `HintLabel`: "R restart · Esc menu" — keyboard-only.
+   So the screen is operable and looks like a dead end.
+2. **An unnamed player's score is silently discarded.** `leaderboard.gd:_on_game_over` returns early
+   when `player_name` is empty, which is correct per D-049. The server log for the iPhone session
+   shows `OPTIONS /v1/leaderboard` 204 and `GET /v1/leaderboard?limit=5` and `?limit=10` both 200,
+   and **no `POST /v1/scores` at any point** — the submit was never attempted. This is D-049's
+   already-written clause that nothing has implemented yet: "if a score is worth keeping, the
+   game-over screen invites a name; declining is allowed and the score is simply not submitted."
+   T30 owned the title and T31 owned name entry, so neither picked it up. It is now the whole
+   difference between playing on a phone and appearing on the board.
+3. **"Leaderboard offline" is displayed after a successful fetch.** `_reset_leaderboard_ui()` hides
+   the label at every game over, so something re-showed it; meanwhile the board list rendered empty,
+   meaning `last_entries` was also empty. Yet the server answered that game's `GET
+   /v1/leaderboard?limit=10` with **200 and 551 bytes**. A 200 that reaches the server and still
+   leaves the client believing it is offline is a client-side bug, not a network one. Root cause not
+   determined by the planner; the evidence above is the starting point.
+- **Contract:** on a touch device, every action the game-over screen offers must be visible and
+  reachable without a keyboard, and reading the on-screen text must not be misleading about what
+  works. Styling is not cosmetic here — an invisible control is an absent control.
+- **Contract:** a score good enough to matter must be savable from the device that made it. An
+  unnamed player is offered the chance to name themselves at game over; declining is fine and
+  discards the score, but silently discarding it without asking is not.
+- Ordering: the button fix is the smaller and more urgent of the three; the offline contradiction
+  needs diagnosis before a fix and must not hold up the other two.
