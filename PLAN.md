@@ -52,7 +52,7 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T30 | **iPhone unlock:** play must not require a name; visible Play button; touch-correct control hints (D-049) | 10 | reviewed + approved 2026-09-25 (PR #40, 5328f77) — awaiting merge | cheap-mid | — |
 | T31 | Text entry without a hardware keyboard: virtual keyboard + visible confirm, name and D-048 restore field (D-049) | 10 | **done** 2026-09-26 — merged (PR #41), deployed, keyboard confirmed live on iPhone | mid | T30 |
 | T32 | **Game over unusable on touch:** Restart/Menu invisible (no StyleBoxFlat) + invite a name so a score can be saved (D-051) | 10 | reviewed + approved 2026-09-26 (PR #42, 04df0f0) — awaiting merge | cheap-mid | — |
-| T33 | Board reports "Leaderboard offline" and an empty list after the server answered 200 (D-051) | 10 | not started — **lead:** a rejected CORS preflight produces this exact message (D-054) | mid | — |
+| T33 | Board reports "Leaderboard offline" and an empty list after the server answered 200 (D-051) | 10 | reviewed + approved 2026-09-26 (PR #44, cf0c4fa) — awaiting merge | mid | — |
 | T34 | Title name never commits on a phone: confirm sits in the opposite corner from the field; commit on blur/return (D-051) | 10 | **unblocked** 2026-09-26 — T32 answered the NameEntry question: fix the title prompt in place, do not reuse it | cheap-mid | T32 |
 | T35 | Profile transfer unusable on a phone: restore field sits under the keyboard and there is no paste path (D-048, D-051) | 10 | reviewed + approved 2026-09-26 (PR #43, 6f2fc56) — awaiting merge | mid | — |
 | T36 | Server: names are unique and resolve to one player; merge the two Dads (D-053) | 11 | not started | mid | — |
@@ -1168,3 +1168,32 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   name. T33 should land before or with T37.
 - 2026-09-26: Planner judgement recorded for objection — for the Dad merge, the canonical id is
   `b8aa808f...` because it holds the 14300 and the real history; `86f2ea8f...` (2000) is the stray.
+- 2026-09-26: T33 (PR #44, cf0c4fa, base ca91975) reviewed in a scratch clone, deleted after. Scope
+  ✓ — 6 files, `server/**` untouched. Gate **28 PASS**, zero FAIL. Semgrep, Trivy and **Bugbot all
+  clean — the first task in five where Bugbot found nothing.** **Approved.**
+- 2026-09-26: **Root cause, and the planner can close its own half of it.** The worker found two
+  mechanisms: (1) Godot defers `request_completed`, so a watchdog can report timeout in the gap and
+  the already-copied 2xx body was then discarded by the `state.done` check; (2) Godot's HTTPRequest
+  closes the socket at 3.0 s, so a server answering later still logs 200 while the client never sees
+  it. They honestly said the phone's latency was unmeasured. For **the planner's original T33
+  observation** the log settles it: that request logged `responseTimeMS=3`, which cannot be the >3 s
+  case — so observation (A) was mechanism (1), the deferred drop, which this PR fixes.
+- 2026-09-26: Verified independently rather than by reading. A 2xx delivered after a watchdog timeout
+  now applies (`last_entries=1`, `board_updated` fired); a late timeout after a good body neither
+  repaints offline nor clears the board; and **T35's dismissed-restore guard still holds** — the
+  cross-task regression the brief called out. `accept_late_success` is opt-in and only `fetch_top`
+  passes it; restore, profile fetch, push and submit keep the strict path.
+- 2026-09-26: The new message assertions were checked for tautology, because `leaderboard_test` case
+  4 compares the label to `offline_line(reason)` and would prove nothing alone. It is pinned by
+  `offline_truth_test._case_distinct_lines`, which tests the relation between reasons. Negative
+  control: collapsing two reasons onto one sentence produced
+  `FAIL case 1: 'unreachable' and 'timeout' share 'The leaderboard took too long'`, green again at 8
+  cases once restored.
+- 2026-09-26: Accepted behaviour, not a defect — the watchdog's sentence can flash for a frame before
+  a late body lands and corrects it. Still open: the 3.0 s client timeout is unchanged (lengthening
+  it would delay D-034's retry), and **D-054's CORS fragility is untouched**, which still matters for
+  T37 because claiming a name needs a round trip.
+- **Open for Steve:** the failure wording. Interim copy lives in `Leaderboard.offline_line` — timeout
+  "The leaderboard took too long", unreachable "Can't reach the leaderboard", no_network "No
+  connection to the leaderboard", request_failed "The leaderboard blocked the answer", bad_json "The
+  leaderboard sent a blank answer", 5xx/4xx with the code, else "Leaderboard offline".
