@@ -1063,3 +1063,44 @@ distinct findings, none of them connectivity:
   discards the score, but silently discarding it without asking is not.
 - Ordering: the button fix is the smaller and more urgent of the three; the offline contradiction
   needs diagnosis before a fix and must not hold up the other two.
+
+## D-052 — Settings becomes pages, and a transfer code never has to be typed (Steve, 2026-09-26)
+Two findings from the same phone session, with one shared fix. Steve, on being handed his transfer
+code: "impossible to paste the code because the keyboard comes up", and "that screen is too busy".
+Measured rather than assumed:
+- `RestoreProfile/CodeEdit` sits at global **y 1088-1116**, which is 448 px below the
+  `KEYBOARD_TOP = 640` line T31's own suite used for the title. Raising the keyboard buries the field
+  and its Restore button.
+- **No paste path exists.** `clipboard_set` is used for Copy; there is no `clipboard_get` anywhere.
+  Godot's web keyboard works through a hidden 0x0 `<input>`, so iOS has nothing to attach a Paste
+  callout to. Restoring therefore means typing 36 characters blind into an invisible field.
+- Settings stacks five sections across **y 100-1270** of a 1280 viewport and **nothing in the app
+  scrolls**. Each task was told to fit the leftover gap; T29's own note says it took "the 980-1150
+  gap". T19 exists because the *main menu* got crowded, and Settings has now filled the same way by
+  the same mechanism.
+**This is a planner miss, recorded so the reasoning is not repeated.** The T31 brief closed
+`settings.gd` and `settings.tscn` with "RestoreProfile already has its confirm control; it gains the
+keyboard for free from the export flag, so there is nothing to change." Gaining a keyboard is exactly
+what broke it. The reusable lesson: when a change introduces a new input modality, every existing
+input inherits the new constraint — "it already has the control" is the wrong test for closing a file.
+- **Settings becomes pages, not one long screen.** Steve: "a bit of all 3, def trim and add some
+  tabs/pages (for admin stuff, etc) and scroll if necessary." So: the everyday, kid-facing choices
+  (avatar, theme) stay on the first page; the technical items (app icon, player id, transfer,
+  restore) move to their own page. Scrolling is used only where a page still needs it, not as the
+  primary answer.
+- **A transfer code is never typed by hand.** Two routes, both required: a **Paste control** using
+  `DisplayServer.clipboard_get()` (a button press is the user gesture the browser Clipboard API
+  needs), and a **link-based restore** where the web build reads a `restore` parameter from the page
+  URL so a texted link just works. Steve chose both.
+- **Any focused text field must sit above the keyboard line.** Apply the same `y < 640` rule T31
+  already applies to the title, to every text input in the app. A field below that line is not a
+  layout preference, it is an unusable control.
+- **Accepted risk on the link route, stated rather than hidden:** a code in a URL lands in browser
+  history and referrer headers. It is the same bearer credential the public board already exposes
+  (see the `player_id` note below), so the link does not make the exposure materially worse — but it
+  does make it more casual, and it should not be described to anyone as private.
+- **Separately, and not fixed here:** `GET /v1/leaderboard` returns `player_id` for every entry with
+  no key. D-048 justified the bearer-credential design on the basis that only someone you handed the
+  code to would hold it; the public board publishes it, so that justification is void. Not urgent on
+  an unadvertised family URL, and the shipped Godot client parses those fields, so removing it needs
+  checking against `game_over.gd` and `title.gd` first.
