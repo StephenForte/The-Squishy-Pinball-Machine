@@ -49,6 +49,8 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T27 | Admin cleanup + per-IP limiting so a griefed board is repairable (D-046) | 9 | merged + **deployed live** 2026-09-21 (PR #36 → 3fc6560) | mid | T25 |
 | T28 | Admin score listing so a row can be found and deleted (D-047) | 9 | **done** 2026-09-21 — merged, deployed, Smoke Test row deleted | cheap | T27 |
 | T29 | Profile transfer: show this device’s player id, restore an existing identity by pasting it (D-048) | 10 | reviewed + approved 2026-09-20 (PR #39, efa1520) — awaiting merge | cheap-mid | T20b |
+| T30 | **iPhone unlock:** play must not require a name; visible Play button; touch-correct control hints (D-049) | 10 | not started | cheap-mid | — |
+| T31 | Text entry without a hardware keyboard: virtual keyboard + visible confirm, name and D-048 restore field (D-049) | 10 | not started | mid | T30 |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8 → T10 → T9 →
 **Phase 5:** T11 ∥ T12 → T11.1 (deploy) → T13.
@@ -331,6 +333,21 @@ Contract D-047. Owns `server/**` only. Verified before designing: board entries 
 (`['at','avatar','name','player_id','rank','score']` from the live service) and `grep` finds no
 admin list route. Small, but it sits on the admin boundary, so every D-046 gate case is re-asserted.
 Planner deploys after merge, then removes the Smoke Test row — which is the acceptance test.
+
+### T30 — iPhone unlock: the title screen must not require a name (field report, 2026-09-25)
+Contract D-049. **Highest priority — the game is unplayable on a phone.** Steve reported it; the
+planner reproduced it at 375x812 with touch emulation against the live build and verified all four
+links: no save → `_needs_name()` true → `title.gd:236` swallows the launch action TouchControls
+correctly fires → `title.gd:193` also kills the Settings button → no `<input>` in the DOM, so the
+name that would unlock it cannot be typed. Owns `scripts/ui/title.gd` and `scenes/ui/title.tscn`
+plus a suite. Does **not** own name entry or the keyboard — that is T31.
+
+### T31 — Text entry without a hardware keyboard (2026-09-25)
+Contract D-049. Follows T30. The shipped build already carries the engine hooks
+(`godot_js_display_vk_show` / `_hide` / `_available` are present in `index.js`), so this is wiring,
+not a port. Covers the name field and D-048's restore field, each with a visible confirm control
+because Enter may not exist. Until it lands a phone can play but cannot name itself, and so cannot
+post to the board — an accepted gap, recorded in D-049.
 
 ### T29 — Profile transfer by player id (production finding, 2026-09-20)
 Contract D-048. Found in production, not in review: the hour the web build went live it produced a
@@ -955,3 +972,12 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   expect 22”. The measured baseline was 21 lines under a grep that excluded `quit-after-300` and
   `boot-check`; the full runner reports 23 before this task and 24 after. The worker counted
   correctly and was not misled, but the brief’s enumeration was wrong.
+- 2026-09-25: **iPhone field report — title screen hard-locked (D-049, → T30/T31).** Reproduced,
+  not inferred: at 375x812 with touch emulation on the live build, tapping the playfield does
+  nothing and the Settings button does nothing. Cause is a four-link chain ending in a name gate
+  that a phone cannot satisfy, because the Godot canvas exposes **zero `<input>` elements** for iOS
+  to attach a keyboard to. Ruled out while diagnosing: the API is healthy (200 in 0.33s) and CORS
+  for the site origin is intact, so this is not a leaderboard or deploy problem.
+- 2026-09-25: Observed but **not diagnosed** — the title showed "Leaderboard offline" during the
+  mobile repro while the API answered fine from curl. Possibly the 3.0s `REQUEST_TIMEOUT` against a
+  cold first request. Not folded into T30/T31; needs its own look if it recurs on a real phone.
