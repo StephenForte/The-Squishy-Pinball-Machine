@@ -41,6 +41,26 @@ focus_mode = 0
 theme_override_font_sizes/font_size = 28
 text = "Close"
 
+[node name="LookButton" type="Button" parent="."]
+layout_mode = 0
+offset_left = 40.0
+offset_top = 96.0
+offset_right = 350.0
+offset_bottom = 196.0
+focus_mode = 0
+theme_override_font_sizes/font_size = 32
+text = "My look"
+
+[node name="DeviceButton" type="Button" parent="."]
+layout_mode = 0
+offset_left = 370.0
+offset_top = 96.0
+offset_right = 680.0
+offset_bottom = 196.0
+focus_mode = 0
+theme_override_font_sizes/font_size = 32
+text = "This phone"
+
 [node name="AvatarPicker" parent="." instance=ExtResource("4_avatar")]
 
 [node name="ThemePicker" parent="." instance=ExtResource("2_theme")]
@@ -121,9 +141,9 @@ text = "Copy"
 [node name="RestoreProfile" type="Control" parent="."]
 layout_mode = 0
 offset_left = 80.0
-offset_top = 1068.0
+offset_top = 208.0
 offset_right = 640.0
-offset_bottom = 1144.0
+offset_bottom = 460.0
 mouse_filter = 0
 
 [node name="Caption" type="Label" parent="RestoreProfile"]
@@ -131,7 +151,7 @@ layout_mode = 0
 offset_left = 0.0
 offset_top = 0.0
 offset_right = 560.0
-offset_bottom = 18.0
+offset_bottom = 22.0
 mouse_filter = 2
 theme_override_colors/font_color = Color(1, 0.92, 0.35, 1)
 theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
@@ -143,33 +163,115 @@ vertical_alignment = 1
 [node name="CodeEdit" type="LineEdit" parent="RestoreProfile"]
 layout_mode = 0
 offset_left = 0.0
-offset_top = 20.0
-offset_right = 400.0
-offset_bottom = 48.0
+offset_top = 26.0
+offset_right = 560.0
+offset_bottom = 90.0
 focus_mode = 1
-theme_override_font_sizes/font_size = 14
-placeholder_text = "paste transfer code"
+theme_override_font_sizes/font_size = 22
+placeholder_text = "transfer code"
 max_length = 40
+
+[node name="PasteButton" type="Button" parent="RestoreProfile"]
+layout_mode = 0
+offset_left = 0.0
+offset_top = 98.0
+offset_right = 270.0
+offset_bottom = 218.0
+focus_mode = 0
+theme_override_font_sizes/font_size = 28
+text = "Paste"
 
 [node name="RestoreButton" type="Button" parent="RestoreProfile"]
 layout_mode = 0
-offset_left = 410.0
-offset_top = 20.0
+offset_left = 290.0
+offset_top = 98.0
 offset_right = 560.0
-offset_bottom = 48.0
+offset_bottom = 218.0
 focus_mode = 0
-theme_override_font_sizes/font_size = 16
+theme_override_font_sizes/font_size = 28
 text = "Restore"
 
 [node name="StatusLabel" type="Label" parent="RestoreProfile"]
 layout_mode = 0
 offset_left = 0.0
-offset_top = 50.0
+offset_top = 224.0
 offset_right = 560.0
-offset_bottom = 74.0
+offset_bottom = 252.0
 mouse_filter = 2
 theme_override_colors/font_color = Color(1, 1, 1, 1)
 theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
 theme_override_constants/outline_size = 4
-theme_override_font_sizes/font_size = 14
+theme_override_font_sizes/font_size = 16
+vertical_alignment = 1
+
+[node name="LinkRestore" type="Control" parent="."]
+visible = false
+layout_mode = 0
+offset_left = 40.0
+offset_top = 208.0
+offset_right = 680.0
+offset_bottom = 568.0
+mouse_filter = 0
+
+[node name="Prompt" type="Label" parent="LinkRestore"]
+layout_mode = 0
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 640.0
+offset_bottom = 110.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 0.92, 0.35, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 6
+theme_override_font_sizes/font_size = 28
+text = "Restore this profile on this phone?
+It replaces the player saved here."
+autowrap_mode = 3
+
+[node name="CodeLabel" type="Label" parent="LinkRestore"]
+layout_mode = 0
+offset_left = 0.0
+offset_top = 118.0
+offset_right = 640.0
+offset_bottom = 170.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 4
+theme_override_font_sizes/font_size = 20
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="ConfirmButton" type="Button" parent="LinkRestore"]
+layout_mode = 0
+offset_left = 0.0
+offset_top = 186.0
+offset_right = 300.0
+offset_bottom = 306.0
+focus_mode = 0
+theme_override_font_sizes/font_size = 28
+text = "Restore"
+
+[node name="CancelButton" type="Button" parent="LinkRestore"]
+layout_mode = 0
+offset_left = 320.0
+offset_top = 186.0
+offset_right = 640.0
+offset_bottom = 306.0
+focus_mode = 0
+theme_override_font_sizes/font_size = 28
+text = "Not now"
+
+[node name="StatusLabel" type="Label" parent="LinkRestore"]
+layout_mode = 0
+offset_left = 0.0
+offset_top = 314.0
+offset_right = 640.0
+offset_bottom = 352.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 4
+theme_override_font_sizes/font_size = 18
+horizontal_alignment = 1
 vertical_alignment = 1

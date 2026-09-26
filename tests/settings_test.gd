@@ -231,17 +231,36 @@ func _case_4_picker_keys(main: Node) -> bool:
 
 	_open_settings(main)
 	await process_frame
+	if settings.has_method("show_page"):
+		settings.show_page("look")
+		await process_frame
 	_press_key(main, KEY_I)
 	await process_frame
 	await process_frame
-	if String(_app_icon.icon_id) == icon_before:
-		return _fail("case 4: I should cycle AppIcon while Settings open")
+	if String(_app_icon.icon_id) != icon_before:
+		return _fail("case 4: I changed AppIcon on the look page")
 	_press_key(main, KEY_RIGHT)
 	await process_frame
 	await process_frame
 	if String(_theme.palette_id) == palette_before:
-		return _fail("case 4: → should cycle Theme while Settings open")
+		return _fail("case 4: → should cycle Theme on the look page")
 
+	var theme_after := String(_theme.palette_id)
+	settings.show_page("device")
+	await process_frame
+	_press_key(main, KEY_RIGHT)
+	await process_frame
+	await process_frame
+	if String(_theme.palette_id) != theme_after:
+		return _fail("case 4: → changed Theme on the phone page")
+	_press_key(main, KEY_I)
+	await process_frame
+	await process_frame
+	if String(_app_icon.icon_id) == icon_before:
+		return _fail("case 4: I should cycle AppIcon on the phone page")
+
+	settings.show_page("look")
+	await process_frame
 	_close_settings(main)
 	await process_frame
 	_cases_passed += 1
@@ -339,7 +358,7 @@ func _case_6_layout(main: Node) -> bool:
 
 	var kids: Array[Control] = []
 	for child in settings.get_children():
-		if child is Control:
+		if child is Control and (child as Control).visible:
 			kids.append(child)
 	for i in kids.size():
 		for j in range(i + 1, kids.size()):
