@@ -53,6 +53,7 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T31 | Text entry without a hardware keyboard: virtual keyboard + visible confirm, name and D-048 restore field (D-049) | 10 | **done** 2026-09-26 — merged (PR #41), deployed, keyboard confirmed live on iPhone | mid | T30 |
 | T32 | **Game over unusable on touch:** Restart/Menu invisible (no StyleBoxFlat) + invite a name so a score can be saved (D-051) | 10 | not started | cheap-mid | — |
 | T33 | Board reports "Leaderboard offline" and an empty list after the server answered 200 (D-051) | 10 | not started | mid | — |
+| T34 | Title name never commits on a phone: confirm sits in the opposite corner from the field; commit on blur/return (D-051) | 10 | not started | cheap-mid | — |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8 → T10 → T9 →
 **Phase 5:** T11 ∥ T12 → T11.1 (deploy) → T13.
@@ -1053,3 +1054,17 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   game's `GET /v1/leaderboard?limit=10` returned 200 with 551 bytes**. `_reset_leaderboard_ui()`
   hides the label at every game over, so something re-showed it, and `last_entries` was empty too.
   Client-side, root cause not determined. → T33, which must not block T32.
+- 2026-09-26: **Correction to the T32 diagnosis, from Steve: he DID type "Dad" into the box.** The
+  server log settles what happened — **zero `PUT /v1/profile` and zero `POST /v1/scores` all day**.
+  `push_profile()` fires on `name_changed`, so if `set_name("Dad")` had run there would be a PUT.
+  There is none. The name was typed and **never committed**; `_on_text_submitted` never fired. The
+  earlier note that he "played without a name" was right about the state and wrong about the cause.
+- 2026-09-26: Likely why, and it is a planner miss. T31 placed `ConfirmButton` at (576,48)-(704,192),
+  the top-right corner, while `NameEdit` sits at (120,652)-(600,724) mid-screen — opposite corners,
+  with Done sitting directly beside Play. Typing mid-screen with the keyboard up, the natural move is
+  the keyboard's return key or a control near the field, not a button in the far corner that reads as
+  part of Play. The planner's review checked that Done was **reachable** (pick stack, clip_contents)
+  and never asked whether it was **findable**. Reachability is not discoverability. → T34.
+- 2026-09-26: T34 is separate from T32 on purpose — different file (`name_entry.*`), different screen,
+  and T32 was already dispatched with `name_entry` explicitly closed. The T32 worker was sent an
+  addendum so its game-over name prompt does not repeat the same mistake.
