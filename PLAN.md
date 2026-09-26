@@ -54,6 +54,7 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T32 | **Game over unusable on touch:** Restart/Menu invisible (no StyleBoxFlat) + invite a name so a score can be saved (D-051) | 10 | reviewed + approved 2026-09-26 (PR #42, 04df0f0) — awaiting merge | cheap-mid | — |
 | T33 | Board reports "Leaderboard offline" and an empty list after the server answered 200 (D-051) | 10 | not started | mid | — |
 | T34 | Title name never commits on a phone: confirm sits in the opposite corner from the field; commit on blur/return (D-051) | 10 | **unblocked** 2026-09-26 — T32 answered the NameEntry question: fix the title prompt in place, do not reuse it | cheap-mid | T32 |
+| T35 | Profile transfer unusable on a phone: restore field sits under the keyboard and there is no paste path (D-048, D-051) | 10 | scope pending Steve’s call on link-based restore | mid | — |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8 → T10 → T9 →
 **Phase 5:** T11 ∥ T12 → T11.1 (deploy) → T13.
@@ -1096,3 +1097,27 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   discard exactly one score. T34 therefore fixes the title prompt in place rather than sharing a
   scene. Open for Steve: how insistent the name ask should be (T32 ships "always ask when unnamed,
   Not now one tap away").
+- 2026-09-26: T32 worked in the field — the phone posted 2000 at 18:01. It also produced **two Dads
+  again**: desktop `b8aa808f…` 14300 and phone `86f2ea8f…` 2000. That is D-048 behaving as designed
+  (identity is the local uuid), and the remedy is supposed to be the T29 transfer field.
+- 2026-09-26: **The remedy does not work on a phone, and this is a planner miss.** Measured:
+  `RestoreProfile/CodeEdit` sits at global **y 1088–1116**, which is 448 px below the `KEYBOARD_TOP =
+  640` line T31's own suite used for the title — so raising the keyboard buries both the field and its
+  Restore button. There is also **no paste path anywhere**: `clipboard_set` exists for Copy, there is
+  no `clipboard_get`, and Godot's web keyboard works through a hidden 0x0 `<input>`, so iOS has
+  nothing to attach a Paste callout to. Restoring therefore means typing 36 characters blind into an
+  invisible field.
+- 2026-09-26: Root cause of the miss is the T31 brief, written by the planner: it closed
+  `scripts/ui/settings.gd` and `scenes/ui/settings.tscn` with the reasoning "RestoreProfile already
+  has its confirm control; it gains the keyboard for free from the export flag, so there is nothing
+  to change." Gaining a keyboard is exactly what broke it. The lesson is narrow and reusable: when a
+  change makes a new input modality possible, every existing input in the app inherits the new
+  constraint — closing a file because it "already has" the control is the wrong test. → T35.
+- 2026-09-26: Security note found while handing Steve his transfer code — **`/v1/leaderboard` returns
+  `player_id` for every entry, with no key**. D-048 accepted the transfer code as a bearer credential
+  on the basis that only someone you handed it to would hold it. The public board publishes it, so
+  that reasoning does not hold: anyone who can reach the URL can post as any player or adopt their
+  profile. Practical risk on an unadvertised family URL is negligible and nothing is being changed in
+  a hurry, but the contract states something untrue and should be corrected. The Godot client parses
+  those fields, so removing `player_id` from the public board needs checking against `game_over.gd`
+  and `title.gd` first.
