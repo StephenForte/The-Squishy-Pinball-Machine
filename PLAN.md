@@ -50,7 +50,7 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T28 | Admin score listing so a row can be found and deleted (D-047) | 9 | **done** 2026-09-21 — merged, deployed, Smoke Test row deleted | cheap | T27 |
 | T29 | Profile transfer: show this device’s player id, restore an existing identity by pasting it (D-048) | 10 | reviewed + approved 2026-09-20 (PR #39, efa1520) — awaiting merge | cheap-mid | T20b |
 | T30 | **iPhone unlock:** play must not require a name; visible Play button; touch-correct control hints (D-049) | 10 | reviewed + approved 2026-09-25 (PR #40, 5328f77) — awaiting merge | cheap-mid | — |
-| T31 | Text entry without a hardware keyboard: virtual keyboard + visible confirm, name and D-048 restore field (D-049) | 10 | not started | mid | T30 |
+| T31 | Text entry without a hardware keyboard: virtual keyboard + visible confirm, name and D-048 restore field (D-049) | 10 | reviewed + approved 2026-09-25 (PR #41, 8f7703f) — awaiting merge | mid | T30 |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8 → T10 → T9 →
 **Phase 5:** T11 ∥ T12 → T11.1 (deploy) → T13.
@@ -1003,3 +1003,31 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   consistent with D-049, which gates play on identity, not on focus. **Not verified:** that touch
   *zones* map to these actions on real hardware (T24 owns the zones; the planner drove actions
   directly), and no real iPhone yet.
+- 2026-09-25: T31 (PR #41, 8f7703f, base 90bdc78) reviewed in a scratch clone, deleted after. Scope
+  ✓ — exactly the 6 permitted files. Gate re-run: **25 PASS**, zero FAIL; Semgrep, Trivy and Bugbot
+  all clean. **Approved, no blocking defects.**
+- 2026-09-25: The risk worth checking was the worker's own disclosure — `ConfirmButton` is drawn
+  **outside** `NameEntry`'s rect and depends on `clip_contents = false`. Enumerated every Title child
+  covering `(576,48)-(704,192)`: only `Shade` (mouse_filter 2, IGNORE, cannot take a tap) and
+  `Settings` (STOP but `visible_in_tree = false`). `GameOver` is layer 20 above Title but hidden;
+  HUD and TouchControls are below. Nothing intercepts the point, so Godot recurses in and picks the
+  button. The model matches the engine.
+- 2026-09-25: **Planner probe error, caught by a positive control rather than shipped.** A real
+  `InputEventMouseButton` at the Done button fired nothing, which looked like a blocking defect.
+  Tapping `SettingsButton` and `PlayButton` — ordinary in-bounds controls — also fired nothing:
+  **headless Godot routes no GUI input at all**, exactly as the handoff disclosed. Standing lesson:
+  before reporting a negative from synthetic input, run the positive control first. Without it this
+  was a wrong change request and a wasted worker round trip.
+- 2026-09-25: Negative control on the new guard — flipping the flag back to `false` in a scratch
+  clone produced `EXPORT_WEB FAIL case 2: generated preset missing
+  html/experimental_virtual_keyboard=true`. Real guard, not decoration. `variant/thread_support=false`
+  is unchanged, so the single-thread browser build is intact.
+- 2026-09-25: **Side effect worth recording, which the worker did not claim.** Because a touch load
+  no longer focuses the name field, `is_capturing()` is false there, and the launch swallow only
+  tests `capturing` — so tap-to-launch now works from the title on a fresh phone, making T30's
+  "Tap the table → Launch" hint true rather than aspirational.
+- 2026-09-25: **Still open after T31 merges:** deploy, then a real iPhone. Nobody has run any of
+  T29/T30/T31 on hardware; the live site predates all three. The last unverifiable path is whether
+  iOS swallows the Done tap while dismissing the keyboard. That device test also closes D-043.
+- Housekeeping, not a task: `tests/run_all.sh:58` creates `/tmp/squish-lb-test.log` and never removes
+  it, so every gate run leaves one behind. Harmless, noted so it is not misread as a worker's litter.
