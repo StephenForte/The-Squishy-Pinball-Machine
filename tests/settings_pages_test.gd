@@ -48,6 +48,8 @@ func _run() -> void:
 		return
 	if not await _case_link(main):
 		return
+	if not await _case_dismiss_cancels_inflight(main):
+		return
 
 	print("SETTINGS_PAGES PASS cases=%d" % _cases_passed)
 	quit(0)
@@ -303,6 +305,55 @@ func _case_link(main: Node) -> bool:
 		return _fail("case 5: failed confirm status '%s'" % ("" if link_status == null else link_status.text))
 	_cases_passed += 1
 	print("SETTINGS_PAGES case 5 pass")
+	return true
+
+
+func _case_dismiss_cancels_inflight(main: Node) -> bool:
+	print("SETTINGS_PAGES case 6 dismiss cancels in-flight restore")
+	var settings := _settings(main)
+	if settings == null:
+		return _fail("case 6: Settings missing")
+	var id_before := String(_profile.player_id)
+	if not await _dismiss_drops_late_success(settings, "cancel"):
+		return false
+	if String(_profile.player_id) != id_before:
+		return _fail("case 6: Not now let a late success adopt")
+	if not await _dismiss_drops_late_success(settings, "close"):
+		return false
+	if String(_profile.player_id) != id_before:
+		return _fail("case 6: Close let a late success adopt")
+	_cases_passed += 1
+	print("SETTINGS_PAGES case 6 pass")
+	return true
+
+
+func _dismiss_drops_late_success(settings: Control, how: String) -> bool:
+	var id_before := String(_profile.player_id)
+	settings.offer_restore_from_search("?restore=%s" % VALID_ID)
+	await process_frame
+	var panel := settings.get_node_or_null("LinkRestore") as Control
+	var cancel := settings.get_node_or_null("LinkRestore/CancelButton") as Button
+	if panel == null or not panel.visible or cancel == null:
+		return _fail("case 6: %s offer did not show" % how)
+	# restore_profile would have captured this generation, then gone async.
+	var captured := int(_leaderboard._restore_gen) + 1
+	_leaderboard._restore_gen = captured
+	settings._restore_busy = true
+	if how == "close":
+		settings.close()
+	else:
+		cancel.pressed.emit()
+	await process_frame
+	if int(_leaderboard._restore_gen) != captured + 1:
+		return _fail("case 6: %s did not retire the in-flight generation" % how)
+	_leaderboard._on_restore_profile_finished(true, 200, {
+		"player_id": VALID_ID,
+		"name": "Stolen",
+		"avatar": "bear_bounce",
+	}, "", captured)
+	await process_frame
+	if String(_profile.player_id) != id_before or String(_profile.player_name) == "Stolen":
+		return _fail("case 6: %s late success adopted %s" % [how, _profile.player_id])
 	return true
 
 

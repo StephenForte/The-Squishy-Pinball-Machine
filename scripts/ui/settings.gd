@@ -125,8 +125,7 @@ func open() -> void:
 func close() -> void:
 	visible = false
 	_set_code_visible(false)
-	_restore_busy = false
-	_set_restore_busy(false)
+	_abandon_inflight_restore()
 	_release_restore_focus()
 	# Close declines an unconfirmed link. It does not adopt.
 	_pending_link_id = ""
@@ -412,12 +411,26 @@ func _on_link_confirm() -> void:
 
 
 func _on_link_cancel() -> void:
+	_abandon_inflight_restore()
 	_pending_link_id = ""
 	if _link_status != null:
 		_link_status.text = ""
 	if _link_panel != null:
 		_link_panel.visible = false
 	_apply_page_layout()
+
+
+## Leaderboard adopts inside its own HTTP callback, before restore_finished.
+## Not now / Close bump the existing generation so that callback is stale
+## and drops the adopt (the same guard as a superseded restore).
+func _abandon_inflight_restore() -> void:
+	if not _restore_busy:
+		return
+	var leaderboard := get_node_or_null("/root/Leaderboard")
+	if leaderboard != null:
+		leaderboard._restore_gen = int(leaderboard._restore_gen) + 1
+	_restore_busy = false
+	_set_restore_busy(false)
 
 
 func _begin_restore(raw: String) -> void:
