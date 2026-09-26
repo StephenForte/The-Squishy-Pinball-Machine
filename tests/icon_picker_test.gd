@@ -66,8 +66,14 @@ func _case_1_present(main: Node) -> bool:
 		return _fail("case 1: IconPicker should stay hidden while Settings is closed")
 	settings.visible = true
 	await process_frame
+	if picker.is_visible_in_tree():
+		return _fail("case 1: IconPicker should stay on the phone page")
+	if not settings.has_method("show_page"):
+		return _fail("case 1: Settings.show_page missing")
+	settings.show_page("device")
+	await process_frame
 	if not picker.visible or not picker.is_visible_in_tree():
-		return _fail("case 1: IconPicker should be visible once Settings is open")
+		return _fail("case 1: IconPicker should be visible on the phone page")
 	var name_label := picker.get_node_or_null("NameLabel") as Label
 	if name_label == null:
 		return _fail("case 1: NameLabel missing")
@@ -188,6 +194,8 @@ func _case_5_layout(main: Node) -> bool:
 		if child == picker or not (child is Control):
 			continue
 		var sibling := child as Control
+		if not sibling.visible:
+			continue
 		var sibling_rect: Rect2 = sibling.get_global_rect()
 		if picker_rect.intersects(sibling_rect):
 			return _fail(

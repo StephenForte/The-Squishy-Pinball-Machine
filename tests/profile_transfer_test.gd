@@ -397,6 +397,9 @@ func _case_9_lineedit_does_not_leak(main: Node) -> bool:
 	await process_frame
 	if not settings.is_visible_in_tree():
 		return _fail("case 9: Settings should be open")
+	if settings.has_method("show_page"):
+		settings.show_page("device")
+		await process_frame
 	edit.text = ""
 	edit.grab_focus()
 	await process_frame
