@@ -53,7 +53,7 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T31 | Text entry without a hardware keyboard: virtual keyboard + visible confirm, name and D-048 restore field (D-049) | 10 | **done** 2026-09-26 — merged (PR #41), deployed, keyboard confirmed live on iPhone | mid | T30 |
 | T32 | **Game over unusable on touch:** Restart/Menu invisible (no StyleBoxFlat) + invite a name so a score can be saved (D-051) | 10 | not started | cheap-mid | — |
 | T33 | Board reports "Leaderboard offline" and an empty list after the server answered 200 (D-051) | 10 | not started | mid | — |
-| T34 | Title name never commits on a phone: confirm sits in the opposite corner from the field; commit on blur/return (D-051) | 10 | not started | cheap-mid | — |
+| T34 | Title name never commits on a phone: confirm sits in the opposite corner from the field; commit on blur/return (D-051) | 10 | **held** — Steve 2026-09-26: do not dispatch until T32 is back | cheap-mid | T32 |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8 → T10 → T9 →
 **Phase 5:** T11 ∥ T12 → T11.1 (deploy) → T13.
@@ -1068,3 +1068,7 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
 - 2026-09-26: T34 is separate from T32 on purpose — different file (`name_entry.*`), different screen,
   and T32 was already dispatched with `name_entry` explicitly closed. The T32 worker was sent an
   addendum so its game-over name prompt does not repeat the same mistake.
+- 2026-09-26: Steve: hold T34 until T32 returns. Reason it is a real dependency and not just
+  sequencing — T32's game-over prompt may conclude it should reuse the title's `NameEntry` scene
+  rather than introduce a second confirm pattern, and that answer changes what T34 should build.
+  Dispatching both now risks two different solutions to the same problem landing in one week.
