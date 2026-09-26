@@ -1104,3 +1104,49 @@ input inherits the new constraint — "it already has the control" is the wrong 
   code to would hold it; the public board publishes it, so that justification is void. Not urgent on
   an unadvertised family URL, and the shipped Godot client parses those fields, so removing it needs
   checking against `game_over.gd` and `title.gd` first.
+
+## D-053 — The name IS the identity; transfer codes are abandoned (Steve, 2026-09-26)
+Steve, after trying the T35 flow on a real phone: "xfer is bad UX. I can't create the link easily,
+nor am I going to expect a 10 year old to do so. Second when I try to paste just the code in after
+texting it, it took 10 tries and then failed with 'couldn't reach the leaderboard'. I think we will
+have to do it a different way. Longer term we can have a simple UID/PWD but to keep it simple we can
+do an unauthenticated UID, ie ANYONE can type in 'natasha' but there will only be 1 natasha (for
+now)."
+**This supersedes D-048's transfer-by-player-id and the client half of D-052.** A 36-character code
+that has to be copied between devices was the wrong shape for a family game, and two rounds of work
+(T29, T35) made it *reachable* without ever making it *usable*.
+- **Typing a name claims that player.** Names are unique across the whole board on a normalized key
+  (the existing D-026 sanitization plus case folding, so "Natasha" and "natasha" are one player). If
+  the name exists, the device adopts that player; if it does not, it is created.
+- **Unauthenticated, deliberately.** Anyone can type any name and become that player. Steve chose
+  this explicitly for now. It is written down as an accepted risk, not an oversight: on a family
+  board the worst case is a sibling prank, and a password comes later.
+- **The design must not preclude a password.** Whatever resolves a name today should be able to take
+  an optional secret later without changing the client's call shape.
+- **The transfer UI goes away.** The transfer code display, the restore field, the Paste control and
+  the link-restore panel are removed rather than left as dead controls. This is the third time this
+  screen has been extended; removing it is part of the "too busy" fix, not separate from it.
+- **Two Dads must become one.** Today `b8aa808f...` holds 14300 and `86f2ea8f...` holds 2000. The id
+  with the real history is canonical; the stray is removed. The 14300 survives.
+- **Offline is the case that decides whether this is safe.** Name entry now needs the server, and
+  Steve's own failure was exactly a request that never arrived. If a name cannot be resolved, the
+  game must let the player keep playing and must NOT silently invent a divergent local identity that
+  later collides with the real one. Defining that behaviour is part of the work, not an afterthought.
+
+## D-054 — CORS is a single exact origin, and a rejected preflight is invisible (planner, 2026-09-26)
+Found while diagnosing the paste failure above. The server's request log shows the iPhone's
+preflights for `/v1/profile` returning **330 bytes at 22:03 and 133 bytes at 22:08 and 22:10**, with
+**no GET following the short ones**. Reproduced the mechanism against production: an allowed origin
+gets a 416-byte preflight header block, a disallowed origin, a `null` origin and a missing origin all
+get 219. So those attempts carried an `Origin` the allowlist rejected, the browser blocked the real
+request, and the client reported the generic "couldn't reach the leaderboard".
+- Render does not log the `Origin` header, so **what the origin actually was is unknown** and is not
+  guessed at here. The likely shape is a link opened in a context that did not present the site
+  origin.
+- **D-044's allowlist is one exact string.** Any variation — a redirector, a null origin, a
+  home-screen web-app context, a second hostname — fails closed and silently. Failing closed is
+  correct; being indistinguishable from "the network is down" is not.
+- This is a strong lead for **T33** ("Leaderboard offline" while the server answered 200): the two
+  symptoms are the same generic message, and a rejected preflight produces exactly it.
+- D-053 makes this worse rather than better: name entry will need a round trip, so an origin the
+  allowlist does not know will block a player from claiming their own name.
