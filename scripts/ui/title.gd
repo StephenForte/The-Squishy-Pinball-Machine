@@ -9,7 +9,11 @@ var _flippers_enabled := true
 @onready var _avatar_view: TextureRect = $AvatarView
 @onready var _settings_button: Button = $SettingsButton
 @onready var _name_button: Button = $NameButton
+@onready var _play_button: Button = $PlayButton
 @onready var _settings: Control = $Settings
+
+## Shown when DisplayServer reports a touchscreen. Desktop keeps the scene text.
+const _TOUCH_CONTROLS_TEXT := "Hold bottom left    Left flipper\nHold bottom right   Right flipper\nTap the table       Launch\nRestart button      Restart\nMenu button         Menu"
 
 var _leaderboard: Node
 var _title_offline := false
@@ -31,6 +35,9 @@ func _ready() -> void:
 	_settings_button.pressed.connect(_open_settings)
 	_name_button.focus_mode = Control.FOCUS_NONE
 	_name_button.pressed.connect(_open_name)
+	_play_button.focus_mode = Control.FOCUS_NONE
+	_play_button.pressed.connect(_on_play_pressed)
+	_apply_control_hints()
 	_refresh_name_ui(String(profile.player_name))
 	_refresh_avatar()
 	if _leaderboard != null:
@@ -75,6 +82,10 @@ func _apply_theme(_id: String = "") -> void:
 	_name_button.add_theme_stylebox_override("hover", style)
 	_name_button.add_theme_stylebox_override("pressed", style)
 	_name_button.add_theme_color_override("font_color", theme_node.color("text_on_color"))
+	_play_button.add_theme_stylebox_override("normal", style)
+	_play_button.add_theme_stylebox_override("hover", style)
+	_play_button.add_theme_stylebox_override("pressed", style)
+	_play_button.add_theme_color_override("font_color", theme_node.color("text_on_color"))
 
 
 func _on_name_changed(new_name: String) -> void:
@@ -190,7 +201,7 @@ func _open_name() -> void:
 
 
 func _open_settings() -> void:
-	if _dismissed or _is_capturing_name() or _needs_name():
+	if _dismissed or _is_capturing_name():
 		return
 	if _settings != null and _settings.has_method("open"):
 		_settings.open()
@@ -207,6 +218,7 @@ func _is_capturing_name() -> bool:
 	return _name_entry != null and _name_entry.has_method("is_capturing") and _name_entry.is_capturing()
 
 
+## Kept so callers can still ask. D-049: launch and settings must not gate on it.
 func _needs_name() -> bool:
 	var profile := get_node_or_null("/root/Profile")
 	return profile != null and String(profile.player_name).is_empty()
@@ -233,7 +245,7 @@ func _input(event: InputEvent) -> void:
 	if not (event is InputEventAction):
 		return
 	var capturing := _is_capturing_name()
-	if (capturing or _needs_name()) and event.is_action_pressed("launch_ball"):
+	if capturing and event.is_action_pressed("launch_ball"):
 		get_viewport().set_input_as_handled()
 		return
 	if capturing and event.is_action_pressed("restart"):
@@ -245,14 +257,14 @@ func _input(event: InputEvent) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if _dismissed:
 		return
-	if _is_capturing_name() or _needs_name():
+	if _is_capturing_name():
 		if event.is_action_pressed("launch_ball"):
 			get_viewport().set_input_as_handled()
-		if _is_capturing_name() and event.is_action_pressed("restart"):
+		if event.is_action_pressed("restart"):
 			get_viewport().set_input_as_handled()
-		if _is_capturing_name() and event.is_action_pressed("menu"):
+		if event.is_action_pressed("menu"):
 			get_viewport().set_input_as_handled()
-		if _is_capturing_name() and event is InputEventKey and event.pressed:
+		if event is InputEventKey and event.pressed:
 			var key := event as InputEventKey
 			if key.physical_keycode == KEY_LEFT or key.physical_keycode == KEY_RIGHT:
 				get_viewport().set_input_as_handled()
@@ -268,8 +280,44 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		return
 	if event.is_action_pressed("launch_ball"):
-		_dismissed = true
-		_close_settings()
+		_dismiss_title()
+
+
+func _apply_control_hints() -> void:
+	var label := get_node_or_null("ControlsLabel") as Label
+	if label == null:
+		return
+	if DisplayServer.is_touchscreen_available():
+		label.text = _TOUCH_CONTROLS_TEXT
+
+
+## Fresh devices auto-focus the name field, and launch_ball is still swallowed
+## while that focus is held. A Play press leaves the field, then uses the same
+## launch action that dismisses the title.
+func _on_play_pressed() -> void:
+	if _dismissed:
+		return
+	if _name_entry != null:
 		_name_entry.release_name_focus()
-		_set_flippers_enabled(true)
-		visible = false
+	var viewport := get_viewport()
+	if viewport == null:
+		_dismiss_title()
+		return
+	var press := InputEventAction.new()
+	press.action = &"launch_ball"
+	press.pressed = true
+	viewport.push_input(press)
+	var release := InputEventAction.new()
+	release.action = &"launch_ball"
+	release.pressed = false
+	viewport.push_input(release)
+
+
+func _dismiss_title() -> void:
+	if _dismissed:
+		return
+	_dismissed = true
+	_close_settings()
+	_name_entry.release_name_focus()
+	_set_flippers_enabled(true)
+	visible = false
