@@ -51,9 +51,9 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T29 | Profile transfer: show this device’s player id, restore an existing identity by pasting it (D-048) | 10 | reviewed + approved 2026-09-20 (PR #39, efa1520) — awaiting merge | cheap-mid | T20b |
 | T30 | **iPhone unlock:** play must not require a name; visible Play button; touch-correct control hints (D-049) | 10 | reviewed + approved 2026-09-25 (PR #40, 5328f77) — awaiting merge | cheap-mid | — |
 | T31 | Text entry without a hardware keyboard: virtual keyboard + visible confirm, name and D-048 restore field (D-049) | 10 | **done** 2026-09-26 — merged (PR #41), deployed, keyboard confirmed live on iPhone | mid | T30 |
-| T32 | **Game over unusable on touch:** Restart/Menu invisible (no StyleBoxFlat) + invite a name so a score can be saved (D-051) | 10 | not started | cheap-mid | — |
+| T32 | **Game over unusable on touch:** Restart/Menu invisible (no StyleBoxFlat) + invite a name so a score can be saved (D-051) | 10 | reviewed + approved 2026-09-26 (PR #42, 04df0f0) — awaiting merge | cheap-mid | — |
 | T33 | Board reports "Leaderboard offline" and an empty list after the server answered 200 (D-051) | 10 | not started | mid | — |
-| T34 | Title name never commits on a phone: confirm sits in the opposite corner from the field; commit on blur/return (D-051) | 10 | **held** — Steve 2026-09-26: do not dispatch until T32 is back | cheap-mid | T32 |
+| T34 | Title name never commits on a phone: confirm sits in the opposite corner from the field; commit on blur/return (D-051) | 10 | **unblocked** 2026-09-26 — T32 answered the NameEntry question: fix the title prompt in place, do not reuse it | cheap-mid | T32 |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8 → T10 → T9 →
 **Phase 5:** T11 ∥ T12 → T11.1 (deploy) → T13.
@@ -1072,3 +1072,27 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   sequencing — T32's game-over prompt may conclude it should reuse the title's `NameEntry` scene
   rather than introduce a second confirm pattern, and that answer changes what T34 should build.
   Dispatching both now risks two different solutions to the same problem landing in one week.
+- 2026-09-26: T32 (PR #42, 04df0f0, base 8354d96) reviewed in a scratch clone, deleted after. Scope
+  ✓ — exactly 4 files, and notably **without** touching `leaderboard.gd`, which the brief had closed
+  with a stop-and-report. Gate re-run: **26 PASS**, zero FAIL. Semgrep and Trivy green.
+  **Approved, no blocking defects.**
+- 2026-09-26: The expensive failure would be a duplicate row on the family board, so it was measured
+  rather than reasoned about — six scenarios against a fresh local server, counting **raw score rows**
+  via `/v1/admin/scores`: save 1, save-twice 1, return-key 1, decline 0, restart-with-text 1,
+  save-then-restart 1. `return_key` is the one that answers the original field report: the return key
+  alone commits, with no tap on Save.
+- 2026-09-26: **Planner instrument error, corrected mid-review.** The first pass counted entries on
+  `/v1/leaderboard`, which collapses to best-per-player — a duplicate post would still have read as
+  one entry, so it proved nothing. Re-ran against raw rows and then proved the counter could see a
+  duplicate at all by posting twice deliberately (`raw_rows=2`). Standing lesson alongside the
+  positive-control one: check that the metric can distinguish the failure before trusting the pass.
+- 2026-09-26: Bugbot again earned its keep — on `68a5375` it found that `_on_skip_down` latched
+  `_declined` on press-down, so a cancelled "Not now" permanently refused to save. Real medium defect
+  the worker's own tests missed; fixed in `04df0f0`, verified by diffing the reviewed SHA. **Bugbot
+  has not re-reviewed `04df0f0`**, so the fix commit carries no bot verdict — state, not defect.
+- 2026-09-26: **T34 is unblocked and its shape is now decided.** T32 argued, and the planner accepts,
+  that game over must NOT reuse the title `NameEntry`: that scene's confirm sits in the far corner,
+  its empty-name cancel re-grabs focus, and it only calls `set_name` while game over must post or
+  discard exactly one score. T34 therefore fixes the title prompt in place rather than sharing a
+  scene. Open for Steve: how insistent the name ask should be (T32 ships "always ask when unnamed,
+  Not now one tap away").
