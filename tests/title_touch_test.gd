@@ -112,15 +112,15 @@ func _case_launch_with_empty_name(main: Node, title: Node) -> bool:
 
 
 func _case_settings_with_empty_name(main: Node, title: Node) -> bool:
-	print("TITLE_TOUCH case 3 empty name opens settings")
+	print("TITLE_TOUCH case 3 settings opens while name field is focused")
 	if title.has_method("show_menu"):
 		title.show_menu()
 	await process_frame
 	await process_frame
 	if not title.visible:
 		return _fail("case 3: Title should be visible")
-	if not await _release_name_capture(title):
-		return _fail("case 3: could not leave the name field")
+	if not await _wait_capturing(title):
+		return _fail("case 3: name field did not capture on an empty name")
 	var button := title.get_node_or_null("SettingsButton") as Button
 	var settings := title.get_node_or_null("Settings")
 	if button == null or settings == null:
@@ -133,7 +133,7 @@ func _case_settings_with_empty_name(main: Node, title: Node) -> bool:
 	else:
 		open = settings.visible
 	if not open:
-		return _fail("case 3: Settings button did not open the overlay")
+		return _fail("case 3: Settings button did not open the overlay while the name field was focused")
 	if settings.has_method("close"):
 		settings.close()
 	await process_frame

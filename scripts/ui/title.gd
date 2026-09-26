@@ -32,7 +32,7 @@ func _ready() -> void:
 	if not profile.avatar_changed.is_connected(_on_avatar_changed):
 		profile.avatar_changed.connect(_on_avatar_changed)
 	_settings_button.focus_mode = Control.FOCUS_NONE
-	_settings_button.pressed.connect(_open_settings)
+	_settings_button.pressed.connect(_on_settings_pressed)
 	_name_button.focus_mode = Control.FOCUS_NONE
 	_name_button.pressed.connect(_open_name)
 	_play_button.focus_mode = Control.FOCUS_NONE
@@ -205,6 +205,15 @@ func _open_settings() -> void:
 		return
 	if _settings != null and _settings.has_method("open"):
 		_settings.open()
+
+
+## The button takes no focus, so a tap does not blur NameEdit. A fresh device
+## auto-focuses that field; release it first. S while the field is focused
+## still reaches _open_settings and is refused.
+func _on_settings_pressed() -> void:
+	if _name_entry != null:
+		_name_entry.release_name_focus()
+	_open_settings()
 
 
 func _close_settings() -> void:
