@@ -9,6 +9,10 @@ const DESKTOP_CONTROLS := "A / ←   Left flipper\nD / →   Right flipper\nSpac
 const MIN_PLAY_PX := 64.0 * 720.0 / 375.0
 ## settings_test case 6: visible Title controls must not pass y=1150.
 const TITLE_FLOOR := 1150.0
+## Bottom half of the 720×1280 viewport. Taller than an iPhone portrait
+## keyboard (~40%), so a control that clears it still clears a real one.
+## Headless cannot raise the OS keyboard; this rect stands in for it.
+const KEYBOARD_TOP := 640.0
 
 var _cases_passed: int = 0
 
@@ -63,6 +67,8 @@ func _run() -> void:
 	if not await _case_play_button(main, title):
 		return
 	if not await _case_launch_blocked_while_capturing(main, title):
+		return
+	if not await _case_play_above_keyboard(main, title):
 		return
 
 	print("TITLE_TOUCH PASS cases=%d" % _cases_passed)
@@ -199,6 +205,103 @@ func _case_launch_blocked_while_capturing(main: Node, title: Node) -> bool:
 	_cases_passed += 1
 	print("TITLE_TOUCH case 5 pass")
 	return true
+
+
+func _case_play_above_keyboard(main: Node, title: Node) -> bool:
+	print("TITLE_TOUCH case 6 touch keyboard leaves Play reachable")
+	Input.emulate_touch_from_mouse = true
+	if not DisplayServer.is_touchscreen_available():
+		return _fail("case 6: touchscreen was not reported")
+	if title.has_method("show_menu"):
+		title.show_menu()
+	await process_frame
+	await process_frame
+	var profile := root.get_node_or_null("Profile")
+	if profile == null or String(profile.player_name) != "":
+		return _fail("case 6: expected an empty name before confirm")
+	if not title.visible:
+		return _fail("case 6: Title should be visible")
+	# Fresh touch device must not focus the field, or the keyboard rises on load.
+	if _name_is_capturing(title):
+		return _fail("case 6: fresh touch device auto-focused the name field")
+	if not await _wait_capturing(title):
+		return _fail("case 6: name field did not take focus")
+
+	var play := title.get_node_or_null("PlayButton") as Button
+	if play == null or not play.visible:
+		return _fail("case 6: PlayButton missing or hidden")
+	var play_rect := play.get_global_rect()
+	var visible_band := Rect2(0, 0, 720, KEYBOARD_TOP)
+	var occlusion := Rect2(0, KEYBOARD_TOP, 720, 1280.0 - KEYBOARD_TOP)
+	if not visible_band.encloses(play_rect):
+		return _fail("case 6: PlayButton %s is outside the band above the keyboard" % play_rect)
+	if play_rect.intersects(occlusion):
+		return _fail("case 6: PlayButton %s intersects the keyboard occlusion" % play_rect)
+	if play_rect.end.y > TITLE_FLOOR:
+		return _fail("case 6: PlayButton extends below y=1150: %s" % play_rect)
+	var play_hit := _top_stop_at(title, play_rect.get_center())
+	if play_hit != play:
+		var hit_name := "none" if play_hit == null else String(play_hit.name)
+		return _fail("case 6: Play center hits %s, not PlayButton" % hit_name)
+
+	var confirm := title.get_node_or_null("NameEntry/ConfirmButton") as Button
+	if confirm == null or not confirm.visible:
+		return _fail("case 6: ConfirmButton missing or hidden")
+	var confirm_rect := confirm.get_global_rect()
+	if confirm_rect.size.x < MIN_PLAY_PX or confirm_rect.size.y < MIN_PLAY_PX:
+		return _fail("case 6: ConfirmButton %s smaller than %.1f px" % [confirm_rect.size, MIN_PLAY_PX])
+	if confirm_rect.intersects(play_rect):
+		return _fail("case 6: ConfirmButton %s overlaps PlayButton %s" % [confirm_rect, play_rect])
+	if not visible_band.encloses(confirm_rect):
+		return _fail("case 6: ConfirmButton %s is outside the band above the keyboard" % confirm_rect)
+	if confirm_rect.intersects(occlusion):
+		return _fail("case 6: ConfirmButton intersects the keyboard occlusion")
+	if confirm_rect.end.y > TITLE_FLOOR:
+		return _fail("case 6: ConfirmButton extends below y=1150: %s" % confirm_rect)
+	var confirm_hit := _top_stop_at(title, confirm_rect.get_center())
+	if confirm_hit != confirm:
+		var confirm_hit_name := "none" if confirm_hit == null else String(confirm_hit.name)
+		return _fail("case 6: Done center hits %s, not ConfirmButton" % confirm_hit_name)
+
+	var edit := title.get_node_or_null("NameEntry/NameEdit") as LineEdit
+	if edit == null:
+		return _fail("case 6: NameEdit missing")
+	edit.text = "   "
+	confirm.pressed.emit()
+	await process_frame
+	await process_frame
+	if String(profile.player_name) != "":
+		return _fail("case 6: blank confirm set name to '%s'" % profile.player_name)
+	if not title.visible:
+		return _fail("case 6: blank confirm dismissed the title")
+	edit.text = "Squish"
+	confirm.pressed.emit()
+	await process_frame
+	await process_frame
+	if String(profile.player_name) != "Squish":
+		return _fail("case 6: Done did not commit, name is '%s'" % profile.player_name)
+	_cases_passed += 1
+	print("TITLE_TOUCH case 6 pass")
+	return true
+
+
+func _top_stop_at(node: Node, point: Vector2) -> Control:
+	if node is CanvasItem and not (node as CanvasItem).visible:
+		return null
+	if node is Control:
+		var ctrl := node as Control
+		if ctrl.clip_contents and not ctrl.get_global_rect().has_point(point):
+			return null
+	var children := node.get_children()
+	for i in range(children.size() - 1, -1, -1):
+		var found := _top_stop_at(children[i], point)
+		if found != null:
+			return found
+	if node is Control:
+		var leaf := node as Control
+		if leaf.mouse_filter == Control.MOUSE_FILTER_STOP and leaf.get_global_rect().has_point(point):
+			return leaf
+	return null
 
 
 func _reset_profile(profile: Node) -> void:
