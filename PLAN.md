@@ -50,7 +50,9 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T28 | Admin score listing so a row can be found and deleted (D-047) | 9 | **done** 2026-09-21 — merged, deployed, Smoke Test row deleted | cheap | T27 |
 | T29 | Profile transfer: show this device’s player id, restore an existing identity by pasting it (D-048) | 10 | reviewed + approved 2026-09-20 (PR #39, efa1520) — awaiting merge | cheap-mid | T20b |
 | T30 | **iPhone unlock:** play must not require a name; visible Play button; touch-correct control hints (D-049) | 10 | reviewed + approved 2026-09-25 (PR #40, 5328f77) — awaiting merge | cheap-mid | — |
-| T31 | Text entry without a hardware keyboard: virtual keyboard + visible confirm, name and D-048 restore field (D-049) | 10 | reviewed + approved 2026-09-25 (PR #41, 8f7703f) — awaiting merge | mid | T30 |
+| T31 | Text entry without a hardware keyboard: virtual keyboard + visible confirm, name and D-048 restore field (D-049) | 10 | **done** 2026-09-26 — merged (PR #41), deployed, keyboard confirmed live on iPhone | mid | T30 |
+| T32 | **Game over unusable on touch:** Restart/Menu invisible (no StyleBoxFlat) + invite a name so a score can be saved (D-051) | 10 | not started | cheap-mid | — |
+| T33 | Board reports "Leaderboard offline" and an empty list after the server answered 200 (D-051) | 10 | not started | mid | — |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8 → T10 → T9 →
 **Phase 5:** T11 ∥ T12 → T11.1 (deploy) → T13.
@@ -1031,3 +1033,23 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   iOS swallows the Done tap while dismissing the keyboard. That device test also closes D-043.
 - Housekeeping, not a task: `tests/run_all.sh:58` creates `/tmp/squish-lb-test.log` and never removes
   it, so every gate run leaves one behind. Harmless, noted so it is not misread as a worker's litter.
+- 2026-09-26: **First real iPhone session. T29+T30+T31 all work** — the build loads, Play starts a
+  game, and the virtual keyboard comes up. Two field bugs reported, three found (D-051).
+- 2026-09-26: Reproduced in a mobile browser against the live build, then cross-checked against the
+  **server's own request log**, which is what made the diagnosis certain. From Steve's phone
+  (`iPhone OS 26_6_2`, Chrome iOS): `OPTIONS /v1/leaderboard` 204, `GET ?limit=5` 200, `GET ?limit=10`
+  200, and **no `POST /v1/scores` at any point**. So the missing high score is not connectivity, not
+  CORS and not the deploy — the submit was never attempted, because `leaderboard.gd:_on_game_over`
+  returns early on an empty name and nothing ever asks for one. D-049 already required the game-over
+  screen to invite a name; T30 owned the title and T31 owned name entry, so the clause fell between
+  them. → T32.
+- 2026-09-26: "No way back to the menu" is **invisible, not missing**. `RestartButton` and
+  `MenuButton` are present, correctly positioned and wired. `game_over.gd` is the only UI script that
+  never builds a `StyleBoxFlat` — title, settings, name_entry, theme_picker and icon_picker all do —
+  so they keep Godot's default dark box under `text_on_color` text, on a dark shade, and read as two
+  faint rectangles. The one legible line is "R restart · Esc menu", which is keyboard-only. → T32.
+- 2026-09-26: Third finding, not reported by Steve and only visible because the server log was
+  checked: the game-over screen showed **"Leaderboard offline" with an empty list even though that
+  game's `GET /v1/leaderboard?limit=10` returned 200 with 551 bytes**. `_reset_leaderboard_ui()`
+  hides the label at every game over, so something re-showed it, and `last_entries` was empty too.
+  Client-side, root cause not determined. → T33, which must not block T32.
