@@ -964,3 +964,35 @@ made a third Dad.
 - **Accepted risk, documented rather than mitigated:** the id is a bearer credential — anyone
   holding it can post scores as that player. Proportionate for a family-scale game; real accounts
   are not.
+
+## D-049 — The title screen must never gate play behind a name (planner, 2026-09-25)
+Steve: "The pinball does not work on an iPhone. The issue is the main screen." Reproduced at
+375x812 with touch emulation against the live build: tapping the playfield does nothing and the
+Settings button does nothing. A fresh phone is **hard-locked on the title screen**. The chain, all
+four links verified:
+1. No `user://profile.save` on a new device → `Profile.player_name` is empty → `_needs_name()` true.
+2. TouchControls' launch tap fires correctly (`_fire_launch` pushes an `InputEventAction`), but
+   `title.gd:236` swallows it: `if (capturing or _needs_name()) and is_action_pressed("launch_ball")`.
+3. `title.gd:193` `_open_settings()` early-returns on `_needs_name()`, so Settings is dead too.
+4. The only way out is a typed name plus **Enter**. The page has **zero `<input>` elements** — the
+   Godot canvas gives iOS nothing to attach a keyboard to, and there is no Enter key.
+The name gate was never wrong on desktop, where a keyboard always exists. It becomes a trap on the
+one platform where D-042 said we were heading.
+- **Play is never gated on identity.** `_needs_name()` must not appear in any launch or settings
+  gate. An unnamed player starts the game immediately and is named later or never.
+- **A visible, finger-sized Play button on the title.** A hidden tap zone is not discoverable and
+  was not what failed here — but "Space Launch" as the only instruction is useless on a phone.
+  On a touch device the control list shows touch equivalents, not key names.
+- **Never submit an empty name.** An unnamed run must not PUT a blank profile or post a nameless
+  score. If a score is worth keeping, the game-over screen invites a name; declining is allowed and
+  the score is simply not submitted.
+- **Text entry must work without a hardware keyboard.** The shipped web build already contains the
+  engine hooks (`godot_js_display_vk_show` / `_hide` / `_available`), so a focused field calls
+  `DisplayServer.virtual_keyboard_show()` when `FEATURE_VIRTUAL_KEYBOARD` is present, and hides it on
+  confirm or blur. Enter is not the only way to confirm: every text field gets a visible confirm
+  control.
+- **This applies to D-048's restore field too.** A transfer code cannot be pasted on a phone today,
+  which makes the two-Dads fix unusable on the device that created the second Dad.
+- **Split deliberately:** the playability fix ships on its own (T30) because it unblocks the family
+  now; keyboard entry follows (T31). Between the two, a phone can play but cannot name itself, and
+  therefore cannot post to the board. That is an accepted temporary state, not an oversight.
