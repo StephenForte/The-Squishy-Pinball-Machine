@@ -996,3 +996,34 @@ one platform where D-042 said we were heading.
 - **Split deliberately:** the playability fix ships on its own (T30) because it unblocks the family
   now; keyboard entry follows (T31). Between the two, a phone can play but cannot name itself, and
   therefore cannot post to the board. That is an accepted temporary state, not an oversight.
+
+## D-050 — Correcting D-049: the keyboard is an export flag, not missing code (planner, 2026-09-25)
+**D-049 got the mechanism wrong and this supersedes that clause.** D-049 said the shipped build
+"already contains the engine hooks ... so a focused field calls
+`DisplayServer.virtual_keyboard_show()`", which implied the fix was GDScript. It is not. Read from
+the deployed `index.js`:
+- `GodotDisplayVK.available()` returns `GodotConfig.virtual_keyboard && "ontouchstart" in window`.
+- `GodotDisplayVK.init()` is what creates the hidden `<input>` and `<textarea>` and inserts them
+  next to the canvas. It only runs when `available()` is true.
+- The live page carries `"experimentalVK": false`, because `tools/export_web.sh:164` writes
+  `html/experimental_virtual_keyboard=false`.
+So the hooks exist but are switched off at export time, which is why the planner measured **zero
+`<input>` elements** in the DOM. The engine never builds the element iOS would attach a keyboard to.
+- **The fix is the export preset**, one flag, plus a re-export. No `DisplayServer` call is needed:
+  `LineEdit.virtual_keyboard_enabled` already defaults true and raises the keyboard on focus once
+  `available()` is true.
+- **Enter is probably already handled.** `init()` wires `keydown`/`keyup` on the `input` element and
+  forwards only `Enter` into `GodotInput.onKeyEvent`, so an iOS return key should confirm a
+  `LineEdit`. D-049 still requires a **visible confirm control** anyway, and that requirement
+  stands: the failure mode if the return key does not behave is the same hard-lock this whole line
+  of work exists to remove, and nobody can test iOS Safari from the dev machine. `RestoreProfile`
+  already has `RestoreButton`; **`NameEntry` has only `PromptLabel` and `NameEdit`**, so the name
+  field is the one that needs a confirm control added.
+- **New trap this creates.** A fresh device auto-focuses the name field (`_refresh_name_ui("")` →
+  `NameEntry.open()` → `grab_focus()`). With the keyboard enabled, that focus will now raise the iOS
+  keyboard immediately on load, which can cover the Play button T30 just added and re-strand the
+  user. Whatever T31 does must keep Play reachable with the keyboard up.
+- **`experimental_virtual_keyboard` is Godot's own word, not ours.** Treat regressions in canvas
+  sizing, focus or scroll as expected risks of the flag, and back it out rather than paper over it
+  if the title becomes worse on a phone than it is today.
+- **Acceptance is a real iPhone.** This cannot be proven in CI or headless; the operator runs it.
