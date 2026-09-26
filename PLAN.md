@@ -49,7 +49,7 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T27 | Admin cleanup + per-IP limiting so a griefed board is repairable (D-046) | 9 | merged + **deployed live** 2026-09-21 (PR #36 → 3fc6560) | mid | T25 |
 | T28 | Admin score listing so a row can be found and deleted (D-047) | 9 | **done** 2026-09-21 — merged, deployed, Smoke Test row deleted | cheap | T27 |
 | T29 | Profile transfer: show this device’s player id, restore an existing identity by pasting it (D-048) | 10 | reviewed + approved 2026-09-20 (PR #39, efa1520) — awaiting merge | cheap-mid | T20b |
-| T30 | **iPhone unlock:** play must not require a name; visible Play button; touch-correct control hints (D-049) | 10 | not started | cheap-mid | — |
+| T30 | **iPhone unlock:** play must not require a name; visible Play button; touch-correct control hints (D-049) | 10 | reviewed + approved 2026-09-25 (PR #40, 5328f77) — awaiting merge | cheap-mid | — |
 | T31 | Text entry without a hardware keyboard: virtual keyboard + visible confirm, name and D-048 restore field (D-049) | 10 | not started | mid | T30 |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8 → T10 → T9 →
@@ -981,3 +981,25 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
 - 2026-09-25: Observed but **not diagnosed** — the title showed "Leaderboard offline" during the
   mobile repro while the API answered fine from curl. Possibly the 3.0s `REQUEST_TIMEOUT` against a
   cold first request. Not folded into T30/T31; needs its own look if it recurs on a real phone.
+- 2026-09-25: T30 (PR #40, 5328f77, base 0ed9879) reviewed in a scratch clone, deleted after. Scope
+  ✓ — exactly 4 files. Gate re-run: **25 PASS**, zero FAIL. Semgrep and Trivy green on the SHA.
+  **Approved, no blocking defects.**
+- 2026-09-25: The suite's cases all end at `title.visible == false`, which proves the title goes
+  away, not that the game plays — the actual complaint. Probed separately on a fresh empty profile:
+  the ball launches, travels **805 px**, state reaches PLAYING and scores 600. A fresh phone can
+  genuinely play. Planner false alarm, resolved not reported: an earlier probe read `state=READY`
+  after launch; `state` only becomes PLAYING via `add_score` or a drain (`game.gd:48,85`), so that
+  was a too-short sample window, not a defect.
+- 2026-09-25: **The stay-alive addendum paid for itself immediately.** Bugbot fired on `40edfaf`
+  ("Settings still blocked when name focused") — a real medium-severity defect the worker's own
+  tests had missed, because the Settings button takes no focus so tapping it never blurred the
+  auto-focused name field. The worker was still alive, fixed it in `5328f77` (`_on_settings_pressed`
+  releases focus first), answered the thread, and strengthened the test that had sailed past it.
+  Verified by diffing `40edfaf..5328f77` rather than trusting the reply. Without the addendum this
+  would have merged broken — the same class of miss as the planner's own review of #39, where the
+  bot comment went unread.
+- 2026-09-25: Accepted design call — on a fresh device the name field auto-focuses, so tap-to-launch
+  stays swallowed and the Play button is the way in. Tested both directions (cases 4 and 5) and
+  consistent with D-049, which gates play on identity, not on focus. **Not verified:** that touch
+  *zones* map to these actions on real hardware (T24 owns the zones; the planner drove actions
+  directly), and no real iPhone yet.
