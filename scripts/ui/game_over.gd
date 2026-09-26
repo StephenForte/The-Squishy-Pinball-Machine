@@ -18,6 +18,11 @@ var _invite_open := false
 var _committed := false
 var _declined := false
 var _blur_commit_queued := false
+## True only while Not now is held. A drag-off must not latch a decline.
+var _skip_holding := false
+## Set on Not now press-down so a blur queued by that gesture cannot commit
+## after the finger lifts outside the button.
+var _suppress_blur_commit := false
 
 @onready var _celebration: Node = get_node_or_null("Celebration")
 @onready var _final_score_label: Label = $FinalScoreLabel
@@ -47,6 +52,7 @@ func _ready() -> void:
 	_save_button.pressed.connect(_on_save_pressed)
 	_skip_button.focus_mode = Control.FOCUS_NONE
 	_skip_button.button_down.connect(_on_skip_down)
+	_skip_button.button_up.connect(_on_skip_up)
 	_skip_button.pressed.connect(_on_skip_pressed)
 	_name_edit.max_length = 16
 	_name_edit.text_submitted.connect(_on_name_submitted)
@@ -145,6 +151,8 @@ func _on_game_over(final_score: int, is_high_score: bool) -> void:
 	_committed = false
 	_declined = false
 	_blur_commit_queued = false
+	_skip_holding = false
+	_suppress_blur_commit = false
 	_final_score_label.text = "FINAL  %d" % final_score
 	_high_score_label.text = "HIGH  %d" % _game.high_score
 	_new_high_score_label.visible = is_high_score
@@ -359,7 +367,10 @@ func _on_name_focus_exited() -> void:
 
 func _commit_from_blur() -> void:
 	_blur_commit_queued = false
-	if _declined or _committed or not _invite_open:
+	var suppress := _suppress_blur_commit or _skip_holding
+	if not _skip_holding:
+		_suppress_blur_commit = false
+	if _declined or _committed or not _invite_open or suppress:
 		return
 	var viewport := get_viewport()
 	if viewport != null and viewport.gui_get_hovered_control() == _skip_button:
@@ -396,11 +407,20 @@ func _on_save_pressed() -> void:
 
 
 func _on_skip_down() -> void:
-	_declined = true
+	_skip_holding = true
+	_suppress_blur_commit = true
+
+
+func _on_skip_up() -> void:
+	_skip_holding = false
+	if not _blur_commit_queued:
+		_suppress_blur_commit = false
 
 
 func _on_skip_pressed() -> void:
 	_declined = true
+	_skip_holding = false
+	_suppress_blur_commit = false
 	_hide_invite()
 	_release_name_focus()
 

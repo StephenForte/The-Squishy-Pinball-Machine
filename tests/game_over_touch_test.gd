@@ -72,6 +72,8 @@ func _run() -> void:
 		return
 	if not await _case_named_player_once(main, game, profile):
 		return
+	if not await _case_cancelled_skip(main, game, profile):
+		return
 
 	print("GAME_OVER_TOUCH PASS cases=%d" % _cases_passed)
 	quit(0)
@@ -402,6 +404,44 @@ func _case_named_player_once(main: Node, game: Node, profile: Node) -> bool:
 		return false
 	_cases_passed += 1
 	print("GAME_OVER_TOUCH case 10 pass")
+	return true
+
+
+func _case_cancelled_skip(main: Node, game: Node, profile: Node) -> bool:
+	print("GAME_OVER_TOUCH case 11 cancelled Not now still saves")
+	_reset_profile(profile)
+	var before := _attempt_snapshot()
+	var names_before := _names.size()
+	if not await _go_game_over(main, game, 460):
+		return false
+	var game_over := _game_over(main)
+	var edit := game_over.get_node_or_null("NameEdit") as LineEdit
+	var skip := _button(game_over, "SkipButton")
+	if edit == null or skip == null:
+		return _fail("case 11: name controls missing")
+	edit.text = "Nia"
+	edit.grab_focus()
+	await process_frame
+	# Press-down then release outside the button: pressed never fires.
+	skip.button_down.emit()
+	edit.focus_exited.emit()
+	skip.button_up.emit()
+	await process_frame
+	await process_frame
+	if _attempt_snapshot() != before or _names.size() != names_before:
+		return _fail("case 11: cancelled Not now submitted")
+	if String(profile.player_name) != "":
+		return _fail("case 11: cancelled Not now set name to '%s'" % profile.player_name)
+	if not edit.visible:
+		return _fail("case 11: cancelled Not now dismissed the prompt")
+	edit.text = "Nia"
+	edit.text_submitted.emit("Nia")
+	await process_frame
+	await process_frame
+	if not _assert_one_submit(before, names_before, "Nia", "case 11"):
+		return false
+	_cases_passed += 1
+	print("GAME_OVER_TOUCH case 11 pass")
 	return true
 
 
