@@ -54,7 +54,7 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T32 | **Game over unusable on touch:** Restart/Menu invisible (no StyleBoxFlat) + invite a name so a score can be saved (D-051) | 10 | reviewed + approved 2026-09-26 (PR #42, 04df0f0) — awaiting merge | cheap-mid | — |
 | T33 | Board reports "Leaderboard offline" and an empty list after the server answered 200 (D-051) | 10 | not started | mid | — |
 | T34 | Title name never commits on a phone: confirm sits in the opposite corner from the field; commit on blur/return (D-051) | 10 | **unblocked** 2026-09-26 — T32 answered the NameEntry question: fix the title prompt in place, do not reuse it | cheap-mid | T32 |
-| T35 | Profile transfer unusable on a phone: restore field sits under the keyboard and there is no paste path (D-048, D-051) | 10 | scope pending Steve’s call on link-based restore | mid | — |
+| T35 | Profile transfer unusable on a phone: restore field sits under the keyboard and there is no paste path (D-048, D-051) | 10 | reviewed + approved 2026-09-26 (PR #43, 6f2fc56) — awaiting merge | mid | — |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8 → T10 → T9 →
 **Phase 5:** T11 ∥ T12 → T11.1 (deploy) → T13.
@@ -1121,3 +1121,30 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   a hurry, but the contract states something untrue and should be corrected. The Godot client parses
   those fields, so removing `player_id` from the public board needs checking against `game_over.gd`
   and `title.gd` first.
+- 2026-09-26: T35 (PR #43, 6f2fc56, base bea6177) reviewed in a scratch clone, deleted after. Scope
+  ✓ — 7 files, picker scenes untouched (repositioned only). Gate **27 PASS**, zero FAIL, Semgrep and
+  Trivy green. **Approved, no blocking defects.**
+- 2026-09-26: Five existing checks were modified, so each was judged separately rather than accepted.
+  `settings_test` case 4 is a strengthening (four assertions where there were two, now covering both
+  directions). `settings_test` case 6 and `icon_picker_test` case 5 loosen "all children" to "visible
+  children" — correct, because pages share the content area by design — and the lost coverage is
+  **recovered and widened** by `settings_pages_test._case_geometry`, which loops both pages for
+  viewport containment and overlap where case 6 only ever validated one. Checked the vacuity failure
+  mode too: pages are not a wrapper node, so `settings.get_children()` still walks real siblings.
+- 2026-09-26: Bugbot found the most serious thing in the PR — a dismissed restore whose late success
+  still adopted an identity. Verified the fix with a positive control so the probe could not be
+  blind: a live generation adopts (`aaaaaaaa…`), closing mid-flight retires gen 2→3, and the late
+  success bound to gen 2 is dropped (identity stays `b8aa808f…`).
+- 2026-09-26: **The fix for Steve's actual complaint, measured:** `RestoreProfile/CodeEdit` moved from
+  **y 1088–1116 to y 234–298** — clear of the 640 keyboard line and twice as tall — with CloseButton
+  still reachable. The URL path cannot adopt without a press: non-UUID rejected, only
+  `_pending_link_id` set, `_begin_restore` reachable solely via confirm.
+- 2026-09-26: **Harness limit worth knowing before the next attempt.** A real-HTTP probe with a
+  deliberate server delay is not possible here: under `--fixed-fps`, `SceneTreeTimer` advances per
+  frame, so Leaderboard's `REQUEST_TIMEOUT + 0.25` watchdog fires almost instantly in wall-clock terms
+  and cancels any intentionally-slow request. Three planner probes failed on this before the cause was
+  identified; the deterministic callback-with-control approach is the one that works.
+- 2026-09-26: **Hazard for T33, which will touch `leaderboard.gd`.** `settings.gd` now writes
+  `leaderboard._restore_gen` directly to retire an in-flight restore — a private field of a file it
+  does not own. It works and `settings_pages` case 6 covers it, so it is not a defect, but anyone
+  reworking the restore generation logic must keep that external writer in mind.
