@@ -57,7 +57,8 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T35 | Profile transfer unusable on a phone: restore field sits under the keyboard and there is no paste path (D-048, D-051) | 10 | reviewed + approved 2026-09-26 (PR #43, 6f2fc56) — awaiting merge | mid | — |
 | T36 | Server: names are unique and resolve to one player; merge the two Dads (D-053) | 11 | **done** 2026-09-27 — merged, deployed, duplicates merged; Dad and Natasha both resolve live | mid | — |
 | T37 | Client: typing a name claims that player; remove the transfer/restore UI entirely (D-053) | 11 | **done** 2026-09-27 — merged, deployed; phone claimed Dad and posted two scores to the right player | mid | T36 |
-| T39 | **Title screen is colliding and oversized:** field on top of the title, Play over the HUD; plus the welcome-back confirm (D-056) | 12 | not started | mid | — |
+| T39 | **Title screen is colliding and oversized:** field on top of the title, Play over the HUD; plus the welcome-back confirm (D-056) | 12 | reviewed + approved 2026-09-27 (PR #47, 61ffdad) — awaiting merge | mid | — |
+| T41 | Name lookup should be read-only: the title probe POSTs to the creating resolve route and rebuilds its own HTTP path (D-056) | 12 | not started | cheap-mid | T40 |
 | T40 | Stale identity never reconciles at boot (409), and the title reports offline while the server answers in 1–3 ms (D-056) | 12 | not started | mid | — |
 | T38 | Name holders are undiagnosable: resolve hides the blocker, admin scores caps at 50 with no paging, and a score row locks a name forever (D-055) | 11 | not started | mid | — |
 
@@ -1293,3 +1294,29 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   passes a green gate. T39 must assert that no two visible Title controls overlap, labels included.
 - 2026-09-27: Steve approved the welcome-back confirmation before adopting an existing name; it rides
   with T39 since it is the same screen.
+- 2026-09-27: T39 (PR #47, 61ffdad, base 82e4474) reviewed in a scratch clone, deleted after. Scope
+  ✓ — 8 files, no server and no identity autoloads. **Server 86 pass / 0 fail; Godot 30 PASS**
+  (29 plus `title_compose_test`). Semgrep, Trivy and Bugbot clean. **Approved.**
+- 2026-09-27: Layout verified independently rather than read from the report: **title_overlaps=0 and
+  hud_overlaps=0**, the second being the cross-layer case on a different CanvasLayer. Play is now
+  176x128 where it was 384x144, the title label is clear of the name field, and the screen spans
+  108..1128 instead of crowding the top third.
+- 2026-09-27: **Planner nearly requested changes on a mis-framed premise, and the probe corrected
+  it.** The handoff disclosed "a new name is posted twice (a peek, then resolve_name)", and the probe
+  does POST to `/v1/players/resolve`, which creates when the name is free — the shape that caused the
+  duplicate-identity mess. Driven against a real server with a new name: local `player_name='Elsa'
+  id=410d681c` and server `resolve Elsa -> created=false player_id=410d681c`, the same id both sides.
+  The peek fires **on submit, not on keystrokes**, and the adopt follows immediately, so submitting a
+  name claims it — which is what submitting is for. Standing lesson, third of its kind this session:
+  measure the consequence before writing the change request.
+- 2026-09-27: Recorded rather than blocked → **T41**. The probe builds its own `HTTPRequest` inside
+  `name_entry.gd` instead of going through Leaderboard, so it inherits neither T33's watchdog nor its
+  reason mapping, and it reaches a creating route to ask a read-only question. The correct fix is a
+  genuinely read-only lookup on the server, which T39 was forbidden to touch. Sequenced after T40
+  because both touch identity plumbing.
+- 2026-09-27: `title_touch` case 4 is the repair this task existed to make — a hand-listed
+  `["NameEntry","SettingsButton","NameButton"]` comparison became every visible Title child,
+  pairwise, labels included. That enumerated list is exactly why a field could sit on the title label
+  through a green gate for two releases.
+- **Open for Steve:** the confirmation copy. Worker's interim, inline in the name prompt rather than a
+  separate panel: "Welcome back, %s!" with "That's me" and "Not me".
