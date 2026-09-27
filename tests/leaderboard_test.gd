@@ -183,6 +183,8 @@ func _case_1_title_top_five(main: Node) -> bool:
 		return _fail("case 1: TopFiveLabel missing seeded names: '%s'" % text)
 	if text.contains("Seed5"):
 		return _fail("case 1: TopFiveLabel should not include 6th seed: '%s'" % text)
+	if text.to_lower().contains("leaderboard") or text.to_lower().contains("offline"):
+		return _fail("case 1: successful fetch left an offline line: '%s'" % text)
 	_cases_passed += 1
 	print("LEADERBOARD case 1 pass")
 	return true
@@ -219,6 +221,13 @@ func _case_2_game_over_700(main: Node) -> bool:
 		return _fail("case 2: player row not highlighted")
 	if not highlighted.text.begins_with("▸"):
 		return _fail("case 2: highlighted row should start with ▸")
+	var offline_label := _require_label(main, "OfflineLabel")
+	if offline_label == null:
+		return false
+	if offline_label.visible:
+		return _fail("case 2: successful fetch left offline visible '%s'" % offline_label.text)
+	if list.get_child_count() < 1:
+		return _fail("case 2: successful fetch left the list empty")
 	_cases_passed += 1
 	print("LEADERBOARD case 2 pass")
 	return true
@@ -292,9 +301,13 @@ func _case_4_unreachable(main: Node) -> bool:
 	if offline_label == null:
 		OS.set_environment("SQUISH_LEADERBOARD_URL", LOCAL_URL)
 		return false
-	if not offline_label.visible or offline_label.text != "Leaderboard offline":
+	var expected_line := String(_leaderboard.offline_line(_last_offline))
+	if not offline_label.visible or offline_label.text != expected_line:
 		OS.set_environment("SQUISH_LEADERBOARD_URL", LOCAL_URL)
-		return _fail("case 4: OfflineLabel should be quiet 'Leaderboard offline'")
+		return _fail("case 4: OfflineLabel '%s' expected '%s' for %s" % [offline_label.text, expected_line, _last_offline])
+	if expected_line == "Leaderboard offline":
+		OS.set_environment("SQUISH_LEADERBOARD_URL", LOCAL_URL)
+		return _fail("case 4: reason '%s' still uses the generic sentence" % _last_offline)
 	if _got_submit:
 		OS.set_environment("SQUISH_LEADERBOARD_URL", LOCAL_URL)
 		return _fail("case 4: submit should not succeed against a closed port")

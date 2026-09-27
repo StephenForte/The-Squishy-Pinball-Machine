@@ -17,6 +17,7 @@ const _TOUCH_CONTROLS_TEXT := "Hold bottom left    Left flipper\nHold bottom rig
 
 var _leaderboard: Node
 var _title_offline := false
+var _offline_reason := ""
 var _placeholder_avatar: Texture2D
 
 
@@ -118,15 +119,23 @@ func is_capturing_name() -> bool:
 
 func _on_board_updated(entries: Array, _total_players: int) -> void:
 	_title_offline = false
+	_offline_reason = ""
 	_render_top_five(entries)
 
 
-func _on_offline(_reason: String) -> void:
+func _on_offline(reason: String) -> void:
 	_title_offline = true
+	_offline_reason = reason
 	var cached: Array = []
 	if _leaderboard != null:
 		cached = _leaderboard.last_entries
 	_render_top_five(cached)
+
+
+func _offline_line() -> String:
+	if _leaderboard != null and _leaderboard.has_method("offline_line"):
+		return String(_leaderboard.offline_line(_offline_reason))
+	return "Leaderboard offline"
 
 
 func _render_top_five(entries: Array) -> void:
@@ -144,10 +153,11 @@ func _render_top_five(entries: Array) -> void:
 		lines.append("%d. %s  %d" % [rank, player_name, score])
 		shown += 1
 	if _title_offline:
+		var line := _offline_line()
 		if lines.is_empty():
-			_top_five_label.text = "Leaderboard offline"
+			_top_five_label.text = line
 		else:
-			_top_five_label.text = "\n".join(lines) + "\nLeaderboard offline"
+			_top_five_label.text = "\n".join(lines) + "\n" + line
 	else:
 		_top_five_label.text = "\n".join(lines)
 

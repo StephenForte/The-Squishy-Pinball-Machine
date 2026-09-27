@@ -196,11 +196,17 @@ func _on_submitted(result: Dictionary) -> void:
 	_maybe_upgrade_celebration(result)
 
 
-func _on_offline(_reason: String) -> void:
+func _on_offline(reason: String) -> void:
 	if not visible:
 		return
-	_offline_label.text = "Leaderboard offline"
+	_offline_label.text = _offline_line(reason)
 	_offline_label.visible = true
+
+
+func _offline_line(reason: String) -> String:
+	if _leaderboard != null and _leaderboard.has_method("offline_line"):
+		return String(_leaderboard.offline_line(reason))
+	return "Leaderboard offline"
 
 
 func _reset_leaderboard_ui() -> void:
