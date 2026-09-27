@@ -53,10 +53,10 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T31 | Text entry without a hardware keyboard: virtual keyboard + visible confirm, name and D-048 restore field (D-049) | 10 | **done** 2026-09-26 — merged (PR #41), deployed, keyboard confirmed live on iPhone | mid | T30 |
 | T32 | **Game over unusable on touch:** Restart/Menu invisible (no StyleBoxFlat) + invite a name so a score can be saved (D-051) | 10 | reviewed + approved 2026-09-26 (PR #42, 04df0f0) — awaiting merge | cheap-mid | — |
 | T33 | Board reports "Leaderboard offline" and an empty list after the server answered 200 (D-051) | 10 | reviewed + approved 2026-09-26 (PR #44, cf0c4fa) — awaiting merge | mid | — |
-| T34 | Title name never commits on a phone: confirm sits in the opposite corner from the field; commit on blur/return (D-051) | 10 | **unblocked** 2026-09-26 — T32 answered the NameEntry question: fix the title prompt in place, do not reuse it | cheap-mid | T32 |
+| T34 | Title name never commits on a phone: confirm sits in the opposite corner from the field; commit on blur/return (D-051) | 10 | **closed by T37** 2026-09-27 — the title prompt was rewritten there, not fixed in place | cheap-mid | T32 |
 | T35 | Profile transfer unusable on a phone: restore field sits under the keyboard and there is no paste path (D-048, D-051) | 10 | reviewed + approved 2026-09-26 (PR #43, 6f2fc56) — awaiting merge | mid | — |
 | T36 | Server: names are unique and resolve to one player; merge the two Dads (D-053) | 11 | **done** 2026-09-27 — merged, deployed, duplicates merged; Dad and Natasha both resolve live | mid | — |
-| T37 | Client: typing a name claims that player; remove the transfer/restore UI entirely (D-053) | 11 | **unblocked** 2026-09-27 — production resolves Dad, Natasha and T13 | mid | T36 |
+| T37 | Client: typing a name claims that player; remove the transfer/restore UI entirely (D-053) | 11 | reviewed + approved 2026-09-27 (PR #46, baa9c65) — awaiting merge | mid | T36 |
 | T38 | Name holders are undiagnosable: resolve hides the blocker, admin scores caps at 50 with no paging, and a score row locks a name forever (D-055) | 11 | not started | mid | — |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8 → T10 → T9 →
@@ -1244,3 +1244,32 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   `name_ambiguous` without naming a holder; and `GET /v1/admin/scores` clamps to 50 rows with no
   paging while the table is 72, so the first listing looked clean because the culprit was on page 2.
   → T38. Open for Steve inside it: whether a score row should hold a name at all.
+- 2026-09-27: T37 (PR #46, baa9c65, base ed61488) reviewed in a scratch clone, deleted after. Scope
+  ✓ — `server/**` untouched and `autoload/profile.gd` has no diff at all, because `adopt_identity`
+  was reused rather than duplicated. **Server 86 pass / 0 fail; Godot 29 PASS** (28 plus
+  `name_claim_test`). **Approved. This also closes T34.**
+- 2026-09-27: Verified by counting **raw score rows on a real server**, not in-process counters,
+  with a control proving the counter sees a duplicate (two deliberate posts → 2):
+  existing name with the server up → adopted, **1 row**; a title claim landing *after* game over →
+  adopted, **1 row**; **server unreachable → player_id unchanged, name empty, 0 rows**. That last one
+  is the trap, and it holds: a failed resolve mints no identity, so the duplicate-player failure that
+  cost D-048, T29, T35, T36 and three admin round trips cannot recur through this path.
+- 2026-09-27: **Bugbot found a HIGH-severity defect on `f94ca93`** — a claim started on the title
+  landing after game over adopted the name and **silently dropped the score**. Re-derived
+  independently rather than trusted: `_open_invite` no longer clears a generation belonging to a
+  claim it did not start. One honest limit on the planner's probe — by the time the claim returned
+  Save was already hidden, so "Save after a carried claim" was not exercised; the invite closing is
+  itself correct, which makes that path unreachable rather than untested.
+- 2026-09-27: Two assertion relaxations that look like weakenings and are the opposite.
+  `game_over_touch` case 3 (one submit → zero) and `profile_test` case 2 (name stored → unchanged)
+  previously **required** that confirming a name while the server was unreachable stored it locally
+  and posted — encoding the exact bug D-053 removes. Correct calls.
+- 2026-09-27: **Behaviour change Steve should know about, and a question it raises.** An offline
+  player can no longer save a score at all: no server → no name → no post, and nothing is queued,
+  because D-034's retry covers submit and not resolve. That is the trade the brief demanded and the
+  right one (a lost score is recoverable, a duplicate identity is not), but it is real for anyone
+  playing without a connection. Whether an offline run should queue its score against a name claimed
+  later is an open product question, not a defect.
+- **Open for Steve:** when a typed name already belongs to someone, the device becomes them silently.
+  The worker recommends a "welcome back, Natasha" confirmation first, since a typo otherwise takes
+  another player's identity and there is nothing to check it against. Interim is silent adopt.
