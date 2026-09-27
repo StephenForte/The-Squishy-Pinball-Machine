@@ -1150,3 +1150,32 @@ request, and the client reported the generic "couldn't reach the leaderboard".
   symptoms are the same generic message, and a rejected preflight produces exactly it.
 - D-053 makes this worse rather than better: name entry will need a round trip, so an origin the
   allowlist does not know will block a player from claiming their own name.
+
+## D-055 — A name is held by score rows too, and that is nearly undiagnosable (planner, 2026-09-27)
+T36 deployed cleanly and the migration left the board untouched, but merging the three duplicate Dad
+**profiles** did not release the name: `resolve "Dad"` still answered 409 `name_ambiguous`. Finding
+out why took three round trips with the operator's admin key. The cause was one row:
+`scores id=3, player_id 6c107d4d… (Natasha's), name "Dad", 5100, 2026-09-09` — Dad's early play
+recorded against Natasha's id, back before the family had separate identities. Deleting it released
+the name; the board did not change, because 5100 was nobody's best.
+Three things compounded to make one row take three round trips, and all three are fixable:
+- **`holdersOf` unions profiles with every `scores` row whose name normalizes to the key.** So a name
+  can be held by a score row that has no profile at all, and merging profiles does not release it.
+  The consequence is sharper than it looks on a board that accumulates years of play: **any single
+  historical row permanently locks a name, and the only remedy the API offers is deleting history.**
+  That is the wrong trade for a family archive.
+- **`resolve` answers `name_ambiguous` without naming a single holder.** The server knows exactly
+  which player_ids hold the key and discards that, so the blocker cannot be found from the API. This
+  is the same shape as the bug T33 just fixed on the client: the diagnosis is computed and thrown
+  away.
+- **`GET /v1/admin/scores` clamps `limit` to 50 (D-026's `parseLimit`) and has no offset or cursor.**
+  The table is now 72 rows, so **the tool cannot show the whole table it exists to inspect**. The
+  culprit was outside the first page, which is why the first listing looked clean.
+- Recorded but not urgent: `ensureUniqueNameIndex` only runs on resolve's create and backfill
+  branches, so production is probably still serving without the unique index even though the
+  duplicates are gone. It installs on the next restart. Application-level enforcement was proven
+  independently during the T36 review (a new id posting as an existing name returns 409 with no
+  index present), so the backstop's absence is not a live risk.
+- **Not changed here.** Whether a score row should hold a name at all is a real design question, not
+  a bug to patch quietly: loosening it lets someone take a name another player has posted under,
+  which is exactly what D-053 accepts for people but may not want for history. Steve decides.
