@@ -105,6 +105,21 @@ func _case_named_layout(main: Node) -> bool:
 		return _fail("case 2: NameEntry should hide once a name exists")
 	if not _assert_layout(main, title, "case 2"):
 		return false
+	if entry == null or not entry.has_method("open"):
+		return _fail("case 2: NameEntry missing")
+	entry.call("open", false)
+	await process_frame
+	await process_frame
+	if not entry.visible:
+		return _fail("case 2: rename did not open the prompt")
+	var playing := title.get_node_or_null("PlayerNameLabel") as CanvasItem
+	var hint := title.get_node_or_null("PlayHintLabel") as CanvasItem
+	if playing != null and playing.visible:
+		return _fail("case 2: Playing-as stayed up over the rename prompt")
+	if hint != null and hint.visible:
+		return _fail("case 2: play hint stayed up over the rename prompt")
+	if not _assert_layout(main, title, "case 2 rename"):
+		return false
 	_reset_profile()
 	if title.has_method("show_menu"):
 		title.show_menu()
