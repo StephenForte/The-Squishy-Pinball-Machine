@@ -59,8 +59,9 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T37 | Client: typing a name claims that player; remove the transfer/restore UI entirely (D-053) | 11 | **done** 2026-09-27 — merged, deployed; phone claimed Dad and posted two scores to the right player | mid | T36 |
 | T39 | **Title screen is colliding and oversized:** field on top of the title, Play over the HUD; plus the welcome-back confirm (D-056) | 12 | **done** — reviewed, approved and merged 2026-09-27 (PR #47, 61ffdad) | mid | — |
 | T42 | HIGH shows the device's best, not the player's: reconcile with the server's best after boot, claim and submit (D-057) | 12 | **done** 2026-09-27 — merged (PR #48, 8ed0ab0), deployed, verified on the phone | mid | — |
+| T43 | An avatar-less device with a refused id is never detected: the boot gap-fill PUT is skipped without an avatar, so its runs still 409 `name_taken` and are lost (D-058 gap, found in T40 review) | 12 | not started | cheap-mid | T40 |
 | T41 | Name lookup should be read-only: the title probe POSTs to the creating resolve route and rebuilds its own HTTP path (D-056) | 12 | not started | cheap-mid | T40 |
-| T40 | A refused identity (404 then PUT 409 `name_taken`) is never reconciled and silently loses runs: confirm at boot, route game over through the save-your-score invite (D-056, D-058). CORS half closed (D-057) | 12 | brief written 2026-09-27, not dispatched | mid | — |
+| T40 | A refused identity (404 then PUT 409 `name_taken`) is never reconciled and silently loses runs: confirm at boot, route game over through the save-your-score invite (D-056, D-058). CORS half closed (D-057) | 12 | **approved** 2026-09-27 (PR #49, dfd9146) — awaiting merge + static-site redeploy | mid | — |
 | T38 | Name holders are undiagnosable: resolve hides the blocker, admin scores caps at 50 with no paging, and a score row locks a name forever (D-055) | 11 | not started | mid | — |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8 → T10 → T9 →
@@ -1402,3 +1403,18 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   the device's last player; blank when there is none, with Save disabled while blank; a typed name
   that belongs to someone else gets "Welcome back, X!" before anything is saved. T40 brief re-issued
   whole with these folded in; the earlier T40 brief is superseded and must not be dispatched.
+- 2026-09-27: **T40 reviewed — approved, merge as-is** (PR #49, head `dfd9146`, base `f72d361` = main).
+  Re-ran in a scratch clone: Godot **32 PASS** (50 s), server 86/86; 11 named states all
+  `overlap_count=0`. **Five mutation probes, all caught:** dropping the unconfirmed guard on game over
+  → `posted 1 times under the dead id`; never asking about a held typed name → case 6; Save enabled on
+  blank → case 5; dead-id invite taking the landed-name shortcut → case 4; reverting the Bugbot fix →
+  case 6. Bugbot's "blur commit skipped after welcome" queried at `fc3a335`: **real on that commit**,
+  fixed in `dfd9146` (proven by the revert probe); Bugbot has not re-reviewed the head. Bonus: the
+  title probe now uses `lookup_name` via `_http_request` — half of T41 is done in one function.
+- **Gap found in review → T43.** `_reconcile_boot_missing_cloud` returns before the gap-fill PUT when
+  `avatar_id` is empty (on main, unchanged), so a dead-id device with no avatar never becomes
+  unconfirmed and its runs still get 409 `name_taken`. Planner error: the T40 brief tied detection to
+  the PUT. Suggested approach for T43: also treat a score POST answered 409 `name_taken` for the
+  current id as the unconfirmed signal, which catches every path the boot check misses.
+- **State:** D-058 next free **D-059**; tasks through **T43**, next free **T44**. Order: merge #49 and
+  redeploy → T43 → T41 (now smaller) → T38.
