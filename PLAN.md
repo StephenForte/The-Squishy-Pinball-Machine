@@ -1398,3 +1398,7 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   name gets 409 `name_taken`, not retried → the run is lost. → **D-058**; T40 rescoped and briefed.
 - **State:** decisions through **D-058**, next free **D-059**. Tasks through **T42**, next free
   **T43**. No open PRs. Order: **T40** → T41 (both touch `name_entry.gd`; T41 after) → T38.
+- 2026-09-27: Steve set the game-over invite rules for T40 (recorded in D-058's amendment): pre-fill
+  the device's last player; blank when there is none, with Save disabled while blank; a typed name
+  that belongs to someone else gets "Welcome back, X!" before anything is saved. T40 brief re-issued
+  whole with these folded in; the earlier T40 brief is superseded and must not be dispatched.
