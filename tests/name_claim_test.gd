@@ -94,6 +94,8 @@ func _run() -> void:
 		return
 	if not await _case_title_commits(main, natasha_id):
 		return
+	if not await _case_late_claim_posts_score(main):
+		return
 	if not await _case_transport_no_score(main):
 		return
 	if not await _case_rate_limit_no_score(main):
@@ -458,6 +460,37 @@ func _title_commit(main: Node, how: String, typed: String, expect_id: String) ->
 	_profile._load_or_create()
 	if String(_profile.player_id) != kept:
 		return _fail("case 13 %s: reload dropped id" % how)
+	return true
+
+
+func _case_late_claim_posts_score(main: Node) -> bool:
+	print("NAME_CLAIM case 16 a claim landing after game over still posts")
+	_unnamed()
+	var before := _attempt_snapshot()
+	var names_before := _names.size()
+	if not await _go_game_over(main, 390):
+		return false
+	# The title's claim, not this invite's. The invite must not drop it.
+	_arm()
+	_leaderboard.resolve_name("LatePost")
+	if not await _wait_resolve():
+		return _fail("case 16: resolve did not finish")
+	if not _resolve_ok or String(_profile.player_name) != "LatePost":
+		return _fail("case 16: did not adopt %s" % _resolve_info)
+	var after := _attempt_snapshot()
+	if after.x != before.x + 1 or after.y != before.y + 1:
+		return _fail("case 16: submissions %s → %s" % [before, after])
+	if _names.size() != names_before + 1 or String(_names[_names.size() - 1]) != "LatePost":
+		return _fail("case 16: submit carried %s" % _names)
+	var save := _button(main, "SaveButton")
+	if save != null and save.visible:
+		save.pressed.emit()
+		for _i in 8:
+			await process_frame
+	if _attempt_snapshot() != after:
+		return _fail("case 16: save posted a second score")
+	_cases_passed += 1
+	print("NAME_CLAIM case 16 pass")
 	return true
 
 
