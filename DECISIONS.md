@@ -1209,3 +1209,42 @@ Four defects, all observed rather than inferred:
   borrowed for a phone and then applied to a 720x1280 canvas without a layout budget.
 - **Approved by Steve:** when a typed name already belongs to a player, confirm before adopting
   ("welcome back, Natasha") rather than adopting silently. Design it so a typo is recoverable.
+
+## D-057 — HIGH is the larger of the device's best and the server's best; the custom domain is not on the CORS allowlist (planner, 2026-09-27)
+T39 live. Steve on his iPhone: "it will say welcome back dad and has the wrong dad, the high score is
+the giveaway". Measured, not inferred:
+- **The claim picked the right Dad.** Production has exactly one Dad:
+  `GET /v1/leaderboard/me?player_id=b8aa808f-6d01-439e-87be-664baf0ead85` →
+  `{"rank":1,"best":14300,"name":"Dad","avatar":"dumpling_dottie"}`. The phone's claim at 21:14:52
+  (`POST /v1/players/resolve` 200 ×2 — probe, then "That's me") resolved to that player.
+- **HIGH is device-local and never learns the server's best.** `Game.high_score` reads
+  `high_scores[Profile.player_id]` from `user://highscore.save` (D-031). Nothing writes the server's
+  best into it: not boot, not a claim, not a submit. The phone's own Dad rows on the server are 6900
+  and 7400 (D-056), so on the phone Dad's HIGH shows the phone's number, not 14300, and a correct
+  claim reads as the wrong player. D-031 was written when one device was one player; D-053 made one
+  player span devices and nobody revisited HIGH.
+- **The rule from here:** for the current player, HIGH is `max(device best, server best)`, and the
+  merged value is written back to `highscore.save` so it holds offline. The server's best is taken
+  from `GET /v1/leaderboard/me` (field `best`) after boot restore, after any identity adoption
+  (claim, restore), and from `POST /v1/scores`' own response (field `best`). HIGH never goes down.
+  A 404 `unknown_player` means "no server best yet" and leaves the device value alone. A response is
+  applied only if the id it was requested for is still `Profile.player_id` when it arrives.
+- **Consequence, accepted:** `game_over.is_high_score` and the "NEW HIGH SCORE" label compare
+  against the merged best, so a 9000 on the phone is no longer a new high for Dad. That is the
+  honest meaning; the old behaviour congratulated a player for not beating their own score.
+- **Second finding — the timeout T40 could not explain.** Steve: the main URL is
+  `https://squishypinball.com/`, a custom domain on the static site (DNS → Render/Cloudflare, 200).
+  Probed against production: a preflight with `Origin: https://squishypinball.com` or
+  `https://www.squishypinball.com` gets **no** `access-control-allow-origin`; the onrender.com origin
+  gets it on every route. So every request from the custom domain is blocked by the browser. The
+  server log shows exactly that from the same iPhone: preflights of 133 bytes with no request
+  following (21:14:24, 21:15:20–36, including ten resolve preflights and a profile PUT preflight) for
+  a second identity `d2432de0-149e-45d0-954d-c7c0a125f6ad` the server has never seen
+  (`unknown_profile`), interleaved with 330-byte preflights and 200s for `b8aa808f` from the
+  onrender.com tab. The Chromebook's requests at 17:40–17:46 are all 133-byte and unanswered too.
+  Each origin has its own browser storage, so the custom domain is a separate, never-connected copy
+  of the game. This is the D-054 mechanism with the origin now known.
+- **Fix is configuration, not code:** add `https://squishypinball.com` (and `www` if it is served) to
+  `SQUISH_ALLOWED_ORIGINS` on `squish-leaderboard`. D-054's "one exact origin" becomes a list; the
+  server already parses a comma-separated list (D-044). Operator action. T40 keeps the stale-id
+  reconcile half and drops the "root cause undetermined" half once this is verified live.
