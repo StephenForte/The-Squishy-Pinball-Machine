@@ -22,6 +22,7 @@ const ADMIN_PATHS = [
   ['DELETE', '/v1/scores/1'],
   ['DELETE', `/v1/profile/${NATASHA}`],
   ['POST', '/v1/admin/reset'],
+  ['POST', '/v1/admin/merge'],
 ];
 
 const ROW_KEYS = ['client', 'created_at', 'id', 'name', 'player_id', 'score'];
@@ -298,6 +299,13 @@ describe('admin routes are excluded from CORS', () => {
       });
       assert.equal(preflightList.status, 404);
       assert.equal(corsNames(preflightList.headers).length, 0);
+
+      const preflightMerge = await request(port, 'OPTIONS', '/v1/admin/merge', {
+        headers: { Origin: ORIGIN, 'Access-Control-Request-Method': 'POST' },
+      });
+      assert.equal(preflightMerge.status, 404);
+      assert.equal(preflightMerge.json.error, 'not_found');
+      assert.equal(corsNames(preflightMerge.headers).length, 0);
     }, { adminKey: ADMIN_KEY, allowedOrigins: [ORIGIN] });
   });
 });
@@ -560,7 +568,7 @@ describe('per-IP write limiting (D-046)', () => {
       });
       const b1 = await request(port, 'POST', '/v1/scores', {
         key: WRITE_KEY,
-        body: scoreBody({ player_id: STEVE, score: 1 }),
+        body: scoreBody({ player_id: STEVE, name: 'Steve', score: 1 }),
         headers: { 'X-Forwarded-For': '198.51.100.9, 10.0.0.1' },
       });
       assert.equal(a1.status, 201);

@@ -129,10 +129,10 @@ describe('PUT /v1/profile and GET /v1/profile', () => {
       assert.equal(empty.status, 200);
       assert.equal(empty.json.avatar, '');
 
-      for (const id of ids) {
+      for (const [index, id] of ids.entries()) {
         const res = await putProfile(port, {
           player_id: uuid(),
-          name: 'Pip',
+          name: `P${index}`,
           avatar: id,
         });
         assert.equal(res.status, 200, id);

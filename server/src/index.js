@@ -12,13 +12,23 @@ import {
   getProfile,
   insertScore,
   listScores,
+  mergePlayers,
   openDb,
   resetAll,
+  resolvePlayer,
   storeLabel,
   upsertProfile,
 } from './db.js';
 import { renderBoard } from './page.js';
-import { isUuidV4, normalizePlayerId, parseLimit, parseProfileBody, parseScoreBody } from './validate.js';
+import {
+  isUuidV4,
+  normalizePlayerId,
+  parseLimit,
+  parseMergeBody,
+  parseProfileBody,
+  parseResolveBody,
+  parseScoreBody,
+} from './validate.js';
 
 const BODY_LIMIT = 4096;
 const RATE_WINDOW_MS = 60_000;
@@ -35,6 +45,7 @@ const PUBLIC_CORS_PATHS = new Set([
   '/v1/leaderboard',
   '/v1/leaderboard/me',
   '/v1/profile',
+  '/v1/players/resolve',
 ]);
 
 export function parseAllowedOrigins(raw) {
@@ -84,6 +95,9 @@ function isAdminOptionsPath(path) {
 function matchAdminRoute(method, path) {
   if (method === 'GET' && path === '/v1/admin/scores') {
     return { action: 'list_scores' };
+  }
+  if (method === 'POST' && path === '/v1/admin/merge') {
+    return { action: 'merge' };
   }
   if (method === 'DELETE') {
     const score = /^\/v1\/scores\/([^/]+)$/.exec(path);
@@ -282,6 +296,51 @@ async function handleAdmin(req, res, ctx, route) {
     return;
   }
 
+  if (route.action === 'merge') {
+    let raw;
+    try {
+      raw = await readBody(req);
+    } catch (err) {
+      if (err.code === 'body_too_large') {
+        send(res, 400, { error: 'body_too_large' });
+        return;
+      }
+      send(res, 400, { error: 'invalid_json' });
+      return;
+    }
+
+    let body;
+    try {
+      body = raw.length === 0 ? null : JSON.parse(raw.toString('utf8'));
+    } catch {
+      send(res, 400, { error: 'invalid_json' });
+      return;
+    }
+
+    const parsed = parseMergeBody(body);
+    if (!parsed.ok) {
+      send(res, 400, { error: parsed.error });
+      return;
+    }
+
+    let merged;
+    try {
+      merged = mergePlayers(ctx.db, parsed.value);
+    } catch (err) {
+      if (err.code === 'name_taken') {
+        send(res, 409, { error: 'name_taken' });
+        return;
+      }
+      throw err;
+    }
+    if (!merged.ok) {
+      send(res, merged.status, { error: merged.error });
+      return;
+    }
+    send(res, 200, { ok: true });
+    return;
+  }
+
   if (route.action === 'reset') {
     let raw;
     try {
@@ -390,7 +449,16 @@ async function handle(req, res, ctx) {
       return;
     }
 
-    const result = insertScore(ctx.db, parsed.value);
+    let result;
+    try {
+      result = insertScore(ctx.db, parsed.value);
+    } catch (err) {
+      if (err.code === 'name_taken') {
+        send(res, 409, { error: 'name_taken' }, cors);
+        return;
+      }
+      throw err;
+    }
     send(res, 201, result, cors);
     return;
   }
@@ -453,8 +521,68 @@ async function handle(req, res, ctx) {
       return;
     }
 
-    const result = upsertProfile(ctx.db, parsed.value);
+    let result;
+    try {
+      result = upsertProfile(ctx.db, parsed.value);
+    } catch (err) {
+      if (err.code === 'name_taken') {
+        send(res, 409, { error: 'name_taken' }, cors);
+        return;
+      }
+      throw err;
+    }
     send(res, 200, result, cors);
+    return;
+  }
+
+  if (req.method === 'POST' && path === '/v1/players/resolve') {
+    let raw;
+    try {
+      raw = await readBody(req);
+    } catch (err) {
+      if (err.code === 'body_too_large') {
+        send(res, 400, { error: 'body_too_large' }, cors);
+        return;
+      }
+      send(res, 400, { error: 'invalid_json' }, cors);
+      return;
+    }
+
+    let body;
+    try {
+      body = raw.length === 0 ? null : JSON.parse(raw.toString('utf8'));
+    } catch {
+      send(res, 400, { error: 'invalid_json' }, cors);
+      return;
+    }
+
+    const parsed = parseResolveBody(body);
+    if (!parsed.ok) {
+      send(res, 400, { error: parsed.error }, cors);
+      return;
+    }
+
+    const addr = clientAddress(req, ctx.addressFor);
+    if (!ctx.resolveLimiter.allow(addr)) {
+      send(res, 429, { error: 'rate_limited' }, cors);
+      return;
+    }
+
+    let resolved;
+    try {
+      resolved = resolvePlayer(ctx.db, parsed.value.name);
+    } catch (err) {
+      if (err.code === 'name_taken') {
+        send(res, 409, { error: 'name_taken' }, cors);
+        return;
+      }
+      throw err;
+    }
+    if (!resolved.ok) {
+      send(res, resolved.status, { error: resolved.error }, cors);
+      return;
+    }
+    send(res, resolved.status, { ...resolved.profile, created: resolved.created }, cors);
     return;
   }
 
@@ -513,6 +641,10 @@ export function createServer(options = {}) {
     windowMs: IP_RATE_WINDOW_MS,
     max: IP_RATE_MAX,
   });
+  const resolveLimiter = options.resolveLimiter ?? createRateLimiter({
+    windowMs: IP_RATE_WINDOW_MS,
+    max: IP_RATE_MAX,
+  });
   const catalog = options.catalog ?? createCatalog({
     catalogPath: options.catalogPath,
     repoRoot: options.repoRoot,
@@ -524,6 +656,7 @@ export function createServer(options = {}) {
     allowedOrigins,
     limiter,
     ipLimiter,
+    resolveLimiter,
     addressFor: options.addressFor,
     store: storeLabel(dbPath),
     catalog,

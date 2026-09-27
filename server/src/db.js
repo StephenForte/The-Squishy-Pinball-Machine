@@ -1,6 +1,8 @@
+import { randomUUID } from 'node:crypto';
 import { existsSync, statSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
+import { nameKey } from './validate.js';
 
 export function storeLabel(dbPath) {
   return dbPath === ':memory:' ? 'memory' : 'sqlite';
@@ -41,10 +43,143 @@ export function openDb(dbPath) {
       player_id text primary key,
       name text not null,
       avatar text not null default '',
-      updated_at text not null
+      updated_at text not null,
+      name_key text not null default ''
     )
   `);
+  // Existing databases were created without name_key. CREATE TABLE IF NOT EXISTS
+  // will not add it, and a UNIQUE index built while duplicate names are still
+  // stored would throw here and take the whole service down.
+  migrateProfiles(db);
   return db;
+}
+
+function nameTaken() {
+  const err = new Error('name_taken');
+  err.code = 'name_taken';
+  return err;
+}
+
+function rethrowConstraint(err) {
+  const message = err && typeof err.message === 'string' ? err.message : '';
+  if (message.includes('UNIQUE constraint failed')) throw nameTaken();
+  throw err;
+}
+
+function withImmediate(db, fn) {
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    const value = fn();
+    db.exec('COMMIT');
+    return value;
+  } catch (err) {
+    try {
+      db.exec('ROLLBACK');
+    } catch {
+      // already closed or not in a transaction
+    }
+    rethrowConstraint(err);
+  }
+}
+
+/**
+ * Add name_key to a pre-change profiles table, backfill it, and install the
+ * unique index only when every key is already unique. Duplicate rows are left
+ * in place for an explicit merge; startup must still succeed.
+ */
+function migrateProfiles(db) {
+  const cols = db.prepare('PRAGMA table_info(profiles)').all();
+  if (!cols.some((col) => col.name === 'name_key')) {
+    db.exec(`ALTER TABLE profiles ADD COLUMN name_key TEXT NOT NULL DEFAULT ''`);
+  }
+  const rows = db.prepare('SELECT player_id, name, name_key FROM profiles').all();
+  const update = db.prepare('UPDATE profiles SET name_key = ? WHERE player_id = ?');
+  for (const row of rows) {
+    const key = nameKey(row.name);
+    if (row.name_key !== key) update.run(key, row.player_id);
+  }
+  ensureUniqueNameIndex(db, { log: true });
+}
+
+function duplicateNameKeys(db) {
+  return db
+    .prepare(
+      `
+      SELECT name_key FROM profiles
+      WHERE name_key != ''
+      GROUP BY name_key
+      HAVING COUNT(*) > 1
+    `,
+    )
+    .all();
+}
+
+function ensureUniqueNameIndex(db, { log = false } = {}) {
+  const dupes = duplicateNameKeys(db);
+  if (dupes.length > 0) {
+    if (log) {
+      console.error(
+        `profiles name_key not unique (${dupes.length} key${dupes.length === 1 ? '' : 's'}); serving without the unique index until they are merged`,
+      );
+    }
+    return false;
+  }
+  db.exec(
+    `CREATE UNIQUE INDEX IF NOT EXISTS profiles_name_key ON profiles (name_key) WHERE name_key != ''`,
+  );
+  return true;
+}
+
+function latestScoreName(db, playerId) {
+  const row = db
+    .prepare(
+      `
+      SELECT name FROM scores
+      WHERE player_id = ?
+      ORDER BY created_at DESC, id DESC
+      LIMIT 1
+    `,
+    )
+    .get(playerId);
+  return row ? row.name : null;
+}
+
+/**
+ * A player holds a name while their profile key matches, or any of their
+ * score rows still carries it. The board shows only the latest score name;
+ * older rows keep the name reserved so a second player cannot take it.
+ */
+function holdersOf(db, key) {
+  const ids = new Set();
+  const profiles = db
+    .prepare('SELECT player_id FROM profiles WHERE name_key = ?')
+    .all(key);
+  for (const row of profiles) ids.add(row.player_id);
+  const scores = db.prepare('SELECT player_id, name FROM scores').all();
+  for (const row of scores) {
+    if (nameKey(row.name) === key) ids.add(row.player_id);
+  }
+  return [...ids];
+}
+
+function holdsName(db, playerId, key) {
+  const profile = db
+    .prepare('SELECT name_key FROM profiles WHERE player_id = ?')
+    .get(playerId);
+  if (profile && profile.name_key === key) return true;
+  const scores = db.prepare('SELECT name FROM scores WHERE player_id = ?').all(playerId);
+  return scores.some((row) => nameKey(row.name) === key);
+}
+
+function playerExists(db, playerId) {
+  const profile = db
+    .prepare('SELECT 1 AS ok FROM profiles WHERE player_id = ?')
+    .get(playerId);
+  if (profile) return true;
+  const score = db
+    .prepare('SELECT 1 AS ok FROM scores WHERE player_id = ?')
+    .get(playerId);
+  return Boolean(score);
 }
 
 export function closeDb(db) {
@@ -59,16 +194,22 @@ export function playerBest(db, playerId) {
 }
 
 export function insertScore(db, { player_id, name, score, client }) {
-  const previousBest = playerBest(db, player_id);
-  const created_at = new Date().toISOString();
-  db.prepare(
-    'INSERT INTO scores (player_id, name, score, client, created_at) VALUES (?, ?, ?, ?, ?)',
-  ).run(player_id, name, score, client, created_at);
+  const key = nameKey(name);
+  return withImmediate(db, () => {
+    if (!holdsName(db, player_id, key) && holdersOf(db, key).length > 0) {
+      throw nameTaken();
+    }
+    const previousBest = playerBest(db, player_id);
+    const created_at = new Date().toISOString();
+    db.prepare(
+      'INSERT INTO scores (player_id, name, score, client, created_at) VALUES (?, ?, ?, ?, ?)',
+    ).run(player_id, name, score, client, created_at);
 
-  const best = previousBest === null ? score : Math.max(previousBest, score);
-  const is_personal_best = previousBest === null || score > previousBest;
-  const { rank, total_players } = playerStanding(db, player_id);
-  return { rank, best, is_personal_best, total_players };
+    const best = previousBest === null ? score : Math.max(previousBest, score);
+    const is_personal_best = previousBest === null || score > previousBest;
+    const { rank, total_players } = playerStanding(db, player_id);
+    return { rank, best, is_personal_best, total_players };
+  });
 }
 
 /**
@@ -167,18 +308,106 @@ export function getProfile(db, playerId) {
 }
 
 export function upsertProfile(db, { player_id, name, avatar }) {
-  const updated_at = new Date().toISOString();
-  db.prepare(
-    `
-    INSERT INTO profiles (player_id, name, avatar, updated_at)
-    VALUES (?, ?, ?, ?)
-    ON CONFLICT(player_id) DO UPDATE SET
-      name = excluded.name,
-      avatar = excluded.avatar,
-      updated_at = excluded.updated_at
-  `,
-  ).run(player_id, name, avatar, updated_at);
-  return getProfile(db, player_id);
+  const key = nameKey(name);
+  return withImmediate(db, () => {
+    if (!holdsName(db, player_id, key) && holdersOf(db, key).length > 0) {
+      throw nameTaken();
+    }
+    const updated_at = new Date().toISOString();
+    db.prepare(
+      `
+      INSERT INTO profiles (player_id, name, avatar, updated_at, name_key)
+      VALUES (?, ?, ?, ?, ?)
+      ON CONFLICT(player_id) DO UPDATE SET
+        name = excluded.name,
+        avatar = excluded.avatar,
+        updated_at = excluded.updated_at,
+        name_key = excluded.name_key
+    `,
+    ).run(player_id, name, avatar, updated_at, key);
+    return getProfile(db, player_id);
+  });
+}
+
+/**
+ * Resolve a normalized name to its one player, or claim it.
+ * More than one current holder is ambiguous — the caller must merge, not guess.
+ */
+export function resolvePlayer(db, name) {
+  const display = name;
+  const key = nameKey(name);
+  return withImmediate(db, () => {
+    const holders = holdersOf(db, key);
+    if (holders.length > 1) {
+      return { ok: false, status: 409, error: 'name_ambiguous' };
+    }
+    if (holders.length === 1) {
+      const player_id = holders[0];
+      let profile = getProfile(db, player_id);
+      if (!profile) {
+        const stored = latestScoreName(db, player_id) || display;
+        const updated_at = new Date().toISOString();
+        db.prepare(
+          `
+          INSERT INTO profiles (player_id, name, avatar, updated_at, name_key)
+          VALUES (?, ?, '', ?, ?)
+        `,
+        ).run(player_id, stored, updated_at, nameKey(stored));
+        profile = getProfile(db, player_id);
+        ensureUniqueNameIndex(db);
+      }
+      return { ok: true, status: 200, created: false, profile };
+    }
+    const player_id = randomUUID();
+    const updated_at = new Date().toISOString();
+    db.prepare(
+      `
+      INSERT INTO profiles (player_id, name, avatar, updated_at, name_key)
+      VALUES (?, ?, '', ?, ?)
+    `,
+    ).run(player_id, display, updated_at, key);
+    ensureUniqueNameIndex(db);
+    return { ok: true, status: 201, created: true, profile: getProfile(db, player_id) };
+  });
+}
+
+/**
+ * Absorb `drop` into `keep`. Survivor profile fields stay as they are.
+ * Moved score rows take the survivor's display name so the board, which reads
+ * scores.name, cannot keep showing the merged-away player.
+ */
+export function mergePlayers(db, { keep, drop }) {
+  return withImmediate(db, () => {
+    if (!playerExists(db, keep) || !playerExists(db, drop)) {
+      return { ok: false, status: 404, error: 'not_found' };
+    }
+    const keepProfile = db
+      .prepare('SELECT player_id, name, avatar, updated_at FROM profiles WHERE player_id = ?')
+      .get(keep);
+    const canonical =
+      keepProfile?.name || latestScoreName(db, keep) || latestScoreName(db, drop);
+    if (!canonical) {
+      return { ok: false, status: 404, error: 'not_found' };
+    }
+
+    db.prepare('DELETE FROM profiles WHERE player_id = ?').run(drop);
+    if (!keepProfile) {
+      const updated_at = new Date().toISOString();
+      db.prepare(
+        `
+        INSERT INTO profiles (player_id, name, avatar, updated_at, name_key)
+        VALUES (?, ?, '', ?, ?)
+      `,
+      ).run(keep, canonical, updated_at, nameKey(canonical));
+    }
+    db.prepare('UPDATE scores SET player_id = ?, name = ? WHERE player_id = ?').run(
+      keep,
+      canonical,
+      drop,
+    );
+    ensureUniqueNameIndex(db);
+    return { ok: true };
+  });
 }
 
 /**
