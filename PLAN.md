@@ -55,7 +55,7 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T33 | Board reports "Leaderboard offline" and an empty list after the server answered 200 (D-051) | 10 | reviewed + approved 2026-09-26 (PR #44, cf0c4fa) — awaiting merge | mid | — |
 | T34 | Title name never commits on a phone: confirm sits in the opposite corner from the field; commit on blur/return (D-051) | 10 | **unblocked** 2026-09-26 — T32 answered the NameEntry question: fix the title prompt in place, do not reuse it | cheap-mid | T32 |
 | T35 | Profile transfer unusable on a phone: restore field sits under the keyboard and there is no paste path (D-048, D-051) | 10 | reviewed + approved 2026-09-26 (PR #43, 6f2fc56) — awaiting merge | mid | — |
-| T36 | Server: names are unique and resolve to one player; merge the two Dads (D-053) | 11 | not started | mid | — |
+| T36 | Server: names are unique and resolve to one player; merge the two Dads (D-053) | 11 | reviewed + approved 2026-09-27 (PR #45, 164dfaf) — awaiting merge, then the operator runs the merge | mid | — |
 | T37 | Client: typing a name claims that player; remove the transfer/restore UI entirely (D-053) | 11 | not started | mid | T36 |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8 → T10 → T9 →
@@ -1197,3 +1197,28 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   "The leaderboard took too long", unreachable "Can't reach the leaderboard", no_network "No
   connection to the leaderboard", request_failed "The leaderboard blocked the answer", bad_json "The
   leaderboard sent a blank answer", 5xx/4xx with the code, else "Leaderboard offline".
+- 2026-09-27: T36 (PR #45, 164dfaf, base 3ccae4a) reviewed in a scratch clone, deleted after. Scope
+  ✓ — server only. **Server 86 pass / 0 fail** (baseline 74) and **Godot 28 PASS**; Semgrep, Trivy
+  and Bugbot all clean. **Approved.**
+- 2026-09-27: Verified by rebuilding the production shape rather than trusting the seeded proof — a
+  pre-change schema with no `name_key` and no index, holding the **three real Dad rows** and the real
+  Natasha row. Results: the server **boots and serves 200** while logging "profiles name_key not
+  unique (1 key); serving without the unique index until they are merged" (the outage this task
+  existed to avoid); `resolve {"name":"natasha"}` returns Natasha's real id with `created:false`
+  (D-053's whole point, case-insensitive); `resolve {"name":"Dad"}` returns 409 `name_ambiguous`
+  while duplicates remain; two merges return 200 and a third 404 (idempotent); `resolve {"name":"DAD"}`
+  then returns `b8aa808f…`; and the unique index appears once the duplicates are gone.
+- 2026-09-27: **The best decision in the PR, and the thing most worth having checked.** Production
+  will run *without* the unique index until the merge runs, so uniqueness living only in the index
+  would leave a window where more duplicates could be minted. It does not — `nameOwner` enforces it
+  in the write path, and a new id posting as "Natasha" returns **409 with no index present**. The
+  pre-merge window is safe.
+- 2026-09-27: Three existing server checks were modified. `ADMIN_PATHS` gaining `POST /v1/admin/merge`
+  plus an OPTIONS 404 / no-CORS assertion is a strengthening. The two fixture edits are forced — both
+  tests implicitly relied on two player_ids sharing a name, now illegal — and their assertions are
+  unchanged, so nothing is lost.
+- 2026-09-27: **Operational sequencing, important for T37.** After this deploys, production still has
+  three Dads, so the index will be absent and `resolve "Dad"` will answer 409 `name_ambiguous` until
+  the operator runs the two merges. T37 must not ship before that, or claiming "Dad" fails on the one
+  name the family actually uses. The surviving id is `b8aa808f…` (holds the 14300); the route takes
+  `keep` and `drop` and hardcodes nothing.
