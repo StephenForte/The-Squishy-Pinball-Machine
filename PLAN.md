@@ -56,7 +56,9 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T34 | Title name never commits on a phone: confirm sits in the opposite corner from the field; commit on blur/return (D-051) | 10 | **closed by T37** 2026-09-27 — the title prompt was rewritten there, not fixed in place | cheap-mid | T32 |
 | T35 | Profile transfer unusable on a phone: restore field sits under the keyboard and there is no paste path (D-048, D-051) | 10 | reviewed + approved 2026-09-26 (PR #43, 6f2fc56) — awaiting merge | mid | — |
 | T36 | Server: names are unique and resolve to one player; merge the two Dads (D-053) | 11 | **done** 2026-09-27 — merged, deployed, duplicates merged; Dad and Natasha both resolve live | mid | — |
-| T37 | Client: typing a name claims that player; remove the transfer/restore UI entirely (D-053) | 11 | reviewed + approved 2026-09-27 (PR #46, baa9c65) — awaiting merge | mid | T36 |
+| T37 | Client: typing a name claims that player; remove the transfer/restore UI entirely (D-053) | 11 | **done** 2026-09-27 — merged, deployed; phone claimed Dad and posted two scores to the right player | mid | T36 |
+| T39 | **Title screen is colliding and oversized:** field on top of the title, Play over the HUD; plus the welcome-back confirm (D-056) | 12 | not started | mid | — |
+| T40 | Stale identity never reconciles at boot (409), and the title reports offline while the server answers in 1–3 ms (D-056) | 12 | not started | mid | — |
 | T38 | Name holders are undiagnosable: resolve hides the blocker, admin scores caps at 50 with no paging, and a score row locks a name forever (D-055) | 11 | not started | mid | — |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8 → T10 → T9 →
@@ -1273,3 +1275,21 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
 - **Open for Steve:** when a typed name already belongs to someone, the device becomes them silently.
   The worker recommends a "welcome back, Natasha" confirmation first, since a typo otherwise takes
   another player's identity and there is nothing to check it against. Interim is silent adopt.
+- 2026-09-27: **T37 deployed; claim-by-name works on the real phone.** Established from the server's
+  own log and raw rows, not assumed: the phone resolved a name (200) and posted two scores (201, 201)
+  that landed as `id=75 b8aa808f Dad 6900` and `id=76 b8aa808f Dad 7400`. **The phone and the desktop
+  are one player.** The board looked unchanged only because both were under the 14300 best.
+- 2026-09-27: Steve: "dad is still wong". The data was right, so the problem is on screen. Four
+  defects found, all observed (D-056): a **stale id is never reconciled at boot** (the phone tried to
+  recreate the deleted `86f2ea8f…` and got a correct 409, and every pre-T36 device is in that
+  state); the title shows **"The leaderboard took too long" while the server answers in 1–3 ms**,
+  reproduced in a desktop browser so it is not the phone, root cause undetermined; the **name field
+  renders on top of the title text and Play overlaps the HUD**; and buttons are oversized for the
+  canvas. → T39, T40.
+- 2026-09-27: **The collisions are a planner failure and the reason no test caught them.** T30, T31
+  and T37 each required a 64 px minimum button and every text field above y=640, and none required
+  the screen to be composed. `title_touch` case 4 compares PlayButton against NameEntry,
+  SettingsButton and NameButton only — **labels are excluded** — so a field sitting on a title label
+  passes a green gate. T39 must assert that no two visible Title controls overlap, labels included.
+- 2026-09-27: Steve approved the welcome-back confirmation before adopting an existing name; it rides
+  with T39 since it is the same screen.
