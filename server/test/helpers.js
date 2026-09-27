@@ -34,6 +34,7 @@ export async function withServer(fn, options = {}) {
     allowedOrigins: options.allowedOrigins ?? [],
     limiter: options.limiter,
     ipLimiter: options.ipLimiter,
+    resolveLimiter: options.resolveLimiter,
     addressFor: options.addressFor,
     catalogPath: options.catalogPath,
     repoRoot: options.repoRoot,

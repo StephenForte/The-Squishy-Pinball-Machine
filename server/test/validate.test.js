@@ -1,6 +1,14 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { parseLimit, parseProfileBody, parseScoreBody, sanitizeName } from '../src/validate.js';
+import {
+  nameKey,
+  parseLimit,
+  parseMergeBody,
+  parseProfileBody,
+  parseResolveBody,
+  parseScoreBody,
+  sanitizeName,
+} from '../src/validate.js';
 
 const ID = '11111111-1111-4111-8111-111111111111';
 
@@ -78,6 +86,50 @@ describe('parseProfileBody', () => {
     assert.equal(parseProfileBody({ ...good, avatar: 'not_a_squishy' }, known).error, 'invalid_avatar');
     assert.equal(parseProfileBody({ ...good, avatar: 1 }, known).error, 'invalid_avatar');
     assert.equal(parseProfileBody({ ...good, client: 'nope' }, known).error, 'invalid_client');
+  });
+});
+
+describe('nameKey', () => {
+  it('folds case and whitespace onto sanitizeName', () => {
+    assert.equal(nameKey('natasha'), nameKey('Natasha'));
+    assert.equal(nameKey('  NATASHA'), nameKey('Natasha'));
+    assert.equal(nameKey('Natasha '), nameKey('natasha'));
+    assert.equal(nameKey('  Ann   Marie  '), 'ann marie');
+    assert.equal(nameKey('Na\u200Btas\uFEFFha'), 'natasha');
+  });
+});
+
+describe('parseResolveBody', () => {
+  it('accepts a name and an optional secret without requiring one', () => {
+    const plain = parseResolveBody({ name: '  Natasha ' });
+    assert.equal(plain.ok, true);
+    assert.equal(plain.value.name, 'Natasha');
+    assert.equal(plain.value.secret, '');
+
+    const withSecret = parseResolveBody({ name: 'Natasha', secret: 'later' });
+    assert.equal(withSecret.ok, true);
+    assert.equal(withSecret.value.secret, 'later');
+  });
+
+  it('rejects an empty name, control characters, and a non-string secret', () => {
+    assert.equal(parseResolveBody({ name: '   ' }).error, 'invalid_name');
+    assert.equal(parseResolveBody({ name: 'Nat\u0001asha' }).error, 'invalid_name');
+    assert.equal(parseResolveBody({ name: 'Natasha', secret: 1 }).error, 'invalid_secret');
+    assert.equal(parseResolveBody(null).error, 'invalid_json');
+  });
+});
+
+describe('parseMergeBody', () => {
+  const keep = 'b8aa808f-6d01-439e-87be-664baf0ead85';
+  const drop = '86f2ea8f-40ab-4141-8411-0db7c837bc47';
+
+  it('lowercases both ids and rejects a pair that is the same player', () => {
+    const parsed = parseMergeBody({ keep: keep.toUpperCase(), drop });
+    assert.equal(parsed.ok, true);
+    assert.equal(parsed.value.keep, keep);
+    assert.equal(parsed.value.drop, drop);
+    assert.equal(parseMergeBody({ keep, drop: keep }).error, 'same_player');
+    assert.equal(parseMergeBody({ keep: 'nope', drop }).error, 'invalid_player_id');
   });
 });
 

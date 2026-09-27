@@ -19,6 +19,14 @@ export function sanitizeName(raw) {
   return [...collapsed].slice(0, 16).join('');
 }
 
+/**
+ * Identity key for a name: sanitizeName, then Unicode case fold.
+ * "Natasha", "natasha" and "  NATASHA" share one key. Locale-independent.
+ */
+export function nameKey(raw) {
+  return sanitizeName(raw).toLowerCase();
+}
+
 export function parseLimit(raw, fallback = 10) {
   if (raw === undefined || raw === null || raw === '') return fallback;
   const n = Number(raw);
@@ -93,4 +101,49 @@ export function parseProfileBody(body, isKnownAvatar = () => false) {
       client: body.client,
     },
   };
+}
+
+/**
+ * Resolve or claim a name (D-053). Unauthenticated today.
+ * `secret` is optional and unused so a later password can occupy the same field.
+ */
+export function parseResolveBody(body) {
+  if (body === null || typeof body !== 'object' || Array.isArray(body)) {
+    return { ok: false, error: 'invalid_json' };
+  }
+  if (typeof body.name === 'string' && /[\p{Cc}]/u.test(body.name)) {
+    return { ok: false, error: 'invalid_name' };
+  }
+  const name = sanitizeName(body.name);
+  if (!name) {
+    return { ok: false, error: 'invalid_name' };
+  }
+  if (Object.prototype.hasOwnProperty.call(body, 'secret')) {
+    if (typeof body.secret !== 'string') {
+      return { ok: false, error: 'invalid_secret' };
+    }
+  }
+  return {
+    ok: true,
+    value: {
+      name,
+      secret: typeof body.secret === 'string' ? body.secret : '',
+    },
+  };
+}
+
+/** Admin merge. `keep` survives; `drop` is absorbed. Ids are inputs, never implied. */
+export function parseMergeBody(body) {
+  if (body === null || typeof body !== 'object' || Array.isArray(body)) {
+    return { ok: false, error: 'invalid_json' };
+  }
+  if (!isUuidV4(body.keep) || !isUuidV4(body.drop)) {
+    return { ok: false, error: 'invalid_player_id' };
+  }
+  const keep = normalizePlayerId(body.keep);
+  const drop = normalizePlayerId(body.drop);
+  if (keep === drop) {
+    return { ok: false, error: 'same_player' };
+  }
+  return { ok: true, value: { keep, drop } };
 }
