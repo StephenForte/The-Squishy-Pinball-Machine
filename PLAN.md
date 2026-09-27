@@ -55,8 +55,9 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T33 | Board reports "Leaderboard offline" and an empty list after the server answered 200 (D-051) | 10 | reviewed + approved 2026-09-26 (PR #44, cf0c4fa) — awaiting merge | mid | — |
 | T34 | Title name never commits on a phone: confirm sits in the opposite corner from the field; commit on blur/return (D-051) | 10 | **unblocked** 2026-09-26 — T32 answered the NameEntry question: fix the title prompt in place, do not reuse it | cheap-mid | T32 |
 | T35 | Profile transfer unusable on a phone: restore field sits under the keyboard and there is no paste path (D-048, D-051) | 10 | reviewed + approved 2026-09-26 (PR #43, 6f2fc56) — awaiting merge | mid | — |
-| T36 | Server: names are unique and resolve to one player; merge the two Dads (D-053) | 11 | reviewed + approved 2026-09-27 (PR #45, 164dfaf) — awaiting merge, then the operator runs the merge | mid | — |
-| T37 | Client: typing a name claims that player; remove the transfer/restore UI entirely (D-053) | 11 | not started | mid | T36 |
+| T36 | Server: names are unique and resolve to one player; merge the two Dads (D-053) | 11 | **done** 2026-09-27 — merged, deployed, duplicates merged; Dad and Natasha both resolve live | mid | — |
+| T37 | Client: typing a name claims that player; remove the transfer/restore UI entirely (D-053) | 11 | **unblocked** 2026-09-27 — production resolves Dad, Natasha and T13 | mid | T36 |
+| T38 | Name holders are undiagnosable: resolve hides the blocker, admin scores caps at 50 with no paging, and a score row locks a name forever (D-055) | 11 | not started | mid | — |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8 → T10 → T9 →
 **Phase 5:** T11 ∥ T12 → T11.1 (deploy) → T13.
@@ -1222,3 +1223,24 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   the operator runs the two merges. T37 must not ship before that, or claiming "Dad" fails on the one
   name the family actually uses. The surviving id is `b8aa808f…` (holds the 14300); the route takes
   `keep` and `drop` and hardcodes nothing.
+- 2026-09-27: **T36 deployed and the name mechanism is live on production.** The migration ran on the
+  real database and the board came through unchanged (Natasha 14300, Dad 14300, T13 1313). There was
+  a ~30 s 502 window mid-restart, normal for a Render restart. Verified after: `Dad`/`dad` →
+  `b8aa808f…`, `natasha`/`NATASHA` → `6c107d4d…`, `T13` → `43f8e028…`, all `created:false`, and both
+  stray Dad profiles 404.
+- 2026-09-27: The two profile merges returned 200 but **did not release the name** — `resolve "Dad"`
+  still answered 409. Cause, found after three round trips with the admin key: `scores id=3`,
+  under **Natasha's** player_id, named "Dad", 5100, from 2026-09-09 — Dad's early play recorded on
+  her id before the family had separate identities. Deleting it released the name and changed nothing
+  on the board, since 5100 was nobody's best. → D-055, T38.
+- 2026-09-27: **Planner error worth recording:** the merge command handed over asserted success as
+  "resolve returns b8aa808f". That check was right; the assumption behind it was not — the planner
+  had verified the *profiles* table and assumed `scores` was already clean, not knowing that
+  `holdersOf` counts score rows as holders. The operator ran a correct command that could not
+  succeed. Lesson: before handing over a command whose success depends on data state, check every
+  table the code actually reads, not the one the mental model is built on.
+- 2026-09-27: Three compounding gaps made one row cost three round trips (all in D-055): a score row
+  can hold a name with no profile, so merging profiles need not release it; `resolve` reports
+  `name_ambiguous` without naming a holder; and `GET /v1/admin/scores` clamps to 50 rows with no
+  paging while the table is 72, so the first listing looked clean because the culprit was on page 2.
+  → T38. Open for Steve inside it: whether a score row should hold a name at all.
