@@ -1281,3 +1281,17 @@ playing each time.
   name, and the saved name on a device that never reached the server may have been typed by anyone.
 - No server change. Forwarding merged ids to their survivor would cover only the `86f2ea8f` shape,
   not `d2432de0`.
+- **Amended the same day — Steve on the game-over invite:** "the pre-filled should default to
+  whatever name was chosen, if no name leave blank but disallow a save", and "We should not be
+  defaulting to Dad but rather the last player. If there was no last player, ask for a player name
+  (and if that name was taken, i.e Natasha, then say is that you)". So the invite rules are:
+  - The field is **pre-filled with this device's last player** (`Profile.player_name`). Saving that
+    pre-filled name needs no extra confirmation: it is the device's own last player, no riskier than a
+    named device posting as its last player today.
+  - **No last player:** the field is blank and **Save is disabled while the field is blank** (after
+    trimming). Return and blur on a blank field do nothing, as today.
+  - **A typed name that differs from the last player and already belongs to a player** gets the
+    welcome-back confirmation ("Welcome back, Natasha!" / That's me / Not me) before anything is
+    adopted or posted. This applies to every invite, unnamed or unconfirmed — it brings the game-over
+    invite in line with D-056, which T39 applied to the title only.
+  - The boot confirmation for an unconfirmed identity stands as written ("prompt at boot is great").
