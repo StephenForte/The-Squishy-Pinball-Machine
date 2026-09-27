@@ -15,6 +15,8 @@ func _ready() -> void:
 	_game.game_over.connect(_on_game_over)
 	_game.game_restarted.connect(_on_game_restarted)
 	_game.streak_changed.connect(_on_streak_changed)
+	if _game.has_signal("high_score_changed"):
+		_game.high_score_changed.connect(_on_high_score_changed)
 	var profile := get_node_or_null("/root/Profile")
 	if profile != null and profile.has_signal("name_changed"):
 		if not profile.name_changed.is_connected(_on_name_changed):
@@ -56,6 +58,15 @@ func _on_streak_changed(streak: int) -> void:
 
 func _on_name_changed(_name: String) -> void:
 	_set_high(_game.high_score)
+
+
+func _on_high_score_changed(player_id: String, value: int) -> void:
+	var profile := get_node_or_null("/root/Profile")
+	if profile == null:
+		return
+	if String(profile.player_id) != player_id:
+		return
+	_set_high(value)
 
 
 func _sync_from_game() -> void:

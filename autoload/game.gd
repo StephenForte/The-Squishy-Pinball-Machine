@@ -4,6 +4,9 @@ signal score_changed(new_score: int)
 signal ball_count_changed(balls_left: int)
 signal game_over(final_score: int, is_high_score: bool)
 signal game_restarted
+## player_id, new stored best. Emitted only when that id's best strictly
+## increases. Listeners must ignore it unless the id is still current.
+signal high_score_changed(player_id: String, value: int)
 signal streak_changed(streak: int)
 signal big_score_reached(score: int)
 signal supercharged()
@@ -153,6 +156,19 @@ func _set_high_for(player_id: String, value: int) -> void:
 		return
 	high_scores[player_id] = int(value)
 	_save_high_scores()
+
+
+## D-057. Persist max(this device's best, server_best) for the id the request
+## was made for. A late response must not stamp that best onto whoever became
+## current in the meantime, and a smaller server number must not lower the file.
+func reconcile_best(player_id: String, server_best: int) -> void:
+	if player_id.is_empty():
+		return
+	var device := _high_for(player_id)
+	if server_best <= device:
+		return
+	_set_high_for(player_id, server_best)
+	high_score_changed.emit(player_id, server_best)
 
 
 func _load_high_scores() -> void:

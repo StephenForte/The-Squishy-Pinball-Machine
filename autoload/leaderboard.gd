@@ -23,6 +23,9 @@ const _CLOSED_SENTINEL_URL := "http://127.0.0.1:1"
 
 var retry_delays_sec: Array = [5.0, 10.0, 20.0, 30.0]
 var submit_attempts: Dictionary = {}
+## GET /v1/leaderboard/me requests actually sent. Stays 0 when the closed
+## sentinel skips HTTP and when the current player has no name (D-057).
+var best_fetch_count: int = 0
 
 var last_entries: Array = []
 var last_total_players: int = 0
@@ -99,7 +102,7 @@ func restore_profile(player_id: String) -> void:
 		restore_finished.emit(false, "offline")
 		return
 	var url := "%s/v1/profile?player_id=%s" % [_base_url(), id]
-	_http_request(HTTPClient.METHOD_GET, url, "", _on_restore_profile_finished.bind(gen))
+	_http_request(HTTPClient.METHOD_GET, url, "", _on_restore_profile_finished.bind(gen, id))
 
 
 ## Claim the typed name (D-053). Optional secret is sent only when set, so a
@@ -162,12 +165,14 @@ func _on_resolve_finished(ok: bool, code: int, parsed: Variant, reason: String, 
 	if not adopted:
 		name_resolved.emit(gen, false, {"code": code, "reason": "offline", "error": ""})
 		return
+	var adopted_id := String(profile.player_id)
 	name_resolved.emit(gen, true, {
-		"player_id": String(profile.player_id),
+		"player_id": adopted_id,
 		"name": String(profile.player_name),
 		"avatar": String(profile.avatar_id),
 		"created": bool(data.get("created", false)),
 	})
+	_fetch_server_best(adopted_id)
 
 
 func fetch_top(limit: int) -> void:
@@ -223,10 +228,41 @@ func _boot_restore_profile() -> void:
 	if player_id.is_empty():
 		return
 	fetch_profile(player_id, true)
+	_fetch_server_best(player_id)
 
 
 func _profile_http_skipped() -> bool:
 	return _base_url() == _CLOSED_SENTINEL_URL
+
+
+## Ask /v1/leaderboard/me for the id bound here. The body has no player_id, so
+## the callback must not write through Game.high_score (that would follow
+## whoever is current when the response lands).
+func _fetch_server_best(player_id: String) -> void:
+	if player_id.is_empty():
+		return
+	var profile := get_node_or_null("/root/Profile")
+	if profile == null or String(profile.player_name).is_empty():
+		return
+	if _profile_http_skipped():
+		return
+	best_fetch_count += 1
+	var url := "%s/v1/leaderboard/me?player_id=%s" % [_base_url(), player_id]
+	_http_request(HTTPClient.METHOD_GET, url, "", _on_server_best_finished.bind(player_id))
+
+
+func _on_server_best_finished(ok: bool, code: int, parsed: Variant, _reason: String, requested_id: String) -> void:
+	# 404 unknown_player means there is no server best yet. Transport failure
+	# and any other non-2xx leave the device value alone and stay quiet.
+	if code == 404 or not ok or typeof(parsed) != TYPE_DICTIONARY:
+		return
+	var data: Dictionary = parsed
+	if not data.has("best"):
+		return
+	var game := get_node_or_null("/root/Game")
+	if game == null or not game.has_method("reconcile_best"):
+		return
+	game.reconcile_best(requested_id, int(data["best"]))
 
 
 func _on_push_profile_finished(_ok: bool, _code: int, _parsed: Variant, _reason: String) -> void:
@@ -253,7 +289,7 @@ func _on_fetch_profile_finished(ok: bool, code: int, parsed: Variant, _reason: S
 	profile_synced.emit(data)
 
 
-func _on_restore_profile_finished(ok: bool, code: int, parsed: Variant, _reason: String, gen: int) -> void:
+func _on_restore_profile_finished(ok: bool, code: int, parsed: Variant, _reason: String, gen: int, requested_id: String) -> void:
 	if gen != _restore_gen:
 		return
 	# Check 404 before `not ok` — `_on_http_completed` reports every non-2xx
@@ -282,6 +318,10 @@ func _on_restore_profile_finished(ok: bool, code: int, parsed: Variant, _reason:
 	_suppress_profile_push = false
 	if adopted:
 		restore_finished.emit(true, "")
+		var adopted_id := String(data.get("player_id", ""))
+		if adopted_id.is_empty():
+			adopted_id = requested_id
+		_fetch_server_best(adopted_id)
 	else:
 		restore_finished.emit(false, "offline")
 
@@ -430,7 +470,7 @@ func _begin_submit(token: int) -> void:
 		"client": CLIENT,
 	})
 	var url := "%s/v1/scores" % _base_url()
-	_http_request(HTTPClient.METHOD_POST, url, body, _on_submit_finished.bind(token), true)
+	_http_request(HTTPClient.METHOD_POST, url, body, _on_submit_finished.bind(token, player_id), true)
 
 
 func _record_attempt(token: int) -> void:
@@ -517,12 +557,18 @@ func offline_line(reason: String) -> String:
 	return "Leaderboard offline"
 
 
-func _on_submit_finished(ok: bool, code: int, parsed: Variant, reason: String, token: int) -> void:
+func _on_submit_finished(ok: bool, code: int, parsed: Variant, reason: String, token: int, submitted_player_id: String) -> void:
 	var state: Dictionary = _submit_state.get(token, {})
 	if not state.is_empty():
 		state["in_flight"] = false
 	if ok and code == 201 and typeof(parsed) == TYPE_DICTIONARY:
 		_submitted_tokens[token] = true
+		var data: Dictionary = parsed
+		# `best` belongs to the id in the POST body, captured at send time.
+		if data.has("best"):
+			var game := get_node_or_null("/root/Game")
+			if game != null and game.has_method("reconcile_best"):
+				game.reconcile_best(submitted_player_id, int(data["best"]))
 		if token == _submit_token:
 			submitted.emit(parsed)
 		fetch_top(10)
