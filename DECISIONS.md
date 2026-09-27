@@ -1252,3 +1252,32 @@ the giveaway". Measured, not inferred:
   `SQUISH_ALLOWED_ORIGINS` on `squish-leaderboard`. D-054's "one exact origin" becomes a list; the
   server already parses a comma-separated list (D-044). Operator action. T40 keeps the stale-id
   reconcile half and drops the "root cause undetermined" half once this is verified live.
+
+## D-058 — An identity the server refuses is unconfirmed: ask at boot, and never spend a run on it (planner, 2026-09-27)
+T42 live and verified on the phone at https://squishypinball.com/ (Dad's HIGH correct; three scores
+posted 201 at 22:39–22:43; Dad now 25000 on the board). The same log shows T40's stale-id defect
+recurring on a second, different identity:
+- 17:01:30 (onrender.com origin): `PUT /v1/profile` → 409 for `86f2ea8f…`, the id T36's merge deleted.
+- 22:36:07 and 22:37:45 (squishypinball.com): `GET /v1/profile?player_id=d2432de0…` → 404, then
+  `PUT /v1/profile` → 409. `d2432de0` never reached the server at all (CORS, D-057); its saved name
+  is held by `b8aa808f`. Steve then typed Dad, confirmed, and the device healed — by hand.
+So the case is general, not merge-specific: **the device's id is unknown to the server (404) and its
+saved name belongs to another player (the boot gap-fill PUT gets 409 `name_taken`)**. Today the 409
+is dropped (`_on_push_profile_finished` is fire-and-forget, D-037) and the device keeps the dead id.
+**Cost, proven on a local in-memory server:** a score posted under a dead id with a held name gets
+`409 {"error":"name_taken"}`; `_is_retryable(409)` is false, so the run is lost and the player sees
+"The leaderboard said no (409)". Not yet observed in production only because Steve claimed before
+playing each time.
+**Rule:**
+- That 404-then-409 outcome marks the identity **unconfirmed** for this session. It is runtime
+  state, recomputed every boot, not a new save field.
+- On the title, an unconfirmed identity is shown the existing welcome-back confirmation (T39/D-056)
+  for its saved name. Nothing is adopted until "That's me", which claims through the same resolve
+  path as a typed name (and so gets T42's best fetch). "Not me" returns to name entry.
+- An unconfirmed identity is never used for a score POST. At game over it gets the same "save your
+  score" invite as an unnamed player (D-051/T37), so a claim made there posts that run.
+- A successful adoption clears the state; the next boot makes no PUT and gets no 409.
+- **Not** silent auto-adoption at boot: D-056 requires a confirmation before adopting an existing
+  name, and the saved name on a device that never reached the server may have been typed by anyone.
+- No server change. Forwarding merged ids to their survivor would cover only the `86f2ea8f` shape,
+  not `d2432de0`.
