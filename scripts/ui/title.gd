@@ -46,6 +46,8 @@ func _ready() -> void:
 			_leaderboard.board_updated.connect(_on_board_updated)
 		if _leaderboard.has_signal("offline") and not _leaderboard.offline.is_connected(_on_offline):
 			_leaderboard.offline.connect(_on_offline)
+		if _leaderboard.has_signal("identity_unconfirmed_changed") and not _leaderboard.identity_unconfirmed_changed.is_connected(_on_identity_unconfirmed):
+			_leaderboard.identity_unconfirmed_changed.connect(_on_identity_unconfirmed)
 		if (_leaderboard.last_entries as Array).size() > 0:
 			_render_top_five(_leaderboard.last_entries)
 		else:
@@ -54,6 +56,8 @@ func _ready() -> void:
 
 func _process(_delta: float) -> void:
 	_set_flippers_enabled(not _is_capturing_name())
+	# A 409 that landed during a rename waits until that prompt is gone.
+	_consider_unconfirmed_prompt()
 	# Rename reopens NameEntry on top of the "playing as" / play-hint band.
 	# Closing the prompt does not go through _refresh_name_ui, so keep the
 	# labels in step with the prompt every frame.
@@ -93,6 +97,32 @@ func _apply_theme(_id: String = "") -> void:
 	_play_button.add_theme_color_override("font_color", theme_node.color("text_on_color"))
 
 
+func _on_identity_unconfirmed(unconfirmed: bool) -> void:
+	if unconfirmed:
+		_consider_unconfirmed_prompt()
+
+
+func _is_unconfirmed() -> bool:
+	return _leaderboard != null and bool(_leaderboard.get("identity_unconfirmed"))
+
+
+func _consider_unconfirmed_prompt() -> void:
+	if _dismissed or not visible:
+		return
+	if not _is_unconfirmed():
+		return
+	if _settings != null and _settings.has_method("is_open") and bool(_settings.is_open()):
+		return
+	if _name_entry == null or not _name_entry.has_method("offer_unconfirmed"):
+		return
+	if _name_entry.has_method("blocks_unconfirmed_prompt") and bool(_name_entry.blocks_unconfirmed_prompt()):
+		return
+	var profile := get_node_or_null("/root/Profile")
+	var saved := String(profile.player_name) if profile != null else ""
+	_name_entry.offer_unconfirmed(saved)
+	_sync_named_chrome()
+
+
 func _on_name_changed(new_name: String) -> void:
 	_refresh_name_ui(new_name)
 	_refresh_avatar()
@@ -113,6 +143,7 @@ func show_menu() -> void:
 	else:
 		_refresh_name_ui("")
 		_refresh_avatar()
+	_consider_unconfirmed_prompt()
 	if _leaderboard != null and _leaderboard.has_method("fetch_top"):
 		_leaderboard.fetch_top(5)
 
