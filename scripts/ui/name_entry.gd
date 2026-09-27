@@ -5,11 +5,20 @@ extends Control
 ## the field's row, under Play and above the keyboard line. A typed name is
 ## resolved against the server; a failure keeps the text on screen and does
 ## not mint a local identity.
+##
+## An existing name asks first. resolve_name adopts before it signals, so the
+## prompt peeks at the same route and only calls resolve_name once the player
+## says the name is theirs — or immediately, when the name is new.
+
+const _WELCOME_FMT := "Welcome back, %s!"
 
 @onready var _prompt: Label = $PromptLabel
 @onready var _line: LineEdit = $NameEdit
 @onready var _confirm: Button = $ConfirmButton
 @onready var _status: Label = $StatusLabel
+@onready var _welcome: Label = $WelcomeLabel
+@onready var _yes: Button = $YesButton
+@onready var _no: Button = $NoButton
 
 var _resolve_pending := false
 var _pending_gen := -1
@@ -18,6 +27,9 @@ var _suppress_blur := false
 ## What they typed when the server could not say who owns it. Shown again if
 ## the prompt is reopened before a name is actually saved.
 var _unresolved_text := ""
+var _probe_pending := false
+var _probe_gen := 0
+var _confirming := false
 
 
 func _ready() -> void:
@@ -27,6 +39,11 @@ func _ready() -> void:
 	_line.focus_exited.connect(_on_focus_exited)
 	_confirm.focus_mode = Control.FOCUS_NONE
 	_confirm.pressed.connect(_on_confirm_pressed)
+	_yes.focus_mode = Control.FOCUS_NONE
+	_yes.pressed.connect(_on_yes_pressed)
+	_no.focus_mode = Control.FOCUS_NONE
+	_no.pressed.connect(_on_no_pressed)
+	_show_edit_row()
 	var leaderboard := get_node_or_null("/root/Leaderboard")
 	if leaderboard != null and leaderboard.has_signal("name_resolved"):
 		if not leaderboard.name_resolved.is_connected(_on_name_resolved):
@@ -39,10 +56,13 @@ func _ready() -> void:
 
 
 func is_capturing() -> bool:
-	return visible and is_instance_valid(_line) and _line.has_focus()
+	return visible and is_instance_valid(_line) and _line.visible and _line.has_focus()
 
 
 func open(grab_focus: bool = true) -> void:
+	_invalidate_probe()
+	_confirming = false
+	_show_edit_row()
 	var saved := _saved_name()
 	if saved.is_empty() and not _unresolved_text.is_empty():
 		_line.text = _unresolved_text
@@ -59,7 +79,7 @@ func open(grab_focus: bool = true) -> void:
 
 
 func grab_name_focus() -> void:
-	if not visible or not is_instance_valid(_line):
+	if not visible or not is_instance_valid(_line) or not _line.visible:
 		return
 	_line.grab_focus()
 	_line.caret_column = _line.text.length()
@@ -78,21 +98,29 @@ func _apply_theme(_id: String = "") -> void:
 	if theme_node == null or not theme_node.has_method("color"):
 		return
 	_prompt.add_theme_color_override("font_color", theme_node.color("glow_gold"))
+	if _welcome != null:
+		_welcome.add_theme_color_override("font_color", theme_node.color("glow_gold"))
 	_line.add_theme_color_override("font_color", theme_node.color("text_primary"))
 	_line.add_theme_color_override("caret_color", theme_node.color("text_primary"))
 	if _status != null:
 		_status.add_theme_color_override("font_color", theme_node.color("text_primary"))
-	if _confirm != null:
-		var style := StyleBoxFlat.new()
-		style.bg_color = theme_node.color("object_pink")
-		style.corner_radius_top_left = 8
-		style.corner_radius_top_right = 8
-		style.corner_radius_bottom_left = 8
-		style.corner_radius_bottom_right = 8
-		_confirm.add_theme_stylebox_override("normal", style)
-		_confirm.add_theme_stylebox_override("hover", style)
-		_confirm.add_theme_stylebox_override("pressed", style)
-		_confirm.add_theme_color_override("font_color", theme_node.color("text_on_color"))
+	for button in [_confirm, _yes, _no]:
+		_style_button(button, theme_node)
+
+
+func _style_button(button: Button, theme_node: Node) -> void:
+	if button == null:
+		return
+	var style := StyleBoxFlat.new()
+	style.bg_color = theme_node.color("object_pink")
+	style.corner_radius_top_left = 8
+	style.corner_radius_top_right = 8
+	style.corner_radius_bottom_left = 8
+	style.corner_radius_bottom_right = 8
+	button.add_theme_stylebox_override("normal", style)
+	button.add_theme_stylebox_override("hover", style)
+	button.add_theme_stylebox_override("pressed", style)
+	button.add_theme_color_override("font_color", theme_node.color("text_on_color"))
 
 
 func _input(event: InputEvent) -> void:
@@ -111,6 +139,19 @@ func _on_confirm_pressed() -> void:
 	_commit_text()
 
 
+func _on_yes_pressed() -> void:
+	if not _confirming or _resolve_pending:
+		return
+	var raw := _line.text if _line != null else ""
+	_confirming = false
+	_show_edit_row()
+	_resolve_for_commit(raw)
+
+
+func _on_no_pressed() -> void:
+	_back_out_of_welcome()
+
+
 func _on_text_submitted(raw: String) -> void:
 	_line.text = raw
 	_commit_text()
@@ -120,7 +161,7 @@ func _on_focus_exited() -> void:
 	if _suppress_blur:
 		_suppress_blur = false
 		return
-	if _blur_commit_queued or _resolve_pending:
+	if _blur_commit_queued or _resolve_pending or _probe_pending or _confirming:
 		return
 	_blur_commit_queued = true
 	_commit_from_blur.call_deferred()
@@ -131,14 +172,14 @@ func _commit_from_blur() -> void:
 	if _suppress_blur:
 		_suppress_blur = false
 		return
-	if _resolve_pending:
+	if _resolve_pending or _probe_pending or _confirming:
 		return
 	_commit_text()
 
 
 func _commit_text() -> void:
 	_drop_stale_claim()
-	if _resolve_pending:
+	if _resolve_pending or _probe_pending or _confirming:
 		return
 	if _line == null:
 		return
@@ -149,8 +190,131 @@ func _commit_text() -> void:
 	if leaderboard == null or not leaderboard.has_method("resolve_name"):
 		_show_unresolved(raw, "unreachable")
 		return
+	# The closed-port sentinel cannot say whether the name exists. Keep the
+	# fail-closed resolve path so a missed server still adopts nothing.
+	if leaderboard.has_method("_profile_http_skipped") and bool(leaderboard._profile_http_skipped()):
+		_resolve_for_commit(raw)
+		return
+	_start_probe(raw, leaderboard)
+
+
+func _resolve_for_commit(raw: String) -> void:
+	if _resolve_pending:
+		return
+	if raw.strip_edges().is_empty():
+		return
+	var leaderboard := get_node_or_null("/root/Leaderboard")
+	if leaderboard == null or not leaderboard.has_method("resolve_name"):
+		_show_unresolved(raw, "unreachable")
+		return
 	_resolve_pending = true
 	_pending_gen = int(leaderboard.resolve_name(raw))
+
+
+func _start_probe(raw: String, leaderboard: Node) -> void:
+	_probe_gen += 1
+	var gen := _probe_gen
+	_probe_pending = true
+	var http := HTTPRequest.new()
+	http.timeout = 3.0
+	add_child(http)
+	http.request_completed.connect(_on_probe_completed.bind(raw, gen, http))
+	var url := "%s/v1/players/resolve" % String(leaderboard._base_url())
+	var err := http.request(
+		url,
+		PackedStringArray(["Content-Type: application/json"]),
+		HTTPClient.METHOD_POST,
+		JSON.stringify({"name": raw})
+	)
+	if err != OK:
+		_finish_probe_node(http)
+		if gen == _probe_gen:
+			_probe_pending = false
+			_resolve_for_commit(raw)
+
+
+func _on_probe_completed(
+	result: int,
+	code: int,
+	_headers: PackedStringArray,
+	body: PackedByteArray,
+	raw: String,
+	gen: int,
+	http: HTTPRequest
+) -> void:
+	_finish_probe_node(http)
+	if gen != _probe_gen:
+		return
+	_probe_pending = false
+	if _confirming or _resolve_pending:
+		return
+	if _line == null or _line.text != raw:
+		return
+	var parsed: Variant = null
+	if result == HTTPRequest.RESULT_SUCCESS and code >= 200 and code < 300:
+		parsed = JSON.parse_string(body.get_string_from_utf8())
+	if typeof(parsed) != TYPE_DICTIONARY:
+		_resolve_for_commit(raw)
+		return
+	var data: Dictionary = parsed
+	# Missing `created` takes the adopt path. Only an explicit existing name waits.
+	if bool(data.get("created", true)):
+		_resolve_for_commit(raw)
+		return
+	var display := String(data.get("name", "")).strip_edges()
+	if display.is_empty():
+		display = raw.strip_edges()
+	_show_welcome(display)
+
+
+func _finish_probe_node(http: HTTPRequest) -> void:
+	if http != null and is_instance_valid(http):
+		http.queue_free()
+
+
+func _show_welcome(display: String) -> void:
+	_confirming = true
+	_prompt.visible = false
+	_line.visible = false
+	_confirm.visible = false
+	if _status != null:
+		_status.visible = false
+	_welcome.text = _WELCOME_FMT % display
+	_welcome.visible = true
+	_yes.visible = true
+	_no.visible = true
+	_suppress_blur = true
+	_release_without_commit()
+
+
+func _show_edit_row() -> void:
+	if _welcome != null:
+		_welcome.visible = false
+	if _yes != null:
+		_yes.visible = false
+	if _no != null:
+		_no.visible = false
+	if _prompt != null:
+		_prompt.visible = true
+	if _line != null:
+		_line.visible = true
+	if _confirm != null:
+		_confirm.visible = true
+	if _status != null:
+		_status.visible = true
+
+
+func _back_out_of_welcome() -> void:
+	if not _confirming:
+		return
+	_confirming = false
+	_show_edit_row()
+	call_deferred("grab_name_focus")
+
+
+func _invalidate_probe() -> void:
+	_probe_gen += 1
+	_probe_pending = false
 
 
 func _on_name_resolved(generation: int, ok: bool, info: Dictionary) -> void:
@@ -158,6 +322,7 @@ func _on_name_resolved(generation: int, ok: bool, info: Dictionary) -> void:
 		return
 	_resolve_pending = false
 	if ok:
+		_confirming = false
 		_unresolved_text = ""
 		_set_status("")
 		visible = false
@@ -167,7 +332,9 @@ func _on_name_resolved(generation: int, ok: bool, info: Dictionary) -> void:
 
 
 func _show_unresolved(text: String, reason: String) -> void:
+	_confirming = false
 	_unresolved_text = text
+	_show_edit_row()
 	if _line != null:
 		_line.text = text
 	visible = true
@@ -192,6 +359,10 @@ func _release_without_commit() -> void:
 
 
 func _cancel() -> void:
+	_invalidate_probe()
+	if _confirming:
+		_back_out_of_welcome()
+		return
 	var leaderboard := get_node_or_null("/root/Leaderboard")
 	if _claim_is_current() and leaderboard != null and leaderboard.has_method("retire_name_resolve"):
 		leaderboard.retire_name_resolve()

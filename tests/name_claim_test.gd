@@ -420,6 +420,30 @@ func _case_title_commits(main: Node, natasha_id: String) -> bool:
 	return true
 
 
+func _accept_welcome(title: Node, how: String) -> bool:
+	var yes := title.get_node_or_null("NameEntry/YesButton") as Button
+	var welcome := title.get_node_or_null("NameEntry/WelcomeLabel") as Label
+	if yes == null or welcome == null:
+		return _fail("case 13 %s: welcome-back controls missing" % how)
+	var before_id := String(_profile.player_id)
+	var start := Time.get_ticks_msec()
+	while Time.get_ticks_msec() - start < 3000:
+		if welcome.visible:
+			break
+		await process_frame
+	if not welcome.visible:
+		return _fail("case 13 %s: existing name did not ask welcome back" % how)
+	if _got_resolve:
+		return _fail("case 13 %s: resolve finished before welcome-back was accepted" % how)
+	if String(_profile.player_id) != before_id:
+		return _fail("case 13 %s: player_id changed before accept" % how)
+	if welcome.text.find("Natasha") < 0:
+		return _fail("case 13 %s: welcome '%s' does not name Natasha" % [how, welcome.text])
+	_arm()
+	yes.pressed.emit()
+	return true
+
+
 func _title_commit(main: Node, how: String, typed: String, expect_id: String) -> bool:
 	_unnamed()
 	var title := main.get_node_or_null("Title")
@@ -446,6 +470,10 @@ func _title_commit(main: Node, how: String, typed: String, expect_id: String) ->
 		edit.release_focus()
 	else:
 		confirm.pressed.emit()
+	# An existing name asks before it adopts. One Done must not take the id.
+	if expect_id != "":
+		if not await _accept_welcome(title, how):
+			return false
 	if not await _wait_resolve():
 		return _fail("case 13 %s: resolve did not finish" % how)
 	if not _resolve_ok:
