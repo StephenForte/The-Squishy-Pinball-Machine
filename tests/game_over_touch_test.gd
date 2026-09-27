@@ -15,6 +15,8 @@ const KEYBOARD_TOP := 640.0
 var _cases_passed: int = 0
 var _lb: Node
 var _names: Array = []
+var _resolve_seen := false
+var _resolve_ok := false
 
 
 func _initialize() -> void:
@@ -32,6 +34,8 @@ func _run() -> void:
 		return
 	if _lb.has_signal("submit_attempted") and not _lb.submit_attempted.is_connected(_on_submit_attempted):
 		_lb.submit_attempted.connect(_on_submit_attempted)
+	if _lb.has_signal("name_resolved") and not _lb.name_resolved.is_connected(_on_name_resolved):
+		_lb.name_resolved.connect(_on_name_resolved)
 	_reset_profile(profile)
 	game.high_score = 0
 	game.restart()
@@ -82,6 +86,24 @@ func _run() -> void:
 func _on_submit_attempted(_token: int, _attempt: int) -> void:
 	var profile := root.get_node_or_null("Profile")
 	_names.append(String(profile.player_name) if profile != null else "")
+
+
+func _on_name_resolved(_generation: int, ok: bool, _info: Dictionary) -> void:
+	_resolve_seen = true
+	_resolve_ok = ok
+
+
+func _arm_resolve() -> void:
+	_resolve_seen = false
+	_resolve_ok = false
+
+
+func _wait_resolve() -> bool:
+	for _i in 30:
+		if _resolve_seen:
+			return true
+		await process_frame
+	return false
 
 
 func _case_desktop_hint(main: Node, game: Node) -> bool:
@@ -193,20 +215,18 @@ func _case_return_key(main: Node, game: Node, profile: Node) -> bool:
 	if edit == null or not edit.visible:
 		return _fail("case 3: NameEdit missing")
 	edit.text = "Dad"
+	_arm_resolve()
 	edit.text_submitted.emit("Dad")
-	await process_frame
-	await process_frame
-	if not _assert_one_submit(before, names_before, "Dad", "case 3"):
+	if not await _assert_unresolved(profile, before, names_before, "Dad", "case 3", edit):
 		return false
-	if String(profile.player_name) != "Dad":
-		return _fail("case 3: name is '%s'" % profile.player_name)
-	# The field blur that follows a commit must not post a second score.
+	# The field blur that follows a failed claim must not post a score either.
+	_arm_resolve()
 	if edit.has_focus():
 		edit.release_focus()
-	await process_frame
-	await process_frame
-	if not _assert_one_submit(before, names_before, "Dad", "case 3 after blur"):
-		return false
+		if not await _assert_unresolved(profile, before, names_before, "Dad", "case 3 after blur", edit):
+			return false
+	elif _attempt_snapshot() != before or _names.size() != names_before:
+		return _fail("case 3 after blur: submitted without focus")
 	_cases_passed += 1
 	print("GAME_OVER_TOUCH case 3 pass")
 	return true
@@ -227,10 +247,9 @@ func _case_focus_loss(main: Node, game: Node, profile: Node) -> bool:
 	await process_frame
 	if not edit.has_focus():
 		return _fail("case 4: NameEdit did not take focus")
+	_arm_resolve()
 	edit.release_focus()
-	await process_frame
-	await process_frame
-	if not _assert_one_submit(before, names_before, "Mo", "case 4"):
+	if not await _assert_unresolved(profile, before, names_before, "Mo", "case 4", edit):
 		return false
 	_cases_passed += 1
 	print("GAME_OVER_TOUCH case 4 pass")
@@ -252,10 +271,9 @@ func _case_save_button(main: Node, game: Node, profile: Node) -> bool:
 	edit.text = "Lux"
 	edit.grab_focus()
 	await process_frame
+	_arm_resolve()
 	save.pressed.emit()
-	await process_frame
-	await process_frame
-	if not _assert_one_submit(before, names_before, "Lux", "case 5"):
+	if not await _assert_unresolved(profile, before, names_before, "Lux", "case 5", edit):
 		return false
 	_cases_passed += 1
 	print("GAME_OVER_TOUCH case 5 pass")
@@ -368,15 +386,14 @@ func _case_menu_commits(main: Node, game: Node, profile: Node) -> bool:
 	edit.text = "Rex"
 	edit.grab_focus()
 	await process_frame
+	_arm_resolve()
 	menu.pressed.emit()
-	await process_frame
-	await process_frame
+	if not await _assert_unresolved(profile, before, names_before, "Rex", "case 9", edit):
+		return false
 	if not title.visible:
 		return _fail("case 9: Title should be visible after MenuButton")
 	if game_over.visible:
 		return _fail("case 9: GameOver should be hidden after MenuButton")
-	if not _assert_one_submit(before, names_before, "Rex", "case 9"):
-		return false
 	_cases_passed += 1
 	print("GAME_OVER_TOUCH case 9 pass")
 	return true
@@ -423,11 +440,15 @@ func _case_cancelled_skip(main: Node, game: Node, profile: Node) -> bool:
 	edit.grab_focus()
 	await process_frame
 	# Press-down then release outside the button: pressed never fires.
+	# That must not latch a decline, and it must not resolve on its own.
+	_arm_resolve()
 	skip.button_down.emit()
 	edit.focus_exited.emit()
 	skip.button_up.emit()
-	await process_frame
-	await process_frame
+	for _i in 8:
+		await process_frame
+	if _resolve_seen:
+		return _fail("case 11: cancelled Not now resolved the name")
 	if _attempt_snapshot() != before or _names.size() != names_before:
 		return _fail("case 11: cancelled Not now submitted")
 	if String(profile.player_name) != "":
@@ -435,10 +456,9 @@ func _case_cancelled_skip(main: Node, game: Node, profile: Node) -> bool:
 	if not edit.visible:
 		return _fail("case 11: cancelled Not now dismissed the prompt")
 	edit.text = "Nia"
+	_arm_resolve()
 	edit.text_submitted.emit("Nia")
-	await process_frame
-	await process_frame
-	if not _assert_one_submit(before, names_before, "Nia", "case 11"):
+	if not await _assert_unresolved(profile, before, names_before, "Nia", "case 11", edit):
 		return false
 	_cases_passed += 1
 	print("GAME_OVER_TOUCH case 11 pass")
@@ -482,6 +502,25 @@ func _assert_pink_button(button: Button, pink: Color, on_color: Color, default_b
 			return false
 	if button.get_theme_color("font_color") != on_color:
 		_fail("%s: %s font is not text_on_color" % [label, button.name])
+		return false
+	return true
+
+
+func _assert_unresolved(profile: Node, before: Vector2i, names_before: int, typed: String, label: String, edit: LineEdit) -> bool:
+	if not await _wait_resolve():
+		_fail("%s: resolve did not finish" % label)
+		return false
+	if _resolve_ok:
+		_fail("%s: unreachable resolve succeeded" % label)
+		return false
+	if _attempt_snapshot() != before or _names.size() != names_before:
+		_fail("%s: failure submitted (%s names=%s)" % [label, _attempt_snapshot(), _names])
+		return false
+	if String(profile.player_name) != "":
+		_fail("%s: failure set name '%s'" % [label, profile.player_name])
+		return false
+	if edit == null or edit.text != typed:
+		_fail("%s: field is '%s', want '%s'" % [label, edit.text if edit != null else "", typed])
 		return false
 	return true
 

@@ -9,6 +9,9 @@ signal offline(reason: String)
 signal submit_attempted(token: int, attempt: int)
 signal profile_synced(profile: Dictionary)
 signal restore_finished(ok: bool, reason: String)
+## generation, ok, info. Success info is the adopted player_id, name, avatar.
+## Failure info is code, reason, error — and nothing was adopted.
+signal name_resolved(generation: int, ok: bool, info: Dictionary)
 
 const BASE_URL := "https://squish-leaderboard.onrender.com"
 const KEY := "a419f5979f6891504b3af89a20e13125"
@@ -35,6 +38,8 @@ var _fetch_gen: int = 0
 ## must not paint offline over it.
 var _fetch_ok_gen: int = -1
 var _restore_gen: int = 0
+## Bumped to retire an in-flight resolve so a late 200 cannot adopt.
+var _resolve_gen: int = 0
 var _profile_push_count: int = 0
 ## Set while adopting a cloud avatar so set_avatar does not fire a PUT (D-038).
 var _suppress_profile_push: bool = false
@@ -95,6 +100,74 @@ func restore_profile(player_id: String) -> void:
 		return
 	var url := "%s/v1/profile?player_id=%s" % [_base_url(), id]
 	_http_request(HTTPClient.METHOD_GET, url, "", _on_restore_profile_finished.bind(gen))
+
+
+## Claim the typed name (D-053). Optional secret is sent only when set, so a
+## later password can occupy the same field. A failure adopts nothing.
+func resolve_name(raw_name: String, secret: String = "") -> int:
+	_resolve_gen += 1
+	var gen := _resolve_gen
+	var payload := {"name": raw_name}
+	if not secret.is_empty():
+		payload["secret"] = secret
+	if _profile_http_skipped():
+		_emit_resolve_failure.call_deferred(gen, 0, "unreachable")
+		return gen
+	var url := "%s/v1/players/resolve" % _base_url()
+	_http_request(
+		HTTPClient.METHOD_POST,
+		url,
+		JSON.stringify(payload),
+		_on_resolve_finished.bind(gen),
+		false
+	)
+	return gen
+
+
+## Drop a resolve that is no longer wanted (cancel, a newer claim). The
+## in-flight response then fails the generation check and does not adopt.
+func retire_name_resolve() -> void:
+	_resolve_gen += 1
+
+
+func _emit_resolve_failure(gen: int, code: int, reason: String) -> void:
+	if gen != _resolve_gen:
+		return
+	name_resolved.emit(gen, false, {"code": code, "reason": reason, "error": ""})
+
+
+func _on_resolve_finished(ok: bool, code: int, parsed: Variant, reason: String, gen: int) -> void:
+	if gen != _resolve_gen:
+		return
+	if not ok or typeof(parsed) != TYPE_DICTIONARY:
+		name_resolved.emit(gen, false, {
+			"code": code,
+			"reason": reason if not reason.is_empty() else "offline",
+			"error": "",
+		})
+		return
+	var data: Dictionary = parsed
+	var profile := get_node_or_null("/root/Profile")
+	if profile == null or not profile.has_method("adopt_identity"):
+		name_resolved.emit(gen, false, {"code": code, "reason": "offline", "error": ""})
+		return
+	# The resolve response is already the cloud profile. Do not PUT it back.
+	_suppress_profile_push = true
+	var adopted := bool(profile.adopt_identity(
+		String(data.get("player_id", "")),
+		String(data.get("name", "")),
+		String(data.get("avatar", ""))
+	))
+	_suppress_profile_push = false
+	if not adopted:
+		name_resolved.emit(gen, false, {"code": code, "reason": "offline", "error": ""})
+		return
+	name_resolved.emit(gen, true, {
+		"player_id": String(profile.player_id),
+		"name": String(profile.player_name),
+		"avatar": String(profile.avatar_id),
+		"created": bool(data.get("created", false)),
+	})
 
 
 func fetch_top(limit: int) -> void:

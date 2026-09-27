@@ -18,6 +18,21 @@ var _invite_open := false
 var _committed := false
 var _declined := false
 var _blur_commit_queued := false
+var _resolve_pending := false
+var _pending_gen := -1
+var _pending_score := 0
+var _game_serial := 0
+var _pending_serial := -1
+## True only for a claim this invite started. A carried claim must still
+## finish, and Not now must not cancel it.
+var _claim_started_here := false
+## This game's score has been handed to Leaderboard. A second path (the late
+## claim, or Save after the name already landed) must not post it again.
+var _posted_final := false
+## The score captured when a claim started. Distinct from `_posted_final` when
+## a newer game is on screen by the time the claim returns.
+var _posted_pending := false
+const _NAME_PROMPT := "Name this score"
 ## True only while Not now is held. A drag-off must not latch a decline.
 var _skip_holding := false
 ## Set on Not now press-down so a blur queued by that gesture cannot commit
@@ -67,6 +82,8 @@ func _ready() -> void:
 			_leaderboard.submitted.connect(_on_submitted)
 		if _leaderboard.has_signal("offline") and not _leaderboard.offline.is_connected(_on_offline):
 			_leaderboard.offline.connect(_on_offline)
+		if _leaderboard.has_signal("name_resolved") and not _leaderboard.name_resolved.is_connected(_on_name_resolved):
+			_leaderboard.name_resolved.connect(_on_name_resolved)
 	var theme_node := get_node("/root/Theme")
 	theme_node.palette_changed.connect(_apply_theme)
 	_apply_theme(theme_node.palette_id)
@@ -150,6 +167,8 @@ func _apply_control_hints() -> void:
 func _on_game_over(final_score: int, is_high_score: bool) -> void:
 	_committed = false
 	_declined = false
+	_posted_final = false
+	_game_serial += 1
 	_blur_commit_queued = false
 	_skip_holding = false
 	_suppress_blur_commit = false
@@ -325,7 +344,17 @@ func _sync_name_invite() -> void:
 
 func _open_invite() -> void:
 	_invite_open = true
+	# A claim already in flight (this overlay, or the title) must keep its
+	# generation. Clearing it here adopted the name and dropped the score.
+	if not _claim_is_current():
+		_resolve_pending = false
+		_pending_gen = -1
+		_pending_score = 0
+		_pending_serial = -1
+	_claim_started_here = false
 	_name_edit.text = ""
+	if _name_prompt != null:
+		_name_prompt.text = _NAME_PROMPT
 	_name_prompt.visible = true
 	_name_edit.visible = true
 	_save_button.visible = true
@@ -385,27 +414,72 @@ func _commit_from_blur() -> void:
 
 
 func _commit_pending_name() -> void:
-	if _committed or _declined or not _invite_open:
+	if _resolve_pending and not _claim_is_current():
+		_resolve_pending = false
+	if _committed or _declined or not _invite_open or _resolve_pending:
 		return
 	if _name_edit == null:
 		return
 	var profile := get_node_or_null("/root/Profile")
-	if profile == null:
-		return
-	if not String(profile.player_name).is_empty():
+	if profile != null and not String(profile.player_name).is_empty():
+		# The name landed from a claim this invite did not start. Post once.
 		_committed = true
 		_hide_invite()
+		_release_name_focus()
+		_submit_score(_final_score)
 		return
-	profile.call("set_name", _name_edit.text)
-	var named := String(profile.player_name)
-	if named.is_empty():
+	var raw := _name_edit.text
+	if raw.strip_edges().is_empty():
 		return
-	_committed = true
-	var score := _final_score
-	_hide_invite()
-	_release_name_focus()
-	if score > 0 and _leaderboard != null and _leaderboard.has_method("submit"):
-		_leaderboard.submit(score)
+	if _leaderboard == null or not _leaderboard.has_method("resolve_name"):
+		_show_unresolved("unreachable")
+		return
+	_resolve_pending = true
+	_claim_started_here = true
+	_pending_score = _final_score
+	_pending_serial = _game_serial
+	_posted_pending = false
+	_pending_gen = int(_leaderboard.resolve_name(raw))
+
+
+func _on_name_resolved(generation: int, ok: bool, info: Dictionary) -> void:
+	var ours := _pending_gen >= 0 and generation == _pending_gen
+	if not ours:
+		# Title, or a claim whose invite was replaced. Leaderboard already
+		# adopted a success. This game still owes its score.
+		if ok and not _declined:
+			_post_current_score()
+		return
+	_resolve_pending = false
+	_claim_started_here = false
+	if not ok:
+		if not _declined:
+			_show_unresolved(String(info.get("reason", "")))
+		return
+	if not _declined:
+		if _pending_serial == _game_serial:
+			_submit_pending()
+			_posted_final = true
+		else:
+			_submit_pending()
+			_post_current_score()
+		if _invite_open:
+			_committed = true
+			_hide_invite()
+			_release_name_focus()
+		return
+	# Not now discarded this game. An earlier game's claim still posts.
+	if _pending_serial != _game_serial:
+		_submit_pending()
+
+
+func _show_unresolved(reason: String) -> void:
+	# They already left this game over. Do not bring the prompt back, and do
+	# not invent an identity for the name that never resolved.
+	if not _invite_open:
+		return
+	if _name_prompt != null:
+		_name_prompt.text = _offline_line(reason)
 
 
 func _on_save_pressed() -> void:
@@ -427,8 +501,51 @@ func _on_skip_pressed() -> void:
 	_declined = true
 	_skip_holding = false
 	_suppress_blur_commit = false
+	if _claim_started_here and _claim_is_current() and _leaderboard != null and _leaderboard.has_method("retire_name_resolve"):
+		_leaderboard.retire_name_resolve()
+		_resolve_pending = false
+		_claim_started_here = false
 	_hide_invite()
 	_release_name_focus()
+
+
+func _claim_is_current() -> bool:
+	if not _resolve_pending:
+		return false
+	if _leaderboard == null:
+		return false
+	return int(_leaderboard._resolve_gen) == _pending_gen
+
+
+func _post_current_score() -> void:
+	var profile := get_node_or_null("/root/Profile")
+	if profile == null or String(profile.player_name).is_empty():
+		return
+	if _final_score <= 0 or _posted_final or _declined:
+		return
+	_committed = true
+	if _invite_open:
+		_hide_invite()
+		_release_name_focus()
+	_submit_score(_final_score)
+
+
+func _submit_pending() -> void:
+	if _posted_pending or _pending_score <= 0:
+		return
+	if _leaderboard == null or not _leaderboard.has_method("submit"):
+		return
+	_posted_pending = true
+	_leaderboard.submit(_pending_score)
+
+
+func _submit_score(score: int) -> void:
+	if score <= 0 or score != _final_score or _posted_final:
+		return
+	if _leaderboard == null or not _leaderboard.has_method("submit"):
+		return
+	_posted_final = true
+	_leaderboard.submit(score)
 
 
 func _release_name_focus() -> void:

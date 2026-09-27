@@ -5,10 +5,10 @@
 [node name="NameEntry" type="Control"]
 layout_mode = 3
 anchors_preset = 0
-offset_left = 80.0
-offset_top = 600.0
-offset_right = 640.0
-offset_bottom = 760.0
+offset_left = 40.0
+offset_top = 196.0
+offset_right = 680.0
+offset_bottom = 380.0
 clip_contents = false
 mouse_filter = 0
 script = ExtResource("1_name")
@@ -17,22 +17,22 @@ script = ExtResource("1_name")
 layout_mode = 0
 offset_left = 0.0
 offset_top = 0.0
-offset_right = 560.0
-offset_bottom = 40.0
+offset_right = 640.0
+offset_bottom = 28.0
 mouse_filter = 2
 theme_override_colors/font_color = Color(1, 0.92, 0.35, 1)
 theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
 theme_override_constants/outline_size = 6
-theme_override_font_sizes/font_size = 26
+theme_override_font_sizes/font_size = 22
 text = "WHAT SHOULD WE CALL YOU?"
 horizontal_alignment = 1
 
 [node name="NameEdit" type="LineEdit" parent="."]
 layout_mode = 0
-offset_left = 40.0
-offset_top = 52.0
-offset_right = 520.0
-offset_bottom = 124.0
+offset_left = 0.0
+offset_top = 32.0
+offset_right = 488.0
+offset_bottom = 160.0
 theme_override_colors/font_color = Color(1, 1, 0.88, 1)
 theme_override_colors/font_placeholder_color = Color(1, 1, 0.88, 0.45)
 theme_override_font_sizes/font_size = 32
@@ -42,14 +42,30 @@ placeholder_text = "Your name"
 caret_blink = true
 context_menu_enabled = false
 select_all_on_focus = true
+virtual_keyboard_enabled = true
 
 [node name="ConfirmButton" type="Button" parent="."]
 layout_mode = 0
 offset_left = 496.0
-offset_top = -552.0
-offset_right = 624.0
-offset_bottom = -408.0
+offset_top = 32.0
+offset_right = 640.0
+offset_bottom = 160.0
 focus_mode = 0
 custom_minimum_size = Vector2(128, 128)
 theme_override_font_sizes/font_size = 32
 text = "Done"
+
+[node name="StatusLabel" type="Label" parent="."]
+layout_mode = 0
+offset_left = 0.0
+offset_top = 164.0
+offset_right = 640.0
+offset_bottom = 184.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 1, 0.88, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 4
+theme_override_font_sizes/font_size = 16
+text = ""
+horizontal_alignment = 1
+vertical_alignment = 1
