@@ -58,9 +58,9 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T36 | Server: names are unique and resolve to one player; merge the two Dads (D-053) | 11 | **done** 2026-09-27 — merged, deployed, duplicates merged; Dad and Natasha both resolve live | mid | — |
 | T37 | Client: typing a name claims that player; remove the transfer/restore UI entirely (D-053) | 11 | **done** 2026-09-27 — merged, deployed; phone claimed Dad and posted two scores to the right player | mid | T36 |
 | T39 | **Title screen is colliding and oversized:** field on top of the title, Play over the HUD; plus the welcome-back confirm (D-056) | 12 | **done** — reviewed, approved and merged 2026-09-27 (PR #47, 61ffdad) | mid | — |
-| T42 | HIGH shows the device's best, not the player's: reconcile with the server's best after boot, claim and submit (D-057) | 12 | **approved** 2026-09-27 (PR #48, f9aa295) — awaiting merge + static-site redeploy | mid | — |
+| T42 | HIGH shows the device's best, not the player's: reconcile with the server's best after boot, claim and submit (D-057) | 12 | **done** 2026-09-27 — merged (PR #48, 8ed0ab0), deployed, verified on the phone | mid | — |
 | T41 | Name lookup should be read-only: the title probe POSTs to the creating resolve route and rebuilds its own HTTP path (D-056) | 12 | not started | cheap-mid | T40 |
-| T40 | Stale identity never reconciles at boot (409) (D-056). The "offline while the server answers in 1–3 ms" half is **root-caused** (D-057): `squishypinball.com` is not on `SQUISH_ALLOWED_ORIGINS` — operator config fix | 12 | not started; allowlist fix **verified live** 2026-09-27 — rescope to the stale-id half | mid | — |
+| T40 | A refused identity (404 then PUT 409 `name_taken`) is never reconciled and silently loses runs: confirm at boot, route game over through the save-your-score invite (D-056, D-058). CORS half closed (D-057) | 12 | brief written 2026-09-27, not dispatched | mid | — |
 | T38 | Name holders are undiagnosable: resolve hides the blocker, admin scores caps at 50 with no paging, and a score row locks a name forever (D-055) | 11 | not started | mid | — |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8 → T10 → T9 →
@@ -1388,3 +1388,13 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   worker temp paths gone, shared folder on clean `main`.
 - **Next:** Steve merges #48, redeploys the static site, and checks Dad's HIGH = 14300 on the phone
   at https://squishypinball.com/. Then T40 (stale-id reconcile only) → T41 → T38.
+- 2026-09-27: **T42 merged (PR #48 → 8ed0ab0) and deployed** (static deploy `dep-daspkg0473hc739da8pg`
+  live 22:36:20). Steve: "works!". Verified from the server log, not assumed: the phone on
+  squishypinball.com (308-byte preflights, now allowed) claimed Dad at 22:37:48, fetched
+  `/v1/leaderboard/me` for `b8aa808f` (200), and posted three scores (201 at 22:39, 22:42, 22:43).
+  Board: Dad 25000, Natasha 14300, T13 1313. The CORS fix is confirmed from real traffic too.
+- 2026-09-27: The same log shows T40's stale-id defect on a second id (`d2432de0`, 404 → PUT 409 at
+  22:36:07 and 22:37:45). Probed on a local in-memory server: a score under a dead id with a held
+  name gets 409 `name_taken`, not retried → the run is lost. → **D-058**; T40 rescoped and briefed.
+- **State:** decisions through **D-058**, next free **D-059**. Tasks through **T42**, next free
+  **T43**. No open PRs. Order: **T40** → T41 (both touch `name_entry.gd`; T41 after) → T38.
