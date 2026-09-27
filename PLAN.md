@@ -48,16 +48,16 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T26 | Web export pipeline: reproducible build, browser-verified, three unknowns settled (D-045) | 9 | done 2026-09-21 (PR #38 → e36f055); hosted at https://the-squishy-pinball-machine.onrender.com | mid | T24, T25 |
 | T27 | Admin cleanup + per-IP limiting so a griefed board is repairable (D-046) | 9 | merged + **deployed live** 2026-09-21 (PR #36 → 3fc6560) | mid | T25 |
 | T28 | Admin score listing so a row can be found and deleted (D-047) | 9 | **done** 2026-09-21 — merged, deployed, Smoke Test row deleted | cheap | T27 |
-| T29 | Profile transfer: show this device’s player id, restore an existing identity by pasting it (D-048) | 10 | reviewed + approved 2026-09-20 (PR #39, efa1520) — awaiting merge | cheap-mid | T20b |
-| T30 | **iPhone unlock:** play must not require a name; visible Play button; touch-correct control hints (D-049) | 10 | reviewed + approved 2026-09-25 (PR #40, 5328f77) — awaiting merge | cheap-mid | — |
+| T29 | Profile transfer: show this device’s player id, restore an existing identity by pasting it (D-048) | 10 | **done** — reviewed, approved and merged 2026-09-20 (PR #39, efa1520) | cheap-mid | T20b |
+| T30 | **iPhone unlock:** play must not require a name; visible Play button; touch-correct control hints (D-049) | 10 | **done** — reviewed, approved and merged 2026-09-25 (PR #40, 5328f77) | cheap-mid | — |
 | T31 | Text entry without a hardware keyboard: virtual keyboard + visible confirm, name and D-048 restore field (D-049) | 10 | **done** 2026-09-26 — merged (PR #41), deployed, keyboard confirmed live on iPhone | mid | T30 |
-| T32 | **Game over unusable on touch:** Restart/Menu invisible (no StyleBoxFlat) + invite a name so a score can be saved (D-051) | 10 | reviewed + approved 2026-09-26 (PR #42, 04df0f0) — awaiting merge | cheap-mid | — |
-| T33 | Board reports "Leaderboard offline" and an empty list after the server answered 200 (D-051) | 10 | reviewed + approved 2026-09-26 (PR #44, cf0c4fa) — awaiting merge | mid | — |
+| T32 | **Game over unusable on touch:** Restart/Menu invisible (no StyleBoxFlat) + invite a name so a score can be saved (D-051) | 10 | **done** — reviewed, approved and merged 2026-09-26 (PR #42, 04df0f0) | cheap-mid | — |
+| T33 | Board reports "Leaderboard offline" and an empty list after the server answered 200 (D-051) | 10 | **done** — reviewed, approved and merged 2026-09-26 (PR #44, cf0c4fa) | mid | — |
 | T34 | Title name never commits on a phone: confirm sits in the opposite corner from the field; commit on blur/return (D-051) | 10 | **closed by T37** 2026-09-27 — the title prompt was rewritten there, not fixed in place | cheap-mid | T32 |
-| T35 | Profile transfer unusable on a phone: restore field sits under the keyboard and there is no paste path (D-048, D-051) | 10 | reviewed + approved 2026-09-26 (PR #43, 6f2fc56) — awaiting merge | mid | — |
+| T35 | Profile transfer unusable on a phone: restore field sits under the keyboard and there is no paste path (D-048, D-051) | 10 | **done** — reviewed, approved and merged 2026-09-26 (PR #43, 6f2fc56) | mid | — |
 | T36 | Server: names are unique and resolve to one player; merge the two Dads (D-053) | 11 | **done** 2026-09-27 — merged, deployed, duplicates merged; Dad and Natasha both resolve live | mid | — |
 | T37 | Client: typing a name claims that player; remove the transfer/restore UI entirely (D-053) | 11 | **done** 2026-09-27 — merged, deployed; phone claimed Dad and posted two scores to the right player | mid | T36 |
-| T39 | **Title screen is colliding and oversized:** field on top of the title, Play over the HUD; plus the welcome-back confirm (D-056) | 12 | reviewed + approved 2026-09-27 (PR #47, 61ffdad) — awaiting merge | mid | — |
+| T39 | **Title screen is colliding and oversized:** field on top of the title, Play over the HUD; plus the welcome-back confirm (D-056) | 12 | **done** — reviewed, approved and merged 2026-09-27 (PR #47, 61ffdad) | mid | — |
 | T41 | Name lookup should be read-only: the title probe POSTs to the creating resolve route and rebuilds its own HTTP path (D-056) | 12 | not started | cheap-mid | T40 |
 | T40 | Stale identity never reconciles at boot (409), and the title reports offline while the server answers in 1–3 ms (D-056) | 12 | not started | mid | — |
 | T38 | Name holders are undiagnosable: resolve hides the blocker, admin scores caps at 50 with no paging, and a score row locks a name forever (D-055) | 11 | not started | mid | — |
@@ -1335,3 +1335,24 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   the one that is easy to think of. Name the states explicitly — unnamed, named-idle, renaming,
   confirming — and require the invariant in each. A geometry assertion proves nothing about a state
   nobody enumerated.
+- 2026-09-27: T39 merged (PR #47) and **deployed**: `index.pck` 6,155,080 → 6,174,040, all assets 200.
+  The recomposed title and the welcome-back confirmation are live on
+  https://the-squishy-pinball-machine.onrender.com. Not yet looked at on a real phone.
+- 2026-09-27: Plan hygiene — six task rows still read "awaiting merge" while their PRs (#39, #40,
+  #42, #43, #44, #47) were all merged. Corrected to done. Recorded because it is the failure the
+  handoff rules warn about: a status written at review time and never revisited is exactly the kind
+  of stale fact a fresh session would act on.
+- **State at handoff (2026-09-27):** main `e11242d`, **no open PRs and no branches besides main**.
+  Gates on main: Godot **30 PASS**, server **86 pass / 0 fail**. Decisions through **D-056**, next
+  free **D-057**. Tasks through **T41**, next free **T42**. Nothing is dispatched or running.
+- **Open work, in the planner's recommended order:** **T40** (a pre-T36 device never reconciles its
+  deleted id — Steve's phone tried to recreate `86f2ea8f…` and got a correct 409 — and the title
+  reports the leaderboard timed out while the server answers in 1–3 ms, root cause undetermined);
+  **T41** (the title's name probe POSTs to the creating resolve route and builds its own HTTP path,
+  bypassing T33's watchdog and reason mapping — needs a read-only server lookup); **T38** (resolve
+  will not name the holder blocking a name, the admin score listing caps at 50 with no paging while
+  the table is 72 rows, and a score row holds a name forever).
+- **Open questions for Steve, none blocking:** the confirmation copy ("Welcome back, %s!" /
+  "That's me" / "Not me"); T33's failure sentences; whether a score row should hold a name at all
+  (inside T38); and whether an offline run should queue its score against a name claimed later
+  (T37 deliberately posts nothing when resolve fails).
