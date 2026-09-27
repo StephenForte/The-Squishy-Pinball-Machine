@@ -1320,3 +1320,18 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   through a green gate for two releases.
 - **Open for Steve:** the confirmation copy. Worker's interim, inline in the name prompt rather than a
   separate panel: "Welcome back, %s!" with "That's me" and "Not me".
+- 2026-09-27: **Planner miss on T39, caught by Steve and not by the planner.** The review table said
+  "Bugbot clean", taken from the handoff and never queried — a step the review process has
+  explicitly and which had been run on the previous seven PRs. Bugbot had in fact found a **medium
+  on `ee7078d`: "Rename prompt overlaps title labels"** — a named player opening rename left
+  `PlayerNameLabel` and `PlayHintLabel` visible in the same band as `NameEntry`.
+- 2026-09-27: The finding is worse than a missed read, because **it was a state the planner's own
+  measurement could not have caught**: the probe set `player_name = ""` and measured first-run only,
+  and the T39 brief's coverage said "with no name set, the first-run screen satisfies all of the
+  above". Bugbot tested the *named* path that neither the brief nor the review asked about.
+  Verified after the fact at the approved head: `named-idle overlaps=0 visible=9` with both labels
+  present, `rename-open overlaps=0 visible=8` with both absent. Fix confirmed; verdict unchanged.
+- **Standing lesson for every future UI brief:** a screen has more than one state, and "first run" is
+  the one that is easy to think of. Name the states explicitly — unnamed, named-idle, renaming,
+  confirming — and require the invariant in each. A geometry assertion proves nothing about a state
+  nobody enumerated.
