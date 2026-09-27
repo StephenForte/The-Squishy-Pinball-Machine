@@ -1179,3 +1179,33 @@ Three things compounded to make one row take three round trips, and all three ar
 - **Not changed here.** Whether a score row should hold a name at all is a real design question, not
   a bug to patch quietly: loosening it lets someone take a name another player has posted under,
   which is exactly what D-053 accepts for people but may not want for history. Steve decides.
+
+## D-056 — First real claim-by-name session: what works, and four things that do not (2026-09-27)
+T37 deployed. Steve on his iPhone: "dad is still wong", and separately "we still need to clean up
+the main screen, way too busy and buttons too big, etc", and "ok for the welcome back".
+**The identity layer is correct, and that is established from data rather than assumed.** The
+server's own log shows the phone claiming a name (`POST /v1/players/resolve` 200) and then posting
+two scores (`POST /v1/scores` 201 twice), and the raw rows confirm both landed on the right player:
+`id=75 b8aa808f Dad 6900` and `id=76 b8aa808f Dad 7400`. The phone and the desktop are now one
+player. The board did not appear to change only because both scores were under the 14300 best.
+Four defects, all observed rather than inferred:
+- **A stale identity is never reconciled at boot.** The phone started still holding
+  `86f2ea8f…`, the id the merge deleted, and its boot reconcile tried to recreate it:
+  `PUT /v1/profile -> 409` at 17:01:30. T36's uniqueness rule correctly refused, so no duplicate was
+  made, but nothing repairs the device either. It self-heals only when a human types a name.
+  Every device that existed before T36 is in this state.
+- **The title says "The leaderboard took too long" while the server answers in 1–3 ms.** Reproduced
+  in a desktop browser against the live build, so it is not the phone. `title.gd:121` does clear the
+  flag on `board_updated`, which means that signal is not arriving — the fetch is being lost or
+  dropped somewhere after T33's fix. Root cause **not determined**; this is the same symptom class
+  T33 addressed and explicitly could not close for responses Godot has already discarded.
+- **The title screen has real collisions, not just clutter.** The name field renders on top of
+  "THE SQUISH ZONE" and the Play button overlaps the HUD score row. This is a planner failure:
+  successive briefs (T30, T31, T37) required buttons of at least 64 px and every text field above
+  y=640, and never once required that the result be composed. The existing overlap checks did not
+  catch it because `title_touch` case 4 compares PlayButton against NameEntry, SettingsButton and
+  NameButton only — **labels are not in the comparison**, so a field sitting on a title label passes.
+- Buttons are too large for the screen they share. The 64 px floor was a touch-target minimum
+  borrowed for a phone and then applied to a 720x1280 canvas without a layout budget.
+- **Approved by Steve:** when a typed name already belongs to a player, confirm before adopting
+  ("welcome back, Natasha") rather than adopting silently. Design it so a typo is recoverable.
