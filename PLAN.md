@@ -58,8 +58,9 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T36 | Server: names are unique and resolve to one player; merge the two Dads (D-053) | 11 | **done** 2026-09-27 — merged, deployed, duplicates merged; Dad and Natasha both resolve live | mid | — |
 | T37 | Client: typing a name claims that player; remove the transfer/restore UI entirely (D-053) | 11 | **done** 2026-09-27 — merged, deployed; phone claimed Dad and posted two scores to the right player | mid | T36 |
 | T39 | **Title screen is colliding and oversized:** field on top of the title, Play over the HUD; plus the welcome-back confirm (D-056) | 12 | **done** — reviewed, approved and merged 2026-09-27 (PR #47, 61ffdad) | mid | — |
+| T42 | HIGH shows the device's best, not the player's: reconcile with the server's best after boot, claim and submit (D-057) | 12 | brief written 2026-09-27, not dispatched | mid | — |
 | T41 | Name lookup should be read-only: the title probe POSTs to the creating resolve route and rebuilds its own HTTP path (D-056) | 12 | not started | cheap-mid | T40 |
-| T40 | Stale identity never reconciles at boot (409), and the title reports offline while the server answers in 1–3 ms (D-056) | 12 | not started | mid | — |
+| T40 | Stale identity never reconciles at boot (409) (D-056). The "offline while the server answers in 1–3 ms" half is **root-caused** (D-057): `squishypinball.com` is not on `SQUISH_ALLOWED_ORIGINS` — operator config fix | 12 | not started; rescope after the allowlist fix is verified live | mid | — |
 | T38 | Name holders are undiagnosable: resolve hides the blocker, admin scores caps at 50 with no paging, and a score row locks a name forever (D-055) | 11 | not started | mid | — |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8 → T10 → T9 →
@@ -1356,3 +1357,18 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   "That's me" / "Not me"); T33's failure sentences; whether a score row should hold a name at all
   (inside T38); and whether an offline run should queue its score against a name claimed later
   (T37 deliberately posts nothing when resolve fails).
+- 2026-09-27: T39 seen on the real phone. Steve: "welcome back dad and has the wrong dad, the high
+  score is the giveaway". **Measured before diagnosing:** production has one Dad
+  (`b8aa808f…`, best 14300, rank 1) and the phone's claim at 21:14:52 resolved to it. The claim is
+  right; **HIGH is device-local** (D-031) and nothing ever brings the server's best down, so the phone
+  shows its own 7400-ish for Dad. → **D-057**, **T42**.
+- 2026-09-27: The same log window root-caused T40's second half. The iPhone ran two identities
+  seconds apart: `b8aa808f` (330-byte preflights, requests answered) and `d2432de0…` (133-byte
+  preflights, **no request ever followed**, server has never seen the id). Steve: the main URL is
+  `https://squishypinball.com/`. Probed: that origin (and `www.`) get no
+  `access-control-allow-origin`; the onrender.com origin does. The custom domain is a separate,
+  never-connected copy of the game. Fix is Steve's: add it to `SQUISH_ALLOWED_ORIGINS`. D-054
+  predicted this mechanism; now the origin is known.
+- **State (2026-09-27, later):** decisions through **D-057**, next free **D-058**. Tasks through
+  **T42**, next free **T43**. T42 brief written, not dispatched. Recommended order: allowlist fix
+  (operator, minutes) → T42 → T40 (rescoped to the stale-id half) → T41 → T38.
