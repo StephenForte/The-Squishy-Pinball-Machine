@@ -1228,7 +1228,11 @@ the giveaway". Measured, not inferred:
   from `GET /v1/leaderboard/me` (field `best`) after boot restore, after any identity adoption
   (claim, restore), and from `POST /v1/scores`' own response (field `best`). HIGH never goes down.
   A 404 `unknown_player` means "no server best yet" and leaves the device value alone. A response is
-  applied only if the id it was requested for is still `Profile.player_id` when it arrives.
+  written to the slot of the id it was **requested for**, bound at request time — never through the
+  current-player setter — and the visible label repaints only if that id is still `Profile.player_id`.
+  **Amended at T42 review:** this sentence first said "applied only if the requested id is still
+  current", which contradicted the T42 brief; `/me` returns that id's own best, so raising that id's
+  slot is correct whoever is current. The worker flagged the conflict; the brief's reading stands.
 - **Consequence, accepted:** `game_over.is_high_score` and the "NEW HIGH SCORE" label compare
   against the merged best, so a 9000 on the phone is no longer a new high for Dad. That is the
   honest meaning; the old behaviour congratulated a player for not beating their own score.
