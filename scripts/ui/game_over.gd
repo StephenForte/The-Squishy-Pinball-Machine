@@ -425,6 +425,11 @@ func _hide_invite() -> void:
 
 func _show_edit_row() -> void:
 	_confirming = false
+	# Welcome sets this so hiding the field cannot commit. If the field was
+	# already unfocused, that hide never blurs, and the flag would swallow
+	# the next leave. A blur already queued still consumes the flag itself.
+	if not _skip_holding and not _blur_commit_queued:
+		_suppress_blur_commit = false
 	if _welcome != null:
 		_welcome.visible = false
 	if _yes != null:

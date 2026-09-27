@@ -358,7 +358,14 @@ func _case_invite_held_name() -> bool:
 	var before_id := String(_profile.player_id)
 	var nat_rows := await _score_total(NAT_ID)
 	_type(edit, "Natasha")
-	save.pressed.emit()
+	# Leave the field before the lookup returns, so showing the welcome does
+	# not blur it. A stuck suppress flag would then swallow the later leave.
+	if edit.has_focus():
+		edit.release_focus()
+		await process_frame
+		await process_frame
+	if not welcome.visible:
+		save.pressed.emit()
 	if not await _wait_welcome(welcome, "Natasha"):
 		return _fail("case 6: welcome '%s'" % welcome.text)
 	if String(_profile.player_id) != before_id or String(_profile.player_name) != "":
@@ -377,9 +384,11 @@ func _case_invite_held_name() -> bool:
 		return _fail("case 6: Not me locked the field")
 	if await _score_total(NAT_ID) != nat_rows:
 		return _fail("case 6: Not me wrote a row")
-	save.pressed.emit()
+	edit.grab_focus()
+	await process_frame
+	edit.release_focus()
 	if not await _wait_welcome(welcome, "Natasha"):
-		return _fail("case 6: second save did not ask again")
+		return _fail("case 6: blur after Not me did not ask again")
 	var score := int(_game.score)
 	yes.pressed.emit()
 	if not await _wait_id(NAT_ID):
