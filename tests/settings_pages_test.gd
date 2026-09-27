@@ -1,12 +1,12 @@
 extends SceneTree
 
-## D-052. Settings is two pages. A transfer code is pasted or confirmed from
-## a link; it is never adopted just because the URL carried it.
+## D-052 pages, after D-053 removed transfer. Settings still opens, pages and
+## closes. The phone page is the app icon. There is no transfer field, so the
+## keyboard-line rule is checked on the controls that remain: every one of
+## them sits above y=640.
 
 const VIEWPORT := Rect2(0, 0, 720, 1280)
 const KEYBOARD_TOP := 640.0
-const VISIBLE_BAND := Rect2(0, 0, 720, KEYBOARD_TOP)
-const VALID_ID := "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee"
 
 var _cases_passed: int = 0
 var _profile: Node
@@ -44,11 +44,11 @@ func _run() -> void:
 		return
 	if not await _case_keyboard(main):
 		return
-	if not await _case_paste(main):
+	if not await _case_reopen(main):
 		return
-	if not await _case_link(main):
+	if not await _case_icon_still_works(main):
 		return
-	if not await _case_dismiss_cancels_inflight(main):
+	if not await _case_close_does_not_adopt(main):
 		return
 
 	print("SETTINGS_PAGES PASS cases=%d" % _cases_passed)
@@ -61,16 +61,18 @@ func _case_pages(main: Node) -> bool:
 	if settings == null:
 		return _fail("case 1: Settings missing")
 	if settings.is_visible_in_tree():
-		return _fail("case 1: Settings opened itself with no link")
-	if String(settings.page_search()) != "":
-		return _fail("case 1: non-web page_search returned '%s'" % settings.page_search())
+		return _fail("case 1: Settings opened itself")
+	if settings.has_method("page_search") or settings.has_method("offer_restore_from_search") or settings.has_method("use_clipboard_stand_in"):
+		return _fail("case 1: transfer API is still on Settings")
+	if not _transfer_gone(settings):
+		return _fail("case 1: transfer nodes are still in the scene")
 	settings.open()
 	await process_frame
 	if String(settings.current_page()) != "look":
 		return _fail("case 1: open should land on look, got %s" % settings.current_page())
 	if not _section_visible(settings, "AvatarPicker") or not _section_visible(settings, "ThemePicker"):
 		return _fail("case 1: look page should show avatar and theme")
-	if _section_visible(settings, "IconPicker") or _section_visible(settings, "RestoreProfile"):
+	if _section_visible(settings, "IconPicker"):
 		return _fail("case 1: phone controls visible on the look page")
 	var device := settings.get_node_or_null("DeviceButton") as Button
 	var look := settings.get_node_or_null("LookButton") as Button
@@ -84,8 +86,8 @@ func _case_pages(main: Node) -> bool:
 	await process_frame
 	if String(settings.current_page()) != "device":
 		return _fail("case 1: DeviceButton did not open the phone page")
-	if not _section_visible(settings, "IconPicker") or not _section_visible(settings, "RestoreProfile"):
-		return _fail("case 1: phone page missing icon or restore")
+	if not _section_visible(settings, "IconPicker"):
+		return _fail("case 1: phone page missing the app icon")
 	if _section_visible(settings, "AvatarPicker") or _section_visible(settings, "ThemePicker"):
 		return _fail("case 1: look controls visible on the phone page")
 	if not look.visible or not _in_view(look):
@@ -135,226 +137,139 @@ func _case_keyboard(main: Node) -> bool:
 	var settings := _settings(main)
 	if settings == null:
 		return _fail("case 3: Settings missing")
+	if not _transfer_gone(settings):
+		return _fail("case 3: transfer nodes returned")
+	for page in ["look", "device"]:
+		settings.show_page(page)
+		await process_frame
+		if not _line_edits(settings).is_empty():
+			return _fail("case 3: %s page still has a text field" % page)
 	settings.show_page("device")
 	await process_frame
-	var edits := _line_edits(settings)
-	if edits.is_empty():
-		return _fail("case 3: phone page has no text field")
+	var controls := _interactives(settings)
+	if controls.is_empty():
+		return _fail("case 3: phone page has no controls")
+	for ctrl in controls:
+		var rect := ctrl.get_global_rect()
+		if rect.end.y > KEYBOARD_TOP:
+			return _fail("case 3: device/%s %s is not entirely above y=640" % [ctrl.name, rect])
+		if not VIEWPORT.encloses(rect):
+			return _fail("case 3: device/%s outside the viewport %s" % [ctrl.name, rect])
 	var close := settings.get_node_or_null("CloseButton") as Button
-	if close == null:
+	if close == null or not close.visible:
 		return _fail("case 3: CloseButton missing")
-	for edit in edits:
-		edit.grab_focus()
-		await process_frame
-		if not edit.has_focus():
-			return _fail("case 3: %s did not take focus" % edit.name)
-		var rect := edit.get_global_rect()
-		if not VISIBLE_BAND.encloses(rect):
-			return _fail("case 3: focused %s %s is not entirely above y=640" % [edit.name, rect])
-		var close_rect := close.get_global_rect()
-		if not close.visible or not VISIBLE_BAND.encloses(close_rect):
-			return _fail("case 3: Close %s is not above the keyboard while %s is focused" % [close_rect, edit.name])
-		edit.release_focus()
-	var paste := settings.get_node_or_null("RestoreProfile/PasteButton") as Button
-	var restore := settings.get_node_or_null("RestoreProfile/RestoreButton") as Button
-	var field := settings.get_node_or_null("RestoreProfile/CodeEdit") as LineEdit
-	if paste == null or restore == null or field == null:
-		return _fail("case 3: paste row missing")
-	var field_rect := field.get_global_rect()
-	var paste_rect := paste.get_global_rect()
-	if paste_rect.position.y < field_rect.end.y:
-		return _fail("case 3: Paste overlaps the field")
-	if paste_rect.position.y - field_rect.end.y > 16.0:
-		return _fail("case 3: Paste is not next to the field %s vs %s" % [paste_rect, field_rect])
-	if not VISIBLE_BAND.encloses(paste_rect) or not VISIBLE_BAND.encloses(restore.get_global_rect()):
-		return _fail("case 3: Paste or Restore sits under the keyboard")
+	if close.get_global_rect().end.y > KEYBOARD_TOP:
+		return _fail("case 3: Close %s is under the keyboard line" % close.get_global_rect())
 	_cases_passed += 1
 	print("SETTINGS_PAGES case 3 pass")
 	return true
 
 
-func _case_paste(main: Node) -> bool:
-	print("SETTINGS_PAGES case 4 paste")
+func _case_reopen(main: Node) -> bool:
+	print("SETTINGS_PAGES case 4 close and reopen")
 	var settings := _settings(main)
-	var edit := settings.get_node_or_null("RestoreProfile/CodeEdit") as LineEdit
-	var paste := settings.get_node_or_null("RestoreProfile/PasteButton") as Button
-	var status := settings.get_node_or_null("RestoreProfile/StatusLabel") as Label
-	if settings == null or edit == null or paste == null or status == null:
-		return _fail("case 4: paste nodes missing")
+	if settings == null:
+		return _fail("case 4: Settings missing")
+	var id_before := String(_profile.player_id)
+	var name_before := String(_profile.player_name)
 	settings.show_page("device")
 	await process_frame
-	edit.text = ""
-	status.text = "MARKER"
-	paste.pressed.emit()
+	if not _section_visible(settings, "IconPicker"):
+		return _fail("case 4: icon missing before close")
+	settings.close()
 	await process_frame
-	if edit.text != "":
-		return _fail("case 4: unsupported clipboard wrote '%s'" % edit.text)
-	if status.text != "MARKER":
-		return _fail("case 4: empty clipboard set status '%s'" % status.text)
-	settings.use_clipboard_stand_in(VALID_ID)
-	paste.pressed.emit()
+	if settings.is_visible_in_tree():
+		return _fail("case 4: close left Settings open")
+	settings.open()
 	await process_frame
-	if edit.text != VALID_ID:
-		settings.clear_clipboard_stand_in()
-		return _fail("case 4: paste left '%s'" % edit.text)
-	if status.text != "MARKER":
-		settings.clear_clipboard_stand_in()
-		return _fail("case 4: paste rewrote status to '%s'" % status.text)
-	settings.use_clipboard_stand_in("   ")
-	paste.pressed.emit()
-	await process_frame
-	if edit.text != VALID_ID:
-		settings.clear_clipboard_stand_in()
-		return _fail("case 4: empty clipboard cleared the field")
-	if status.text != "MARKER":
-		settings.clear_clipboard_stand_in()
-		return _fail("case 4: empty clipboard set status '%s'" % status.text)
-	if status.text == "that code doesn't look right" or status.text == "no profile found":
-		settings.clear_clipboard_stand_in()
-		return _fail("case 4: empty clipboard reported a restore error")
-	settings.clear_clipboard_stand_in()
+	if not settings.is_visible_in_tree():
+		return _fail("case 4: reopen did not show Settings")
+	if String(settings.current_page()) != "look":
+		return _fail("case 4: reopen landed on %s" % settings.current_page())
+	if not _section_visible(settings, "AvatarPicker") or _section_visible(settings, "IconPicker"):
+		return _fail("case 4: reopen did not restore the look page")
+	if not _transfer_gone(settings):
+		return _fail("case 4: transfer nodes appeared after reopen")
+	if String(_profile.player_id) != id_before or String(_profile.player_name) != name_before:
+		return _fail("case 4: paging changed identity")
 	_cases_passed += 1
 	print("SETTINGS_PAGES case 4 pass")
 	return true
 
 
-func _case_link(main: Node) -> bool:
-	print("SETTINGS_PAGES case 5 link restore")
+func _case_icon_still_works(main: Node) -> bool:
+	print("SETTINGS_PAGES case 5 app icon still pages")
 	var settings := _settings(main)
 	if settings == null:
 		return _fail("case 5: Settings missing")
+	settings.show_page("device")
+	await process_frame
+	var prev := settings.get_node_or_null("IconPicker/PrevButton") as Button
+	var next := settings.get_node_or_null("IconPicker/NextButton") as Button
+	var label := settings.get_node_or_null("IconPicker/NameLabel") as Label
+	if prev == null or next == null or label == null:
+		return _fail("case 5: icon controls missing")
+	if not prev.visible or not next.visible:
+		return _fail("case 5: icon buttons hidden")
+	var prev_rect := prev.get_global_rect()
+	var next_rect := next.get_global_rect()
+	if prev_rect.intersects(next_rect):
+		return _fail("case 5: icon buttons overlap")
+	if prev_rect.end.y > KEYBOARD_TOP or next_rect.end.y > KEYBOARD_TOP:
+		return _fail("case 5: icon buttons sit under y=640")
+	var before := label.text
 	var id_before := String(_profile.player_id)
-	var gen_before := int(_leaderboard._restore_gen)
-	if String(settings.restore_param_from_search("?player_id=%s" % VALID_ID)) != "":
-		return _fail("case 5: a different query key was treated as restore")
-	if String(settings.restore_param_from_search("https://play.example/?utm=1&restore=%s#top" % VALID_ID)) != VALID_ID:
-		return _fail("case 5: full URL did not yield the restore param")
-	var padded := "https://play.example/?restore=%s" % VALID_ID.uri_encode()
-	if String(settings.restore_param_from_search(padded)) != VALID_ID:
-		return _fail("case 5: encoded restore param did not decode")
-
-	settings.offer_restore_from_search("?restore=not-a-uuid")
+	next.pressed.emit()
 	await process_frame
-	var panel := settings.get_node_or_null("LinkRestore") as Control
-	if panel == null:
-		return _fail("case 5: LinkRestore missing")
-	if panel.visible:
-		return _fail("case 5: malformed restore opened the confirm panel")
-	if String(_profile.player_id) != id_before or int(_leaderboard._restore_gen) != gen_before:
-		return _fail("case 5: malformed restore adopted or called restore_profile")
-
-	settings.offer_restore_from_search("?restore=aaaaaaaa-bbbb-1ccc-8ddd-eeeeeeeeeeee")
+	if label.text == before:
+		return _fail("case 5: Next did not change the icon name")
+	prev.pressed.emit()
 	await process_frame
-	if panel.visible or String(_profile.player_id) != id_before:
-		return _fail("case 5: non-v4 restore was not ignored")
-
-	settings.offer_restore_from_search("?foo=1&restore=%s" % VALID_ID)
-	await process_frame
-	if not panel.visible or not settings.is_visible_in_tree():
-		return _fail("case 5: a valid link did not offer restore")
-	var look := settings.get_node_or_null("LookButton") as Button
-	var device := settings.get_node_or_null("DeviceButton") as Button
-	if look == null or device == null:
-		return _fail("case 5: page buttons missing")
-	if look.visible or device.visible:
-		return _fail("case 5: page buttons stay up over the link confirm")
-	var close := settings.get_node_or_null("CloseButton") as Button
-	if close == null or not close.visible or not VIEWPORT.encloses(close.get_global_rect()):
-		return _fail("case 5: Close is not reachable during the link confirm")
-	if close.get_global_rect().intersects(panel.get_global_rect()):
-		return _fail("case 5: Close overlaps the link confirm")
-	var prompt := settings.get_node_or_null("LinkRestore/Prompt") as Label
-	var code := settings.get_node_or_null("LinkRestore/CodeLabel") as Label
-	var confirm := settings.get_node_or_null("LinkRestore/ConfirmButton") as Button
-	var cancel := settings.get_node_or_null("LinkRestore/CancelButton") as Button
-	if prompt == null or code == null or confirm == null or cancel == null:
-		return _fail("case 5: confirm controls missing")
-	if prompt.text.find("replaces") < 0:
-		return _fail("case 5: prompt does not say what restore does")
-	if code.text != VALID_ID:
-		return _fail("case 5: confirm shows '%s'" % code.text)
-	if String(_profile.player_id) != id_before or int(_leaderboard._restore_gen) != gen_before:
-		return _fail("case 5: the link adopted before confirm")
-	if not VIEWPORT.encloses(confirm.get_global_rect()) or not VIEWPORT.encloses(cancel.get_global_rect()):
-		return _fail("case 5: confirm buttons outside the viewport")
-	if confirm.get_global_rect().intersects(cancel.get_global_rect()):
-		return _fail("case 5: Restore and Not now overlap")
-
-	cancel.pressed.emit()
-	await process_frame
-	if panel.visible:
-		return _fail("case 5: Not now left the panel up")
-	if not look.visible or not device.visible:
-		return _fail("case 5: Not now did not bring the pages back")
-	if String(_profile.player_id) != id_before or int(_leaderboard._restore_gen) != gen_before:
-		return _fail("case 5: Not now adopted or called restore_profile")
-
-	settings.offer_restore_from_search("?restore=%s" % VALID_ID)
-	await process_frame
-	if not panel.visible:
-		return _fail("case 5: second offer did not show the panel")
-	var gen_at_confirm := int(_leaderboard._restore_gen)
-	confirm.pressed.emit()
-	await process_frame
-	if int(_leaderboard._restore_gen) != gen_at_confirm + 1:
-		return _fail("case 5: confirm called restore_profile %d times" % (int(_leaderboard._restore_gen) - gen_at_confirm))
+	if label.text != before:
+		return _fail("case 5: Prev did not restore '%s', got '%s'" % [before, label.text])
 	if String(_profile.player_id) != id_before:
-		return _fail("case 5: offline confirm adopted %s" % _profile.player_id)
-	var link_status := settings.get_node_or_null("LinkRestore/StatusLabel") as Label
-	if link_status == null or link_status.text != "couldn't reach the leaderboard":
-		return _fail("case 5: failed confirm status '%s'" % ("" if link_status == null else link_status.text))
+		return _fail("case 5: icon change adopted a player")
 	_cases_passed += 1
 	print("SETTINGS_PAGES case 5 pass")
 	return true
 
 
-func _case_dismiss_cancels_inflight(main: Node) -> bool:
-	print("SETTINGS_PAGES case 6 dismiss cancels in-flight restore")
+func _case_close_does_not_adopt(main: Node) -> bool:
+	print("SETTINGS_PAGES case 6 close leaves identity")
 	var settings := _settings(main)
 	if settings == null:
 		return _fail("case 6: Settings missing")
+	if not _leaderboard.has_method("resolve_name") or not _leaderboard.has_method("retire_name_resolve"):
+		return _fail("case 6: resolve API missing")
 	var id_before := String(_profile.player_id)
-	if not await _dismiss_drops_late_success(settings, "cancel"):
-		return false
-	if String(_profile.player_id) != id_before:
-		return _fail("case 6: Not now let a late success adopt")
-	if not await _dismiss_drops_late_success(settings, "close"):
-		return false
-	if String(_profile.player_id) != id_before:
-		return _fail("case 6: Close let a late success adopt")
+	var name_before := String(_profile.player_name)
+	var players_before := JSON.stringify(_profile.players)
+	settings.show_page("device")
+	await process_frame
+	var close := settings.get_node_or_null("CloseButton") as Button
+	if close == null:
+		return _fail("case 6: CloseButton missing")
+	close.pressed.emit()
+	await process_frame
+	if settings.is_visible_in_tree():
+		return _fail("case 6: Close did not hide Settings")
+	if String(_profile.player_id) != id_before or String(_profile.player_name) != name_before:
+		return _fail("case 6: Close changed identity")
+	if JSON.stringify(_profile.players) != players_before:
+		return _fail("case 6: Close changed the players map")
+	if not _transfer_gone(settings):
+		return _fail("case 6: transfer nodes present at close")
 	_cases_passed += 1
 	print("SETTINGS_PAGES case 6 pass")
 	return true
 
 
-func _dismiss_drops_late_success(settings: Control, how: String) -> bool:
-	var id_before := String(_profile.player_id)
-	settings.offer_restore_from_search("?restore=%s" % VALID_ID)
-	await process_frame
-	var panel := settings.get_node_or_null("LinkRestore") as Control
-	var cancel := settings.get_node_or_null("LinkRestore/CancelButton") as Button
-	if panel == null or not panel.visible or cancel == null:
-		return _fail("case 6: %s offer did not show" % how)
-	# restore_profile would have captured this generation, then gone async.
-	var captured := int(_leaderboard._restore_gen) + 1
-	_leaderboard._restore_gen = captured
-	settings._restore_busy = true
-	if how == "close":
-		settings.close()
-	else:
-		cancel.pressed.emit()
-	await process_frame
-	if int(_leaderboard._restore_gen) != captured + 1:
-		return _fail("case 6: %s did not retire the in-flight generation" % how)
-	_leaderboard._on_restore_profile_finished(true, 200, {
-		"player_id": VALID_ID,
-		"name": "Stolen",
-		"avatar": "bear_bounce",
-	}, "", captured)
-	await process_frame
-	if String(_profile.player_id) != id_before or String(_profile.player_name) == "Stolen":
-		return _fail("case 6: %s late success adopted %s" % [how, _profile.player_id])
+func _transfer_gone(settings: Node) -> bool:
+	for node_name in ["ThisDevice", "RestoreProfile", "LinkRestore"]:
+		if settings.get_node_or_null(node_name) != null:
+			return false
 	return true
+
 
 
 func _settings(main: Node) -> Control:

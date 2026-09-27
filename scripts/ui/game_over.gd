@@ -18,6 +18,10 @@ var _invite_open := false
 var _committed := false
 var _declined := false
 var _blur_commit_queued := false
+var _resolve_pending := false
+var _pending_gen := -1
+var _pending_score := 0
+const _NAME_PROMPT := "Name this score"
 ## True only while Not now is held. A drag-off must not latch a decline.
 var _skip_holding := false
 ## Set on Not now press-down so a blur queued by that gesture cannot commit
@@ -67,6 +71,8 @@ func _ready() -> void:
 			_leaderboard.submitted.connect(_on_submitted)
 		if _leaderboard.has_signal("offline") and not _leaderboard.offline.is_connected(_on_offline):
 			_leaderboard.offline.connect(_on_offline)
+		if _leaderboard.has_signal("name_resolved") and not _leaderboard.name_resolved.is_connected(_on_name_resolved):
+			_leaderboard.name_resolved.connect(_on_name_resolved)
 	var theme_node := get_node("/root/Theme")
 	theme_node.palette_changed.connect(_apply_theme)
 	_apply_theme(theme_node.palette_id)
@@ -325,7 +331,11 @@ func _sync_name_invite() -> void:
 
 func _open_invite() -> void:
 	_invite_open = true
+	_resolve_pending = false
+	_pending_gen = -1
 	_name_edit.text = ""
+	if _name_prompt != null:
+		_name_prompt.text = _NAME_PROMPT
 	_name_prompt.visible = true
 	_name_edit.visible = true
 	_save_button.visible = true
@@ -385,27 +395,52 @@ func _commit_from_blur() -> void:
 
 
 func _commit_pending_name() -> void:
-	if _committed or _declined or not _invite_open:
+	if _resolve_pending and not _claim_is_current():
+		_resolve_pending = false
+	if _committed or _declined or not _invite_open or _resolve_pending:
 		return
 	if _name_edit == null:
 		return
 	var profile := get_node_or_null("/root/Profile")
-	if profile == null:
-		return
-	if not String(profile.player_name).is_empty():
+	if profile != null and not String(profile.player_name).is_empty():
 		_committed = true
 		_hide_invite()
 		return
-	profile.call("set_name", _name_edit.text)
-	var named := String(profile.player_name)
-	if named.is_empty():
+	var raw := _name_edit.text
+	if raw.strip_edges().is_empty():
+		return
+	if _leaderboard == null or not _leaderboard.has_method("resolve_name"):
+		_show_unresolved("unreachable")
+		return
+	_resolve_pending = true
+	_pending_score = _final_score
+	_pending_gen = int(_leaderboard.resolve_name(raw))
+
+
+func _on_name_resolved(generation: int, ok: bool, info: Dictionary) -> void:
+	if generation != _pending_gen:
+		return
+	_resolve_pending = false
+	if _declined or _committed:
+		return
+	if not ok:
+		_show_unresolved(String(info.get("reason", "")))
 		return
 	_committed = true
-	var score := _final_score
+	var score := _pending_score
 	_hide_invite()
 	_release_name_focus()
 	if score > 0 and _leaderboard != null and _leaderboard.has_method("submit"):
 		_leaderboard.submit(score)
+
+
+func _show_unresolved(reason: String) -> void:
+	# They already left this game over. Do not bring the prompt back, and do
+	# not invent an identity for the name that never resolved.
+	if not _invite_open:
+		return
+	if _name_prompt != null:
+		_name_prompt.text = _offline_line(reason)
 
 
 func _on_save_pressed() -> void:
@@ -427,8 +462,19 @@ func _on_skip_pressed() -> void:
 	_declined = true
 	_skip_holding = false
 	_suppress_blur_commit = false
+	if _claim_is_current() and _leaderboard != null and _leaderboard.has_method("retire_name_resolve"):
+		_leaderboard.retire_name_resolve()
+	_resolve_pending = false
 	_hide_invite()
 	_release_name_focus()
+
+
+func _claim_is_current() -> bool:
+	if not _resolve_pending:
+		return false
+	if _leaderboard == null:
+		return false
+	return int(_leaderboard._resolve_gen) == _pending_gen
 
 
 func _release_name_focus() -> void:

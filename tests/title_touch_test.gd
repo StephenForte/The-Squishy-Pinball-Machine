@@ -266,20 +266,53 @@ func _case_play_above_keyboard(main: Node, title: Node) -> bool:
 	var edit := title.get_node_or_null("NameEntry/NameEdit") as LineEdit
 	if edit == null:
 		return _fail("case 6: NameEdit missing")
+	var edit_rect := edit.get_global_rect()
+	if edit_rect.end.y > KEYBOARD_TOP:
+		return _fail("case 6: NameEdit %s is not entirely above y=640" % edit_rect)
+	if confirm_rect.intersects(edit_rect):
+		return _fail("case 6: Done %s overlaps the field %s" % [confirm_rect, edit_rect])
+	var gap := confirm_rect.position.x - edit_rect.end.x
+	if gap < 0.0 or gap > 16.0:
+		return _fail("case 6: Done is not beside the field, gap %.1f" % gap)
+	if abs(confirm_rect.position.y - edit_rect.position.y) > 1.0:
+		return _fail("case 6: Done is not on the field's row")
+	if abs(confirm_rect.end.y - edit_rect.end.y) > 1.0:
+		return _fail("case 6: Done height does not match the field")
+	var leaderboard := root.get_node_or_null("Leaderboard")
+	if leaderboard == null or not leaderboard.has_signal("name_resolved"):
+		return _fail("case 6: name_resolved missing")
+	var id_before := String(profile.player_id)
 	edit.text = "   "
 	confirm.pressed.emit()
 	await process_frame
 	await process_frame
 	if String(profile.player_name) != "":
 		return _fail("case 6: blank confirm set name to '%s'" % profile.player_name)
+	if String(profile.player_id) != id_before:
+		return _fail("case 6: blank confirm changed player_id")
 	if not title.visible:
 		return _fail("case 6: blank confirm dismissed the title")
+	var got := {"seen": false, "ok": false}
+	var on_resolved := func(_gen: int, ok: bool, _info: Dictionary) -> void:
+		got.seen = true
+		got.ok = ok
+	leaderboard.name_resolved.connect(on_resolved)
 	edit.text = "Squish"
 	confirm.pressed.emit()
-	await process_frame
-	await process_frame
-	if String(profile.player_name) != "Squish":
-		return _fail("case 6: Done did not commit, name is '%s'" % profile.player_name)
+	for _i in 30:
+		if bool(got.seen):
+			break
+		await process_frame
+	if leaderboard.name_resolved.is_connected(on_resolved):
+		leaderboard.name_resolved.disconnect(on_resolved)
+	if not bool(got.seen) or bool(got.ok):
+		return _fail("case 6: Done did not fail closed (seen=%s ok=%s)" % [got.seen, got.ok])
+	if String(profile.player_name) != "" or String(profile.player_id) != id_before:
+		return _fail("case 6: unreachable Done adopted '%s' %s" % [profile.player_name, profile.player_id])
+	if edit.text != "Squish":
+		return _fail("case 6: field dropped the typed name, got '%s'" % edit.text)
+	if not title.visible:
+		return _fail("case 6: failed Done dismissed the title")
 	_cases_passed += 1
 	print("TITLE_TOUCH case 6 pass")
 	return true

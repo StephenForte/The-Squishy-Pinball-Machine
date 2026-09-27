@@ -190,34 +190,46 @@ func _case_2_confirm(main: Node) -> bool:
 	var edit := entry.get_node_or_null("NameEdit") as LineEdit
 	if edit == null:
 		return _fail("case 2: missing NameEdit")
+	var leaderboard := root.get_node_or_null("Leaderboard")
+	if leaderboard == null or not leaderboard.has_signal("name_resolved"):
+		return _fail("case 2: name_resolved missing")
+	var id_before := String(_profile.player_id)
+	var players_before := JSON.stringify(_profile.players)
 	_name_changed_count = 0
+	var got := {"ok": false, "seen": false}
+	var on_resolved := func(_gen: int, ok: bool, _info: Dictionary) -> void:
+		got.seen = true
+		got.ok = ok
+	leaderboard.name_resolved.connect(on_resolved)
 	edit.text = "  Nat  asha "
 	edit.text_submitted.emit(edit.text)
-	await process_frame
-	await process_frame
-	if String(_profile.player_name) != "Nat asha":
-		return _fail("case 2: expected name 'Nat asha', got '%s'" % _profile.player_name)
-	if _name_changed_count != 1:
-		return _fail("case 2: name_changed fired %d times, expected 1" % _name_changed_count)
-	if entry.visible:
-		return _fail("case 2: NameEntry should be hidden after confirm")
-	var name_line := _require_node(main, "PlayerNameLabel") as Label
-	if name_line == null:
-		return false
-	if name_line.text != "Playing as Nat asha · N to change":
-		return _fail("case 2: title name line was '%s'" % name_line.text)
-	if not FileAccess.file_exists(SAVE_PATH):
-		return _fail("case 2: profile.save was not written")
-	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(SAVE_PATH))
-	if typeof(parsed) != TYPE_DICTIONARY:
-		return _fail("case 2: profile.save is not JSON")
-	var data: Dictionary = parsed
-	if String(data.get("player_id", "")) != String(_profile.player_id):
-		return _fail("case 2: profile.save player_id mismatch")
-	if String(data.get("player_name", "")) != "Nat asha":
-		return _fail("case 2: profile.save name was '%s'" % data.get("player_name", ""))
+	for _i in 30:
+		if bool(got.seen):
+			break
+		await process_frame
+	if leaderboard.name_resolved.is_connected(on_resolved):
+		leaderboard.name_resolved.disconnect(on_resolved)
+	if not bool(got.seen):
+		return _fail("case 2: confirm did not resolve")
+	if bool(got.ok):
+		return _fail("case 2: unreachable resolve reported success")
+	if String(_profile.player_id) != id_before:
+		return _fail("case 2: failed resolve changed player_id")
+	if String(_profile.player_name) != "":
+		return _fail("case 2: failed resolve set name '%s'" % _profile.player_name)
+	if JSON.stringify(_profile.players) != players_before:
+		return _fail("case 2: failed resolve minted a players entry")
+	if _name_changed_count != 0:
+		return _fail("case 2: name_changed fired %d times" % _name_changed_count)
+	if not entry.visible:
+		return _fail("case 2: NameEntry hid a name the server did not confirm")
+	if edit.text != "  Nat  asha ":
+		return _fail("case 2: field dropped the typed name, got '%s'" % edit.text)
+	var status := entry.get_node_or_null("StatusLabel") as Label
+	if status == null or status.text.is_empty():
+		return _fail("case 2: no reason shown for the failed resolve")
 	if not title.visible:
-		return _fail("case 2: Title should stay visible after naming")
+		return _fail("case 2: Title should stay visible")
 	_cases_passed += 1
 	print("PROFILE case 2 pass")
 	return true
@@ -227,6 +239,10 @@ func _case_4_rename_cancel(main: Node) -> bool:
 	var entry := _require_node(main, "NameEntry")
 	if entry == null:
 		return false
+	# Case 2 no longer stores a name: the server was unreachable. This case
+	# still checks that Escape restores a name that is already saved.
+	_profile.call("set_name", "Nat asha")
+	await process_frame
 	_push_action(main, "change_name")
 	await process_frame
 	await process_frame
