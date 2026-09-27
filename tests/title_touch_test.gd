@@ -166,13 +166,10 @@ func _case_play_button(main: Node, title: Node) -> bool:
 		return _fail("case 4: PlayButton %s smaller than %.1f px" % [rect.size, MIN_PLAY_PX])
 	if rect.end.y > TITLE_FLOOR:
 		return _fail("case 4: PlayButton extends below y=1150: %s" % rect)
-	for node_name in ["NameEntry", "SettingsButton", "NameButton"]:
-		var other := title.get_node_or_null(node_name) as Control
-		if other == null:
-			return _fail("case 4: %s missing" % node_name)
-		var other_rect := other.get_global_rect()
-		if rect.intersects(other_rect):
-			return _fail("case 4: PlayButton %s overlaps %s %s" % [rect, node_name, other_rect])
+	# Every visible Title child, labels included. A hand-listed button set
+	# stayed green while the name field sat on the title.
+	if not _assert_no_title_overlap(title, "case 4"):
+		return false
 	# Fresh-device state: the name field is focused. Play must still start.
 	play.pressed.emit()
 	await process_frame
@@ -315,6 +312,30 @@ func _case_play_above_keyboard(main: Node, title: Node) -> bool:
 		return _fail("case 6: failed Done dismissed the title")
 	_cases_passed += 1
 	print("TITLE_TOUCH case 6 pass")
+	return true
+
+
+func _assert_no_title_overlap(title: Node, label: String) -> bool:
+	var kids: Array[Control] = []
+	for child in title.get_children():
+		if not (child is Control):
+			continue
+		var node := child as Control
+		if node.name == "Shade":
+			continue
+		if not node.visible or not node.is_visible_in_tree():
+			continue
+		kids.append(node)
+	for i in kids.size():
+		for j in range(i + 1, kids.size()):
+			var a: Rect2 = kids[i].get_global_rect()
+			var b: Rect2 = kids[j].get_global_rect()
+			var shared := a.intersection(b)
+			if shared.get_area() > 0.5:
+				return _fail(
+					"%s: %s %s overlaps %s %s"
+					% [label, kids[i].name, a, kids[j].name, b]
+				)
 	return true
 
 

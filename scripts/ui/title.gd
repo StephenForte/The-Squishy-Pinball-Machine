@@ -54,6 +54,10 @@ func _ready() -> void:
 
 func _process(_delta: float) -> void:
 	_set_flippers_enabled(not _is_capturing_name())
+	# Rename reopens NameEntry on top of the "playing as" / play-hint band.
+	# Closing the prompt does not go through _refresh_name_ui, so keep the
+	# labels in step with the prompt every frame.
+	_sync_named_chrome()
 
 
 func _apply_theme(_id: String = "") -> void:
@@ -165,8 +169,6 @@ func _render_top_five(entries: Array) -> void:
 func _refresh_name_ui(player_name: String) -> void:
 	var named := not player_name.is_empty()
 	_player_name_label.text = "Playing as %s · N to change" % player_name if named else ""
-	_player_name_label.visible = named
-	$PlayHintLabel.visible = named
 	if _name_button != null:
 		_name_button.visible = named
 	if named:
@@ -178,6 +180,19 @@ func _refresh_name_ui(player_name: String) -> void:
 		# that happens on load and can cover the title before Play is pressed.
 		var grab_focus := not DisplayServer.is_touchscreen_available()
 		_name_entry.open(grab_focus)
+	_sync_named_chrome()
+
+
+func _sync_named_chrome() -> void:
+	var profile := get_node_or_null("/root/Profile")
+	var named := profile != null and not String(profile.player_name).is_empty()
+	var prompt_open := _name_entry != null and _name_entry.visible
+	var show_labels := named and not prompt_open
+	if _player_name_label != null and _player_name_label.visible != show_labels:
+		_player_name_label.visible = show_labels
+	var hint := get_node_or_null("PlayHintLabel") as CanvasItem
+	if hint != null and hint.visible != show_labels:
+		hint.visible = show_labels
 
 
 func _refresh_avatar() -> void:
