@@ -152,6 +152,42 @@ focus_mode = 0
 theme_override_font_sizes/font_size = 32
 text = "Not now"
 
+[node name="WelcomeLabel" type="Label" parent="."]
+visible = false
+offset_left = 40.0
+offset_top = 208.0
+offset_right = 680.0
+offset_bottom = 280.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 0.92, 0.35, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 4
+theme_override_font_sizes/font_size = 28
+text = "Welcome back!"
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 3
+
+[node name="YesButton" type="Button" parent="."]
+visible = false
+offset_left = 40.0
+offset_top = 288.0
+offset_right = 350.0
+offset_bottom = 416.0
+focus_mode = 0
+theme_override_font_sizes/font_size = 28
+text = "That's me"
+
+[node name="NoButton" type="Button" parent="."]
+visible = false
+offset_left = 370.0
+offset_top = 288.0
+offset_right = 680.0
+offset_bottom = 416.0
+focus_mode = 0
+theme_override_font_sizes/font_size = 28
+text = "Not me"
+
 [node name="LeaderboardList" type="VBoxContainer" parent="."]
 offset_left = 80.0
 offset_top = 208.0

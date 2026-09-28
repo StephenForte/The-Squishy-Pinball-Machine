@@ -12,6 +12,13 @@ signal restore_finished(ok: bool, reason: String)
 ## generation, ok, info. Success info is the adopted player_id, name, avatar.
 ## Failure info is code, reason, error — and nothing was adopted.
 signal name_resolved(generation: int, ok: bool, info: Dictionary)
+## generation, info. `answered` is false when the server could not be read.
+## `held` is true only when that name already belongs to a player.
+## `queried` is the raw name this call asked about.
+signal name_lookup(generation: int, info: Dictionary)
+## True after this boot's gap-fill PUT returned 409 name_taken (D-058).
+## Runtime only: recomputed from the next boot, never written to the save.
+signal identity_unconfirmed_changed(unconfirmed: bool)
 
 const BASE_URL := "https://squish-leaderboard.onrender.com"
 const KEY := "a419f5979f6891504b3af89a20e13125"
@@ -26,6 +33,12 @@ var submit_attempts: Dictionary = {}
 ## GET /v1/leaderboard/me requests actually sent. Stays 0 when the closed
 ## sentinel skips HTTP and when the current player has no name (D-057).
 var best_fetch_count: int = 0
+## This process has seen a profile PUT answered 409 name_taken.
+var refused_name_count: int = 0
+## player_id of each POST /v1/scores actually sent, including a 409.
+var score_post_ids: Array = []
+## D-058. The device id is unknown and its saved name is held by someone else.
+var identity_unconfirmed: bool = false
 
 var last_entries: Array = []
 var last_total_players: int = 0
@@ -43,6 +56,9 @@ var _fetch_ok_gen: int = -1
 var _restore_gen: int = 0
 ## Bumped to retire an in-flight resolve so a late 200 cannot adopt.
 var _resolve_gen: int = 0
+## One generation per lookup_name call. Listeners ignore a generation they
+## did not ask for; a newer call does not drop an older answer.
+var _lookup_gen: int = 0
 var _profile_push_count: int = 0
 ## Set while adopting a cloud avatar so set_avatar does not fire a PUT (D-038).
 var _suppress_profile_push: bool = false
@@ -58,7 +74,7 @@ func _ready() -> void:
 	call_deferred("_boot_restore_profile")
 
 
-func push_profile() -> void:
+func push_profile(gap_fill_id: String = "") -> void:
 	var profile := get_node_or_null("/root/Profile")
 	if profile == null:
 		return
@@ -78,7 +94,7 @@ func push_profile() -> void:
 		"client": CLIENT,
 	})
 	var url := "%s/v1/profile" % _base_url()
-	_http_request(HTTPClient.METHOD_PUT, url, body, _on_push_profile_finished, true)
+	_http_request(HTTPClient.METHOD_PUT, url, body, _on_push_profile_finished.bind(gap_fill_id), true)
 
 
 func fetch_profile(player_id: String, from_boot: bool = false) -> void:
@@ -133,6 +149,61 @@ func retire_name_resolve() -> void:
 	_resolve_gen += 1
 
 
+## The one place that asks whether a name is already held (D-058).
+## Today this POSTs /v1/players/resolve and reads `created`, and does not adopt.
+## T41 replaces the request inside this function with a read-only lookup.
+func lookup_name(raw_name: String) -> int:
+	_lookup_gen += 1
+	var gen := _lookup_gen
+	if _profile_http_skipped():
+		_emit_lookup_unanswered.call_deferred(gen, raw_name)
+		return gen
+	var url := "%s/v1/players/resolve" % _base_url()
+	_http_request(
+		HTTPClient.METHOD_POST,
+		url,
+		JSON.stringify({"name": raw_name}),
+		_on_lookup_finished.bind(gen, raw_name),
+		false
+	)
+	return gen
+
+
+func _emit_lookup_unanswered(gen: int, raw_name: String) -> void:
+	name_lookup.emit(gen, {
+		"answered": false,
+		"held": false,
+		"display": "",
+		"queried": raw_name,
+	})
+
+
+func _on_lookup_finished(ok: bool, code: int, parsed: Variant, reason: String, gen: int, raw_name: String) -> void:
+	if not ok or typeof(parsed) != TYPE_DICTIONARY:
+		name_lookup.emit(gen, {
+			"answered": false,
+			"held": false,
+			"display": "",
+			"queried": raw_name,
+			"code": code,
+			"reason": reason,
+		})
+		return
+	var data: Dictionary = parsed
+	# Missing `created` is not proof the name is held. Only an explicit
+	# existing name (`created: false`) waits for confirmation.
+	var created := bool(data.get("created", true))
+	var display := String(data.get("name", "")).strip_edges()
+	if display.is_empty():
+		display = raw_name.strip_edges()
+	name_lookup.emit(gen, {
+		"answered": true,
+		"held": not created,
+		"display": display,
+		"queried": raw_name,
+	})
+
+
 func _emit_resolve_failure(gen: int, code: int, reason: String) -> void:
 	if gen != _resolve_gen:
 		return
@@ -155,6 +226,10 @@ func _on_resolve_finished(ok: bool, code: int, parsed: Variant, reason: String, 
 		name_resolved.emit(gen, false, {"code": code, "reason": "offline", "error": ""})
 		return
 	# The resolve response is already the cloud profile. Do not PUT it back.
+	# Clear before adopt so name_changed cannot re-open the boot prompt.
+	var was_unconfirmed := identity_unconfirmed
+	if was_unconfirmed:
+		identity_unconfirmed = false
 	_suppress_profile_push = true
 	var adopted := bool(profile.adopt_identity(
 		String(data.get("player_id", "")),
@@ -163,8 +238,12 @@ func _on_resolve_finished(ok: bool, code: int, parsed: Variant, reason: String, 
 	))
 	_suppress_profile_push = false
 	if not adopted:
+		if was_unconfirmed:
+			identity_unconfirmed = true
 		name_resolved.emit(gen, false, {"code": code, "reason": "offline", "error": ""})
 		return
+	if was_unconfirmed:
+		identity_unconfirmed_changed.emit(false)
 	var adopted_id := String(profile.player_id)
 	name_resolved.emit(gen, true, {
 		"player_id": adopted_id,
@@ -265,9 +344,37 @@ func _on_server_best_finished(ok: bool, code: int, parsed: Variant, _reason: Str
 	game.reconcile_best(requested_id, int(data["best"]))
 
 
-func _on_push_profile_finished(_ok: bool, _code: int, _parsed: Variant, _reason: String) -> void:
+func _on_push_profile_finished(_ok: bool, code: int, parsed: Variant, _reason: String, gap_fill_id: String) -> void:
 	# D-037: fire-and-forget. Failures are dropped; not enrolled in D-034.
-	return
+	# D-058: only the boot gap-fill's 409 name_taken marks this session
+	# unconfirmed. Transport failure is code 0. A 200 is the ordinary
+	# D-038 gap-fill and changes nothing. No offline text either way.
+	if code != 409 or not _body_error_is(parsed, "name_taken"):
+		return
+	refused_name_count += 1
+	if gap_fill_id.is_empty():
+		return
+	var profile := get_node_or_null("/root/Profile")
+	if profile == null:
+		return
+	if String(profile.player_id) != gap_fill_id:
+		return
+	if String(profile.player_name).is_empty():
+		return
+	_mark_unconfirmed()
+
+
+func _body_error_is(parsed: Variant, error_name: String) -> bool:
+	if typeof(parsed) != TYPE_DICTIONARY:
+		return false
+	return String((parsed as Dictionary).get("error", "")) == error_name
+
+
+func _mark_unconfirmed() -> void:
+	if identity_unconfirmed:
+		return
+	identity_unconfirmed = true
+	identity_unconfirmed_changed.emit(true)
 
 
 func _on_fetch_profile_finished(ok: bool, code: int, parsed: Variant, _reason: String, requested_id: String, from_boot: bool) -> void:
@@ -308,6 +415,9 @@ func _on_restore_profile_finished(ok: bool, code: int, parsed: Variant, _reason:
 	if profile == null or not profile.has_method("adopt_identity"):
 		restore_finished.emit(false, "offline")
 		return
+	var was_unconfirmed := identity_unconfirmed
+	if was_unconfirmed:
+		identity_unconfirmed = false
 	var adopted := false
 	_suppress_profile_push = true
 	adopted = bool(profile.adopt_identity(
@@ -316,7 +426,11 @@ func _on_restore_profile_finished(ok: bool, code: int, parsed: Variant, _reason:
 		String(data.get("avatar", ""))
 	))
 	_suppress_profile_push = false
+	if not adopted and was_unconfirmed:
+		identity_unconfirmed = true
 	if adopted:
+		if was_unconfirmed:
+			identity_unconfirmed_changed.emit(false)
 		restore_finished.emit(true, "")
 		var adopted_id := String(data.get("player_id", ""))
 		if adopted_id.is_empty():
@@ -336,7 +450,7 @@ func _reconcile_boot_missing_cloud(requested_id: String) -> void:
 		return
 	if String(profile.avatar_id).is_empty():
 		return
-	push_profile()
+	push_profile(requested_id)
 
 
 func _reconcile_boot_divergence(data: Dictionary) -> void:
@@ -423,6 +537,9 @@ func _on_title_visibility_changed(title: Node) -> void:
 
 func _on_game_over(final_score: int, _is_high_score: bool) -> void:
 	fetch_top(10)
+	# D-058: an unconfirmed id is dead. The invite claims, then posts once.
+	if identity_unconfirmed:
+		return
 	var profile := get_node_or_null("/root/Profile")
 	if profile == null:
 		return
@@ -463,6 +580,7 @@ func _begin_submit(token: int) -> void:
 	state["retry_pending"] = false
 	var score := int(state.get("score", 0))
 	_record_attempt(token)
+	score_post_ids.append(player_id)
 	var body := JSON.stringify({
 		"player_id": player_id,
 		"name": player_name,
@@ -666,7 +784,13 @@ func _on_http_completed(
 	if already and not (accept_late_success and success):
 		return
 	if not success:
-		callback.call(false, response_code, null, _result_reason(result, response_code))
+		# Keep the JSON error body (409 name_taken). Callers still treat
+		# ok == false as failure; 404 is checked before ok, as before.
+		var fail_parsed: Variant = null
+		var fail_text := body.get_string_from_utf8()
+		if not fail_text.is_empty():
+			fail_parsed = JSON.parse_string(fail_text)
+		callback.call(false, response_code, fail_parsed, _result_reason(result, response_code))
 		return
 	var text := body.get_string_from_utf8()
 	var parsed: Variant = JSON.parse_string(text) if not text.is_empty() else {}

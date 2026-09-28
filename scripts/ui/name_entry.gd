@@ -28,7 +28,7 @@ var _suppress_blur := false
 ## the prompt is reopened before a name is actually saved.
 var _unresolved_text := ""
 var _probe_pending := false
-var _probe_gen := 0
+var _pending_lookup := -1
 var _confirming := false
 
 
@@ -48,6 +48,9 @@ func _ready() -> void:
 	if leaderboard != null and leaderboard.has_signal("name_resolved"):
 		if not leaderboard.name_resolved.is_connected(_on_name_resolved):
 			leaderboard.name_resolved.connect(_on_name_resolved)
+	if leaderboard != null and leaderboard.has_signal("name_lookup"):
+		if not leaderboard.name_lookup.is_connected(_on_name_lookup):
+			leaderboard.name_lookup.connect(_on_name_lookup)
 	var theme_node := get_node_or_null("/root/Theme")
 	if theme_node != null:
 		if theme_node.has_signal("palette_changed"):
@@ -57,6 +60,38 @@ func _ready() -> void:
 
 func is_capturing() -> bool:
 	return visible and is_instance_valid(_line) and _line.visible and _line.has_focus()
+
+
+## True while a rename, a typed-name confirmation, or a claim is on screen.
+## The boot prompt must not replace that (D-058).
+func blocks_unconfirmed_prompt() -> bool:
+	# A claim or probe still in flight must finish, even if the title is hidden.
+	if _resolve_pending or _probe_pending:
+		return true
+	# Hidden with the title: nothing on screen to replace. A confirmation or
+	# rename that is actually up must stay up.
+	if not visible:
+		return false
+	if _confirming:
+		return true
+	if _line != null and _line.visible:
+		return true
+	return false
+
+
+## Boot confirmation for the device's last player. That's me claims through
+## resolve_name. Not me returns to the edit row. Does nothing if a prompt
+## the player already opened would be replaced.
+func offer_unconfirmed(display: String) -> void:
+	if display.strip_edges().is_empty():
+		return
+	if blocks_unconfirmed_prompt():
+		return
+	_invalidate_probe()
+	if _line != null:
+		_line.text = display
+	visible = true
+	_show_welcome(display)
 
 
 func open(grab_focus: bool = true) -> void:
@@ -212,64 +247,32 @@ func _resolve_for_commit(raw: String) -> void:
 
 
 func _start_probe(raw: String, leaderboard: Node) -> void:
-	_probe_gen += 1
-	var gen := _probe_gen
 	_probe_pending = true
-	var http := HTTPRequest.new()
-	http.timeout = 3.0
-	add_child(http)
-	http.request_completed.connect(_on_probe_completed.bind(raw, gen, http))
-	var url := "%s/v1/players/resolve" % String(leaderboard._base_url())
-	var err := http.request(
-		url,
-		PackedStringArray(["Content-Type: application/json"]),
-		HTTPClient.METHOD_POST,
-		JSON.stringify({"name": raw})
-	)
-	if err != OK:
-		_finish_probe_node(http)
-		if gen == _probe_gen:
-			_probe_pending = false
-			_resolve_for_commit(raw)
+	if not leaderboard.has_method("lookup_name"):
+		_probe_pending = false
+		_resolve_for_commit(raw)
+		return
+	_pending_lookup = int(leaderboard.lookup_name(raw))
 
 
-func _on_probe_completed(
-	result: int,
-	code: int,
-	_headers: PackedStringArray,
-	body: PackedByteArray,
-	raw: String,
-	gen: int,
-	http: HTTPRequest
-) -> void:
-	_finish_probe_node(http)
-	if gen != _probe_gen:
+func _on_name_lookup(generation: int, info: Dictionary) -> void:
+	if generation != _pending_lookup:
+		return
+	if not _probe_pending:
 		return
 	_probe_pending = false
 	if _confirming or _resolve_pending:
 		return
-	if _line == null or _line.text != raw:
+	var queried := String(info.get("queried", ""))
+	if _line == null or _line.text != queried:
 		return
-	var parsed: Variant = null
-	if result == HTTPRequest.RESULT_SUCCESS and code >= 200 and code < 300:
-		parsed = JSON.parse_string(body.get_string_from_utf8())
-	if typeof(parsed) != TYPE_DICTIONARY:
-		_resolve_for_commit(raw)
+	if not bool(info.get("answered", false)) or not bool(info.get("held", false)):
+		_resolve_for_commit(queried)
 		return
-	var data: Dictionary = parsed
-	# Missing `created` takes the adopt path. Only an explicit existing name waits.
-	if bool(data.get("created", true)):
-		_resolve_for_commit(raw)
-		return
-	var display := String(data.get("name", "")).strip_edges()
+	var display := String(info.get("display", "")).strip_edges()
 	if display.is_empty():
-		display = raw.strip_edges()
+		display = queried.strip_edges()
 	_show_welcome(display)
-
-
-func _finish_probe_node(http: HTTPRequest) -> void:
-	if http != null and is_instance_valid(http):
-		http.queue_free()
 
 
 func _show_welcome(display: String) -> void:
@@ -313,8 +316,8 @@ func _back_out_of_welcome() -> void:
 
 
 func _invalidate_probe() -> void:
-	_probe_gen += 1
 	_probe_pending = false
+	_pending_lookup = -1
 
 
 func _on_name_resolved(generation: int, ok: bool, info: Dictionary) -> void:

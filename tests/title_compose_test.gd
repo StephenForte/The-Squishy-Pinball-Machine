@@ -59,6 +59,8 @@ func _run() -> void:
 		return
 	if not await _case_new_name_one_tap(main):
 		return
+	if not await _case_unconfirmed_layout(main):
+		return
 
 	_cleanup()
 	print("TITLE_COMPOSE PASS cases=%d" % _cases_passed)
@@ -234,6 +236,80 @@ func _case_new_name_one_tap(main: Node) -> bool:
 	_cases_passed += 1
 	print("TITLE_COMPOSE case 4 pass")
 	return true
+
+
+func _case_unconfirmed_layout(main: Node) -> bool:
+	print("TITLE_COMPOSE case 5 unconfirmed-confirming")
+	var dad_id := "b8aa808f-6d01-439e-87be-664baf0ead85"
+	var dead_id := "d2432de0-149e-45d0-954d-c7c0a125f6ad"
+	var seeded: Dictionary = await _raw_put_profile(dad_id, "Dad", "frog_gus")
+	if int(seeded.get("code", 0)) != 200:
+		return _fail("case 5: could not seed Dad (%s)" % seeded)
+	_profile.player_id = dead_id
+	_profile.player_name = "Dad"
+	_profile.players = {"dad": dead_id}
+	_profile.avatar_id = "frog_gus"
+	_profile.avatars = {"dad": "frog_gus"}
+	_profile._save()
+	var title := main.get_node_or_null("Title")
+	if title == null or not title.has_method("show_menu"):
+		return _fail("case 5: Title missing")
+	title.show_menu()
+	await process_frame
+	await process_frame
+	_leaderboard._boot_restore_profile()
+	var welcome := title.get_node_or_null("NameEntry/WelcomeLabel") as Label
+	var entry := title.get_node_or_null("NameEntry") as Control
+	if welcome == null or entry == null:
+		return _fail("case 5: welcome controls missing")
+	var start := Time.get_ticks_msec()
+	while Time.get_ticks_msec() - start < 3000:
+		if entry.visible and welcome.visible and welcome.text.find("Dad") >= 0:
+			break
+		await process_frame
+	if not entry.visible or not welcome.visible or welcome.text.find("Dad") < 0:
+		return _fail("case 5: unconfirmed confirmation did not show ('%s')" % welcome.text)
+	if String(_profile.player_id) != dead_id:
+		return _fail("case 5: boot adopted %s" % _profile.player_id)
+	await process_frame
+	await process_frame
+	if not _assert_layout(main, title, "case 5 unconfirmed-confirming"):
+		return false
+	_cases_passed += 1
+	print("TITLE_COMPOSE state unconfirmed-confirming overlap_count=0")
+	print("TITLE_COMPOSE case 5 pass")
+	return true
+
+
+func _raw_put_profile(player_id: String, player_name: String, avatar: String) -> Dictionary:
+	var http := HTTPRequest.new()
+	http.timeout = 3.0
+	root.add_child(http)
+	var done := {"got": false, "code": 0}
+	http.request_completed.connect(func(_result: int, code: int, _headers: PackedStringArray, _body: PackedByteArray) -> void:
+		done.got = true
+		done.code = code
+	)
+	var err := http.request(
+		"http://127.0.0.1:%d/v1/profile" % PORT,
+		PackedStringArray(["Content-Type: application/json", "X-Squish-Key: devkey"]),
+		HTTPClient.METHOD_PUT,
+		JSON.stringify({
+			"player_id": player_id,
+			"name": player_name,
+			"avatar": avatar,
+			"client": "squish/1.0",
+		})
+	)
+	if err != OK:
+		http.queue_free()
+		return {"code": -1}
+	var start := Time.get_ticks_msec()
+	while Time.get_ticks_msec() - start < 3000 and not bool(done.got):
+		await process_frame
+	var out := {"code": int(done.code)}
+	http.queue_free()
+	return out
 
 
 func _assert_layout(main: Node, title: Node, label: String) -> bool:

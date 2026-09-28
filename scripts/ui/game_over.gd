@@ -1,10 +1,13 @@
 extends CanvasLayer
 
 ## Game over (D-051). Restart and Menu carry a pink stylebox with text_on_color —
-## that colour is unreadable on the default dark button. An unnamed player is
-## asked for a name here. Save sits on the same row as the field. The name
-## commits on Save, on the return key, and on leaving the field with text, so
-## a typed name cannot sit uncommitted. Not now discards it.
+## that colour is unreadable on the default dark button. An unnamed player, and
+## an unconfirmed one (D-058), are asked for a name here. The field opens
+## blank only when this device has no last player; otherwise it is pre-filled
+## with that name. Save is disabled while the field is blank. A typed name
+## that differs from the last player and is already held asks before it adopts.
+## The name commits on Save, on the return key, and on leaving the field with
+## text, so a typed name cannot sit uncommitted. Not now discards it.
 
 const DESKTOP_HINT := "R restart · Esc menu"
 const TOUCH_HINT := "Restart button  ·  Menu button"
@@ -19,6 +22,12 @@ var _committed := false
 var _declined := false
 var _blur_commit_queued := false
 var _resolve_pending := false
+var _lookup_pending := false
+var _pending_lookup := -1
+var _confirming := false
+## The invite opened with a last player already on the device. A name that
+## arrives later, from a claim this invite did not start, is a different case.
+var _opened_with_name := false
 var _pending_gen := -1
 var _pending_score := 0
 var _game_serial := 0
@@ -33,6 +42,7 @@ var _posted_final := false
 ## a newer game is on screen by the time the claim returns.
 var _posted_pending := false
 const _NAME_PROMPT := "Name this score"
+const _WELCOME_FMT := "Welcome back, %s!"
 ## True only while Not now is held. A drag-off must not latch a decline.
 var _skip_holding := false
 ## Set on Not now press-down so a blur queued by that gesture cannot commit
@@ -52,6 +62,9 @@ var _suppress_blur_commit := false
 @onready var _name_edit: LineEdit = $NameEdit
 @onready var _save_button: Button = $SaveButton
 @onready var _skip_button: Button = $SkipButton
+@onready var _welcome: Label = $WelcomeLabel
+@onready var _yes: Button = $YesButton
+@onready var _no: Button = $NoButton
 
 
 func _ready() -> void:
@@ -71,7 +84,14 @@ func _ready() -> void:
 	_skip_button.pressed.connect(_on_skip_pressed)
 	_name_edit.max_length = 16
 	_name_edit.text_submitted.connect(_on_name_submitted)
+	_name_edit.text_changed.connect(_on_name_text_changed)
 	_name_edit.focus_exited.connect(_on_name_focus_exited)
+	if _yes != null:
+		_yes.focus_mode = Control.FOCUS_NONE
+		_yes.pressed.connect(_on_yes_pressed)
+	if _no != null:
+		_no.focus_mode = Control.FOCUS_NONE
+		_no.pressed.connect(_on_no_pressed)
 	_hide_invite()
 	_game.game_over.connect(_on_game_over)
 	_game.game_restarted.connect(_on_game_restarted)
@@ -84,6 +104,8 @@ func _ready() -> void:
 			_leaderboard.offline.connect(_on_offline)
 		if _leaderboard.has_signal("name_resolved") and not _leaderboard.name_resolved.is_connected(_on_name_resolved):
 			_leaderboard.name_resolved.connect(_on_name_resolved)
+		if _leaderboard.has_signal("name_lookup") and not _leaderboard.name_lookup.is_connected(_on_name_lookup):
+			_leaderboard.name_lookup.connect(_on_name_lookup)
 	var theme_node := get_node("/root/Theme")
 	theme_node.palette_changed.connect(_apply_theme)
 	_apply_theme(theme_node.palette_id)
@@ -107,10 +129,14 @@ func _apply_theme(_id: String = "") -> void:
 	_your_rank_label.add_theme_color_override("font_color", theme_node.color("glow_gold"))
 	_offline_label.add_theme_color_override("font_color", primary)
 	_name_prompt.add_theme_color_override("font_color", theme_node.color("glow_gold"))
+	if _welcome != null:
+		_welcome.add_theme_color_override("font_color", theme_node.color("glow_gold"))
 	_style_button(_restart_button, theme_node)
 	_style_button(_menu_button, theme_node)
 	_style_button(_save_button, theme_node)
 	_style_button(_skip_button, theme_node)
+	_style_button(_yes, theme_node)
+	_style_button(_no, theme_node)
 	_style_name_edit(theme_node)
 	_paint_list_theme()
 
@@ -168,6 +194,10 @@ func _on_game_over(final_score: int, is_high_score: bool) -> void:
 	_committed = false
 	_declined = false
 	_posted_final = false
+	_confirming = false
+	_lookup_pending = false
+	_pending_lookup = -1
+	_opened_with_name = false
 	_game_serial += 1
 	_blur_commit_queued = false
 	_skip_holding = false
@@ -333,17 +363,27 @@ func _maybe_upgrade_celebration(result: Dictionary) -> void:
 		_play_celebration(next)
 
 
+func _identity_unconfirmed() -> bool:
+	return _leaderboard != null and bool(_leaderboard.get("identity_unconfirmed"))
+
+
 func _sync_name_invite() -> void:
 	var profile := get_node_or_null("/root/Profile")
-	var unnamed := profile == null or String(profile.player_name).is_empty()
-	if unnamed:
-		_open_invite()
+	var saved := ""
+	if profile != null:
+		saved = String(profile.player_name)
+	# Unnamed, and a dead id that still remembers its last player (D-058).
+	if saved.is_empty() or _identity_unconfirmed():
+		_open_invite(saved)
 	else:
 		_hide_invite()
 
 
-func _open_invite() -> void:
+func _open_invite(saved: String) -> void:
 	_invite_open = true
+	_confirming = false
+	_lookup_pending = false
+	_pending_lookup = -1
 	# A claim already in flight (this overlay, or the title) must keep its
 	# generation. Clearing it here adopted the name and dropped the score.
 	if not _claim_is_current():
@@ -352,18 +392,18 @@ func _open_invite() -> void:
 		_pending_score = 0
 		_pending_serial = -1
 	_claim_started_here = false
-	_name_edit.text = ""
+	_opened_with_name = not saved.is_empty()
+	_name_edit.text = saved
 	if _name_prompt != null:
 		_name_prompt.text = _NAME_PROMPT
-	_name_prompt.visible = true
-	_name_edit.visible = true
-	_save_button.visible = true
-	_skip_button.visible = true
+	_show_edit_row()
 	_place_list(true)
 
 
 func _hide_invite() -> void:
 	_invite_open = false
+	_confirming = false
+	_lookup_pending = false
 	if _name_prompt != null:
 		_name_prompt.visible = false
 	if _name_edit != null:
@@ -372,7 +412,89 @@ func _hide_invite() -> void:
 		_save_button.visible = false
 	if _skip_button != null:
 		_skip_button.visible = false
+	if _welcome != null:
+		_welcome.visible = false
+	if _yes != null:
+		_yes.visible = false
+		_yes.disabled = false
+	if _no != null:
+		_no.visible = false
+		_no.disabled = false
 	_place_list(false)
+
+
+func _show_edit_row() -> void:
+	_confirming = false
+	# Welcome sets this so hiding the field cannot commit. If the field was
+	# already unfocused, that hide never blurs, and the flag would swallow
+	# the next leave. A blur already queued still consumes the flag itself.
+	if not _skip_holding and not _blur_commit_queued:
+		_suppress_blur_commit = false
+	if _welcome != null:
+		_welcome.visible = false
+	if _yes != null:
+		_yes.visible = false
+		_yes.disabled = false
+	if _no != null:
+		_no.visible = false
+		_no.disabled = false
+	if _name_prompt != null:
+		_name_prompt.visible = true
+	if _name_edit != null:
+		_name_edit.visible = true
+	if _save_button != null:
+		_save_button.visible = true
+	if _skip_button != null:
+		_skip_button.visible = true
+	_sync_save_enabled()
+
+
+func _show_welcome(display: String) -> void:
+	# Set before hiding the field, so the blur that hiding causes cannot commit.
+	_confirming = true
+	_suppress_blur_commit = true
+	if _name_prompt != null:
+		_name_prompt.visible = false
+	if _name_edit != null:
+		_name_edit.visible = false
+	if _save_button != null:
+		_save_button.visible = false
+	if _skip_button != null:
+		_skip_button.visible = false
+	if _welcome != null:
+		_welcome.text = _WELCOME_FMT % display
+		_welcome.visible = true
+	if _yes != null:
+		_yes.disabled = false
+		_yes.visible = true
+	if _no != null:
+		_no.disabled = false
+		_no.visible = true
+	_release_name_focus()
+
+
+func _sync_save_enabled() -> void:
+	if _save_button == null or _name_edit == null:
+		return
+	_save_button.disabled = _name_edit.text.strip_edges().is_empty()
+
+
+func _on_name_text_changed(_text: String) -> void:
+	_sync_save_enabled()
+
+
+func _matches_last_player(raw: String) -> bool:
+	var profile := get_node_or_null("/root/Profile")
+	if profile == null:
+		return false
+	var saved := String(profile.player_name)
+	if saved.is_empty():
+		return false
+	if not profile.has_method("_name_key") or not profile.has_method("_sanitize_name"):
+		return false
+	var typed_key := String(profile._name_key(profile._sanitize_name(raw)))
+	var saved_key := String(profile._name_key(saved))
+	return not typed_key.is_empty() and typed_key == saved_key
 
 
 func _place_list(invite_open: bool) -> void:
@@ -405,7 +527,7 @@ func _commit_from_blur() -> void:
 	var suppress := _suppress_blur_commit or _skip_holding
 	if not _skip_holding:
 		_suppress_blur_commit = false
-	if _declined or _committed or not _invite_open or suppress:
+	if _declined or _committed or not _invite_open or suppress or _confirming or _lookup_pending:
 		return
 	var viewport := get_viewport()
 	if viewport != null and viewport.gui_get_hovered_control() == _skip_button:
@@ -416,19 +538,71 @@ func _commit_from_blur() -> void:
 func _commit_pending_name() -> void:
 	if _resolve_pending and not _claim_is_current():
 		_resolve_pending = false
-	if _committed or _declined or not _invite_open or _resolve_pending:
+	if _committed or _declined or not _invite_open or _resolve_pending or _lookup_pending or _confirming:
 		return
 	if _name_edit == null:
 		return
-	var profile := get_node_or_null("/root/Profile")
-	if profile != null and not String(profile.player_name).is_empty():
-		# The name landed from a claim this invite did not start. Post once.
-		_committed = true
-		_hide_invite()
-		_release_name_focus()
-		_submit_score(_final_score)
-		return
+	# A claim this invite did not start can land on an unnamed invite and
+	# leave a name behind. An invite that opened already named (the dead id's
+	# last player) must not take that path: posting now would spend the run
+	# on the dead id.
+	if not _opened_with_name:
+		var profile := get_node_or_null("/root/Profile")
+		if profile != null and not String(profile.player_name).is_empty():
+			_committed = true
+			_hide_invite()
+			_release_name_focus()
+			_submit_score(_final_score)
+			return
 	var raw := _name_edit.text
+	if raw.strip_edges().is_empty():
+		return
+	if _leaderboard == null or not _leaderboard.has_method("resolve_name"):
+		_show_unresolved("unreachable")
+		return
+	# Same name as this device's last player, compared the way the server
+	# does (sanitised, then Profile._name_key). No extra question.
+	if _matches_last_player(raw) or _lookup_skipped():
+		_start_resolve(raw)
+		return
+	_start_lookup(raw)
+
+
+func _lookup_skipped() -> bool:
+	return _leaderboard != null and _leaderboard.has_method("_profile_http_skipped") and bool(_leaderboard._profile_http_skipped())
+
+
+func _start_lookup(raw: String) -> void:
+	if _leaderboard == null or not _leaderboard.has_method("lookup_name"):
+		_start_resolve(raw)
+		return
+	_lookup_pending = true
+	_pending_lookup = int(_leaderboard.lookup_name(raw))
+
+
+func _on_name_lookup(generation: int, info: Dictionary) -> void:
+	if generation != _pending_lookup:
+		return
+	if not _lookup_pending:
+		return
+	_lookup_pending = false
+	if _declined or _committed or not _invite_open or _confirming:
+		return
+	var queried := String(info.get("queried", ""))
+	if _name_edit == null or _name_edit.text != queried:
+		return
+	if bool(info.get("answered", false)) and bool(info.get("held", false)):
+		var display := String(info.get("display", "")).strip_edges()
+		if display.is_empty():
+			display = queried.strip_edges()
+		_show_welcome(display)
+		return
+	_start_resolve(queried)
+
+
+func _start_resolve(raw: String) -> void:
+	if _resolve_pending:
+		return
 	if raw.strip_edges().is_empty():
 		return
 	if _leaderboard == null or not _leaderboard.has_method("resolve_name"):
@@ -440,6 +614,19 @@ func _commit_pending_name() -> void:
 	_pending_serial = _game_serial
 	_posted_pending = false
 	_pending_gen = int(_leaderboard.resolve_name(raw))
+
+
+func _on_yes_pressed() -> void:
+	if not _confirming or _resolve_pending:
+		return
+	var raw := _name_edit.text if _name_edit != null else ""
+	_start_resolve(raw)
+
+
+func _on_no_pressed() -> void:
+	if not _confirming or _resolve_pending:
+		return
+	_show_edit_row()
 
 
 func _on_name_resolved(generation: int, ok: bool, info: Dictionary) -> void:
@@ -454,6 +641,7 @@ func _on_name_resolved(generation: int, ok: bool, info: Dictionary) -> void:
 	_claim_started_here = false
 	if not ok:
 		if not _declined:
+			_show_edit_row()
 			_show_unresolved(String(info.get("reason", "")))
 		return
 	if not _declined:
@@ -483,6 +671,11 @@ func _show_unresolved(reason: String) -> void:
 
 
 func _on_save_pressed() -> void:
+	# Assigning LineEdit.text does not emit text_changed, so a press re-reads
+	# the field. Blank after trim stays disabled and does nothing.
+	_sync_save_enabled()
+	if _save_button != null and _save_button.disabled:
+		return
 	_commit_pending_name()
 
 
