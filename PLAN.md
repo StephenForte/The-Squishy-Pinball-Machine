@@ -60,7 +60,7 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T39 | **Title screen is colliding and oversized:** field on top of the title, Play over the HUD; plus the welcome-back confirm (D-056) | 12 | **done** — reviewed, approved and merged 2026-09-27 (PR #47, 61ffdad) | mid | — |
 | T42 | HIGH shows the device's best, not the player's: reconcile with the server's best after boot, claim and submit (D-057) | 12 | **done** 2026-09-27 — merged (PR #48, 8ed0ab0), deployed, verified on the phone | mid | — |
 | T43 | An avatar-less device with a refused id is never detected: the boot gap-fill PUT is skipped without an avatar, so its runs still 409 `name_taken` and are lost (D-058 gap, found in T40 review) | 12 | **done** 2026-09-28 — merged (PR #50, b737f41), deployed `dep-dasrkd17lnhs73agq7a0` | cheap-mid | T40 |
-| T41 | Name lookup should be read-only: the title probe POSTs to the creating resolve route and rebuilds its own HTTP path (D-056) | 12 | brief written 2026-09-28 (D-059), not dispatched | cheap-mid | T40 |
+| T41 | Name lookup should be read-only: the title probe POSTs to the creating resolve route and rebuilds its own HTTP path (D-056) | 12 | **approved** 2026-09-28 (PR #51, a061a23) — merge → wait for server auto-deploy → static redeploy | cheap-mid | T40 |
 | T40 | A refused identity (404 then PUT 409 `name_taken`) is never reconciled and silently loses runs: confirm at boot, route game over through the save-your-score invite (D-056, D-058). CORS half closed (D-057) | 12 | **done** 2026-09-27 — merged (PR #49, 597a7e8), deployed `dep-dasqsk0473hc739ip58g` | mid | — |
 | T38 | Name holders are undiagnosable: resolve hides the blocker, admin scores caps at 50 with no paging, and a score row locks a name forever (D-055) | 11 | not started | mid | — |
 
@@ -1438,3 +1438,11 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   changes on the client (T40 isolated it). Server auto-deploys on merge; static redeploy only after the
   route answers live. State: decisions through **D-059**, next free **D-060**; tasks through **T43**,
   next free **T44**. Order: T41 → T38.
+- 2026-09-28: **T41 reviewed — approved, merge as-is** (PR #51, head `a061a23`, base `07e7b98` = main).
+  Re-ran: Godot **34 PASS** (55 s); server **94/94** (86 + 8). Bugbot success, no findings. Mutation
+  probes: lookup via `resolvePlayer` → 2 read-only tests fail; score-only branch inserting a profile
+  (the named trap) → fails; route off `PUBLIC_CORS_PATHS` → CORS test fails; unencoded name → client
+  400. "Any 2xx dict is an answer" passed — equivalent, both paths fall through to the claim.
+  `name_claim_test` case 12 modification accepted as a strengthening (ambiguous names now ask first;
+  the 409 claim and no-score assertions kept). Real save intact; no orphan servers. Production
+  lookup route 404 before merge, as expected.
