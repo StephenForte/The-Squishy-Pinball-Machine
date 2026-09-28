@@ -59,8 +59,8 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T37 | Client: typing a name claims that player; remove the transfer/restore UI entirely (D-053) | 11 | **done** 2026-09-27 — merged, deployed; phone claimed Dad and posted two scores to the right player | mid | T36 |
 | T39 | **Title screen is colliding and oversized:** field on top of the title, Play over the HUD; plus the welcome-back confirm (D-056) | 12 | **done** — reviewed, approved and merged 2026-09-27 (PR #47, 61ffdad) | mid | — |
 | T42 | HIGH shows the device's best, not the player's: reconcile with the server's best after boot, claim and submit (D-057) | 12 | **done** 2026-09-27 — merged (PR #48, 8ed0ab0), deployed, verified on the phone | mid | — |
-| T43 | An avatar-less device with a refused id is never detected: the boot gap-fill PUT is skipped without an avatar, so its runs still 409 `name_taken` and are lost (D-058 gap, found in T40 review) | 12 | **approved** 2026-09-27 (PR #50, 0147da1) — awaiting merge + static-site redeploy | cheap-mid | T40 |
-| T41 | Name lookup should be read-only: the title probe POSTs to the creating resolve route and rebuilds its own HTTP path (D-056) | 12 | not started | cheap-mid | T40 |
+| T43 | An avatar-less device with a refused id is never detected: the boot gap-fill PUT is skipped without an avatar, so its runs still 409 `name_taken` and are lost (D-058 gap, found in T40 review) | 12 | **done** 2026-09-28 — merged (PR #50, b737f41), deployed `dep-dasrkd17lnhs73agq7a0` | cheap-mid | T40 |
+| T41 | Name lookup should be read-only: the title probe POSTs to the creating resolve route and rebuilds its own HTTP path (D-056) | 12 | brief written 2026-09-28 (D-059), not dispatched | cheap-mid | T40 |
 | T40 | A refused identity (404 then PUT 409 `name_taken`) is never reconciled and silently loses runs: confirm at boot, route game over through the save-your-score invite (D-056, D-058). CORS half closed (D-057) | 12 | **done** 2026-09-27 — merged (PR #49, 597a7e8), deployed `dep-dasqsk0473hc739ip58g` | mid | — |
 | T38 | Name holders are undiagnosable: resolve hides the blocker, admin scores caps at 50 with no paging, and a score row locks a name forever (D-055) | 11 | not started | mid | — |
 
@@ -1432,3 +1432,9 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
 - **Harness trap (new):** `./tests/run_all.sh <single_test>` skips the import step. In a fresh clone
   it fails with "Profile, Leaderboard, or Game missing" — a harness artifact, not a finding. Run
   `godot --headless --import` first, and take a positive control before reading any single-test red.
+- 2026-09-28: **T43 merged (PR #50 → b737f41) and deployed** (static `dep-dasrkd17lnhs73agq7a0`, live
+  00:52:40 UTC).
+- 2026-09-28: **T41 briefed → D-059.** Read-only `GET /v1/players/lookup`; only `lookup_name`'s request
+  changes on the client (T40 isolated it). Server auto-deploys on merge; static redeploy only after the
+  route answers live. State: decisions through **D-059**, next free **D-060**; tasks through **T43**,
+  next free **T44**. Order: T41 → T38.
