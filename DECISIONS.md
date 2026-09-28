@@ -1334,3 +1334,29 @@ claim that would have created it anyway.
 - Deploy order matters: the server auto-deploys on merge (`server/**`, checks pass); the static site
   is redeployed by hand **after** the new route answers live. A client that meets an old server gets a
   404 on the lookup, which it already treats as "unanswered" and falls back to the claim.
+
+## D-060 — A score row keeps holding its name; admins can see who holds a name and relabel a stray row (Steve, 2026-09-28)
+Answers the question D-055 left open. Steve chose **"keep the hold, add a fix"**: score rows still hold
+their name, so the board can never show two different players under one name, but an admin can now
+(1) see exactly who holds a name and why, (2) read the whole score table, and (3) release a name held
+by a stray row **without deleting history**.
+- **`GET /v1/admin/holders?name=<url-encoded>`** (admin key). Same validation and holder rule as
+  lookup/resolve (`nameKey`, `holdersOf`). Returns the normalised key and one entry per holder:
+  `player_id`, its profile (`name`, `avatar`) or `null`, and **the score rows carrying that name**
+  (`id`, `name`, `score`, `created_at`). Read-only. This is the D-055 diagnosis in one call.
+- **`GET /v1/admin/scores` gains `offset`** (integer ≥ 0; anything else `400 invalid_offset`), same
+  order (`created_at DESC, id DESC`), `total` unchanged. Pages must be disjoint and together cover
+  every row. The 1..50 page size stays.
+- **`POST /v1/admin/scores/:id/relabel`** (admin key, no body). Sets that row's `name` to its **own
+  player's current profile name**. It takes no name argument on purpose: an arbitrary rename could
+  create a new hold or a new ambiguity. `404` unknown row; `409 no_profile` when the row's player has
+  no profile; returns `{ ok, id, player_id, name_before, name_after }`. Score, player and timestamps
+  are unchanged. Applied to D-055's row (`id=3`, Natasha's id, name "Dad") it would have become
+  "Natasha", released "Dad", and kept the 5100.
+- **The public resolve route does not name holders.** A player id is effectively that player's key
+  (anyone holding it can post scores as them), so holder ids stay behind the admin key.
+  `409 name_ambiguous` is unchanged.
+- Deploy observation (T41, 2026-09-28): the server deploy for #51 ran as `manual` at 03:29:33, and
+  the static site went live first, at 03:27:34. Only operator curls hit the lookup route in between
+  (404, then 502 during the restart, then 200). Server merges should not be assumed to auto-deploy:
+  verify the route live before redeploying the static site, as the T41 note said.
