@@ -59,7 +59,7 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T37 | Client: typing a name claims that player; remove the transfer/restore UI entirely (D-053) | 11 | **done** 2026-09-27 — merged, deployed; phone claimed Dad and posted two scores to the right player | mid | T36 |
 | T39 | **Title screen is colliding and oversized:** field on top of the title, Play over the HUD; plus the welcome-back confirm (D-056) | 12 | **done** — reviewed, approved and merged 2026-09-27 (PR #47, 61ffdad) | mid | — |
 | T42 | HIGH shows the device's best, not the player's: reconcile with the server's best after boot, claim and submit (D-057) | 12 | **done** 2026-09-27 — merged (PR #48, 8ed0ab0), deployed, verified on the phone | mid | — |
-| T43 | An avatar-less device with a refused id is never detected: the boot gap-fill PUT is skipped without an avatar, so its runs still 409 `name_taken` and are lost (D-058 gap, found in T40 review) | 12 | brief written 2026-09-27, not dispatched | cheap-mid | T40 |
+| T43 | An avatar-less device with a refused id is never detected: the boot gap-fill PUT is skipped without an avatar, so its runs still 409 `name_taken` and are lost (D-058 gap, found in T40 review) | 12 | **approved** 2026-09-27 (PR #50, 0147da1) — awaiting merge + static-site redeploy | cheap-mid | T40 |
 | T41 | Name lookup should be read-only: the title probe POSTs to the creating resolve route and rebuilds its own HTTP path (D-056) | 12 | not started | cheap-mid | T40 |
 | T40 | A refused identity (404 then PUT 409 `name_taken`) is never reconciled and silently loses runs: confirm at boot, route game over through the save-your-score invite (D-056, D-058). CORS half closed (D-057) | 12 | **done** 2026-09-27 — merged (PR #49, 597a7e8), deployed `dep-dasqsk0473hc739ip58g` | mid | — |
 | T38 | Name holders are undiagnosable: resolve hides the blocker, admin scores caps at 50 with no paging, and a score row locks a name forever (D-055) | 11 | not started | mid | — |
@@ -1423,3 +1423,12 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
 - 2026-09-27: **T43 briefed.** Detection by a score POST's 409 `name_taken` (D-058 amendment), not by
   dropping D-038's avatar condition — that would change `leaderboard_test` case 24 and register names
   at boot. Order: T43 → T41 → T38.
+- 2026-09-27: **T43 reviewed — approved, merge as-is** (PR #50, head `0147da1`, base `d595bba` = main).
+  Re-ran: Godot **33 PASS** (52 s), `leaderboard_test` case 24 unmodified and passing; server 86/86;
+  Bugbot success on the only commit, no findings. Mutation probes: flag-without-signal → case 2;
+  no token check → case 7; any id's name_taken → case 8. Falling through to the generic 409 path
+  alone **passed** — equivalent behaviour, because `_on_offline` also hides the 409 line under an open
+  invite and 409 is not retryable; removing both guards → `case 2: showed 'said no (409)'`.
+- **Harness trap (new):** `./tests/run_all.sh <single_test>` skips the import step. In a fresh clone
+  it fails with "Profile, Leaderboard, or Game missing" — a harness artifact, not a finding. Run
+  `godot --headless --import` first, and take a positive control before reading any single-test red.
