@@ -32,6 +32,13 @@ var _pending_gen := -1
 var _pending_score := 0
 var _game_serial := 0
 var _pending_serial := -1
+## Submit token of the game on screen, or -1 when that game did not post.
+## A 409 for any other token must not open this game's invite.
+var _screen_token := -1
+var _applied_epoch := 0
+## Latest score-refusal token. Applied once `_screen_token` is known, so a
+## fast answer cannot land before the screen has recorded its game.
+var _pending_refusal := -1
 ## True only for a claim this invite started. A carried claim must still
 ## finish, and Not now must not cancel it.
 var _claim_started_here := false
@@ -106,6 +113,8 @@ func _ready() -> void:
 			_leaderboard.name_resolved.connect(_on_name_resolved)
 		if _leaderboard.has_signal("name_lookup") and not _leaderboard.name_lookup.is_connected(_on_name_lookup):
 			_leaderboard.name_lookup.connect(_on_name_lookup)
+		if _leaderboard.has_signal("refused_score") and not _leaderboard.refused_score.is_connected(_on_refused_score):
+			_leaderboard.refused_score.connect(_on_refused_score)
 	var theme_node := get_node("/root/Theme")
 	theme_node.palette_changed.connect(_apply_theme)
 	_apply_theme(theme_node.palette_id)
@@ -194,6 +203,8 @@ func _on_game_over(final_score: int, is_high_score: bool) -> void:
 	_committed = false
 	_declined = false
 	_posted_final = false
+	_screen_token = -1
+	_pending_refusal = -1
 	_confirming = false
 	_lookup_pending = false
 	_pending_lookup = -1
@@ -213,6 +224,10 @@ func _on_game_over(final_score: int, is_high_score: bool) -> void:
 	_sync_name_invite()
 	_apply_control_hints()
 	visible = true
+	# Leaderboard may have handled this signal already, or it may run next.
+	# Both orders have to record this game's token before a late 409.
+	_apply_game_over_token()
+	_apply_game_over_token.call_deferred()
 	_play_celebration(_tier_for(final_score, is_high_score, 0))
 
 
@@ -247,6 +262,11 @@ func _on_submitted(result: Dictionary) -> void:
 
 func _on_offline(reason: String) -> void:
 	if not visible:
+		return
+	# The invite is the message for a refused current id. A 409 that is
+	# not name_taken still uses today's line.
+	if _invite_open and _identity_unconfirmed() and reason == "http_409":
+		_offline_label.visible = false
 		return
 	_offline_label.text = _offline_line(reason)
 	_offline_label.visible = true
@@ -365,6 +385,37 @@ func _maybe_upgrade_celebration(result: Dictionary) -> void:
 
 func _identity_unconfirmed() -> bool:
 	return _leaderboard != null and bool(_leaderboard.get("identity_unconfirmed"))
+
+
+func _apply_game_over_token() -> void:
+	if _leaderboard == null:
+		return
+	var epoch := int(_leaderboard._game_over_epoch)
+	if epoch <= _applied_epoch:
+		return
+	_applied_epoch = epoch
+	_screen_token = int(_leaderboard._game_over_submit_token)
+	_open_refused_invite()
+
+
+func _on_refused_score(token: int) -> void:
+	_pending_refusal = token
+	_open_refused_invite()
+
+
+func _open_refused_invite() -> void:
+	if _pending_refusal < 0 or not visible:
+		return
+	if _screen_token < 0 or _pending_refusal != _screen_token:
+		return
+	if _declined or _committed:
+		_pending_refusal = -1
+		return
+	_pending_refusal = -1
+	if _offline_label != null:
+		_offline_label.visible = false
+	if not _invite_open:
+		_sync_name_invite()
 
 
 func _sync_name_invite() -> void:

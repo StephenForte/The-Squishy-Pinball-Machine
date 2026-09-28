@@ -16,9 +16,14 @@ signal name_resolved(generation: int, ok: bool, info: Dictionary)
 ## `held` is true only when that name already belongs to a player.
 ## `queried` is the raw name this call asked about.
 signal name_lookup(generation: int, info: Dictionary)
-## True after this boot's gap-fill PUT returned 409 name_taken (D-058).
+## True after this boot's gap-fill PUT, or a score POST, returned 409
+## name_taken for the id this device still holds (D-058, T43).
 ## Runtime only: recomputed from the next boot, never written to the save.
 signal identity_unconfirmed_changed(unconfirmed: bool)
+## A score POST was answered 409 name_taken for the id still on the device.
+## `token` is that submit. Game over opens the invite only when the token
+## is the game currently on screen.
+signal refused_score(token: int)
 
 const BASE_URL := "https://squish-leaderboard.onrender.com"
 const KEY := "a419f5979f6891504b3af89a20e13125"
@@ -44,6 +49,10 @@ var last_entries: Array = []
 var last_total_players: int = 0
 
 var _submit_token: int = 0
+## Bumped once per game_over, including a game that does not submit.
+## `_game_over_submit_token` is that game's submit, or -1 when none started.
+var _game_over_epoch: int = 0
+var _game_over_submit_token: int = -1
 var _submitted_tokens: Dictionary = {}
 ## token → {score: int, in_flight: bool, retry_pending: bool}
 var _submit_state: Dictionary = {}
@@ -346,9 +355,11 @@ func _on_server_best_finished(ok: bool, code: int, parsed: Variant, _reason: Str
 
 func _on_push_profile_finished(_ok: bool, code: int, parsed: Variant, _reason: String, gap_fill_id: String) -> void:
 	# D-037: fire-and-forget. Failures are dropped; not enrolled in D-034.
-	# D-058: only the boot gap-fill's 409 name_taken marks this session
-	# unconfirmed. Transport failure is code 0. A 200 is the ordinary
-	# D-038 gap-fill and changes nothing. No offline text either way.
+	# D-058: the boot gap-fill's 409 name_taken marks this session
+	# unconfirmed. A score POST does the same in `_on_submit_finished`
+	# (T43); D-038 still sends no gap-fill PUT without an avatar.
+	# Transport failure is code 0. A 200 is the ordinary gap-fill and
+	# changes nothing. No offline text either way.
 	if code != 409 or not _body_error_is(parsed, "name_taken"):
 		return
 	refused_name_count += 1
@@ -536,6 +547,10 @@ func _on_title_visibility_changed(title: Node) -> void:
 
 
 func _on_game_over(final_score: int, _is_high_score: bool) -> void:
+	# Epoch advances even when this game does not submit, so the screen can
+	# tell "no post" from "the previous game's post".
+	_game_over_epoch += 1
+	_game_over_submit_token = -1
 	fetch_top(10)
 	# D-058: an unconfirmed id is dead. The invite claims, then posts once.
 	if identity_unconfirmed:
@@ -548,6 +563,7 @@ func _on_game_over(final_score: int, _is_high_score: bool) -> void:
 	if final_score <= 0:
 		return
 	_start_new_submit(final_score)
+	_game_over_submit_token = _submit_token
 
 
 func _start_new_submit(score: int) -> void:
@@ -691,6 +707,15 @@ func _on_submit_finished(ok: bool, code: int, parsed: Variant, reason: String, t
 			submitted.emit(parsed)
 		fetch_top(10)
 		return
+	# T43: 409 name_taken for the id still on the device is the same
+	# unconfirmed signal as the boot gap-fill. The invite is the message,
+	# so this path does not emit "said no (409)" and does not retry.
+	# An older token still marks the id, but game over ignores it unless
+	# that token is the game on screen.
+	if _score_refusal_marks_unconfirmed(code, parsed, submitted_player_id):
+		_mark_unconfirmed()
+		refused_score.emit(token)
+		return
 	# Only the latest token talks to GameOver (same rule as submitted). A late
 	# failure from an older game must not paint "Leaderboard offline" over a
 	# score that already landed.
@@ -701,6 +726,19 @@ func _on_submit_finished(ok: bool, code: int, parsed: Variant, reason: String, t
 			offline.emit("http_%d" % code if code > 0 else reason)
 	if _is_retryable(code):
 		_schedule_retry(token)
+
+
+func _score_refusal_marks_unconfirmed(code: int, parsed: Variant, submitted_player_id: String) -> bool:
+	if code != 409 or not _body_error_is(parsed, "name_taken"):
+		return false
+	var profile := get_node_or_null("/root/Profile")
+	if profile == null:
+		return false
+	if submitted_player_id.is_empty() or String(profile.player_id) != submitted_player_id:
+		return false
+	if String(profile.player_name).is_empty():
+		return false
+	return true
 
 
 func _is_retryable(code: int) -> bool:
