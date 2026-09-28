@@ -19,6 +19,8 @@ const ORIGIN = 'https://play.example';
 
 const ADMIN_PATHS = [
   ['GET', '/v1/admin/scores'],
+  ['GET', '/v1/admin/holders?name=Dad'],
+  ['POST', '/v1/admin/scores/999999/relabel'],
   ['DELETE', '/v1/scores/1'],
   ['DELETE', `/v1/profile/${NATASHA}`],
   ['POST', '/v1/admin/reset'],

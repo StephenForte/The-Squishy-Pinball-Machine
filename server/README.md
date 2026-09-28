@@ -1,7 +1,8 @@
 # Squish leaderboard server
 
 Node 24 HTTP service for the shared leaderboard (D-026), cloud profiles (D-037),
-CORS for a browser build (D-044), and admin cleanup (D-046 / D-047).
+CORS for a browser build (D-044), admin cleanup (D-046 / D-047), and admin
+name-hold inspection (D-060).
 Zero npm dependencies: `node:http` + `node:sqlite`. Schema and indexes are
 created on boot. `scores` is never altered; `profiles` is added with
 `CREATE TABLE IF NOT EXISTS`.
@@ -66,7 +67,7 @@ answer a preflight.
   a missing address shares one `unknown` bucket. This is a speed bump, not
   authorization — `X-Forwarded-For` is client-controlled on a direct connection.
 
-## Routes (D-026, amended by D-037, D-044, D-046, D-047, D-059)
+## Routes (D-026, amended by D-037, D-044, D-046, D-047, D-059, D-060)
 
 - `GET /` → HTML top-10 board (same data as `/v1/leaderboard`; `Cache-Control: no-store`). Each row's avatar is a same-origin `<img src="/avatars/<id>.png">` when set.
 - `GET /healthz` → `{ ok, store }` (`memory` when `DB_PATH=:memory:`, otherwise `sqlite`)
@@ -76,11 +77,13 @@ answer a preflight.
 - `PUT /v1/profile` → `200` `{ player_id, name, avatar, updated_at }` (key + limiter, same 30/min per `player_id` as scores). `avatar` is `""` or a D-020 catalog id.
 - `GET /v1/profile?player_id=<uuid>` → the same object, or `404` `unknown_profile`. No key.
 - `GET /v1/players/lookup?name=<url-encoded>` → `200` `{"held": false}` when the name is free, or `200` `{"held": true, "name": "<display>"}` when one holder has it (D-059). The name is validated like resolve: a control character, a missing `name`, or a name that is empty after sanitising is `400` `invalid_name`. A holder is a profile `name_key` or any score row carrying the name. Display is that holder's profile name, otherwise its latest score name. Two or more holders answer `{"held": true}` with no display; claiming still goes through resolve and gets `409` `name_ambiguous`. This route writes nothing (no profile, no score, no index rebuild) and uses the same per-IP limiter as resolve.
-- `POST /v1/players/resolve` is unchanged and remains the only way a name is claimed.
+- `POST /v1/players/resolve` is unchanged and remains the only way a name is claimed. Two or more holders answer `409` with exactly `{"error":"name_ambiguous"}` — no player ids. A player id is that player's key, so holder ids stay on the admin routes.
 - `GET /avatars/<id>.png` → catalogued art only (`image/png`, `Cache-Control: public, max-age=86400`). The id is looked up in `assets/design/squishes/squishies_catalog.json`; the file path comes from that entry, never from the URL segment. PNGs stay in the repo — they are not copied into `server/`.
 
 - `OPTIONS` on the public routes above → `204` when CORS applies (or without CORS headers for an unlisted origin).
-- `GET /v1/admin/scores` → `200` `{ rows, total }` (admin, D-047). Raw score rows, newest first (`created_at` then `id` as stored): `{ id, player_id, name, score, client, created_at }`. Optional `player_id` (uuid v4, else `400` `invalid_player_id`); optional `limit` uses the same 1..50 clamp as the public board. `total` is the matching row count, not the page size. This is how a delete target is found — the public board has no row `id`.
+- `GET /v1/admin/holders?name=<url-encoded>` → `200` `{ key, holders }` (admin, D-060). `name` is validated like lookup: a control character, a missing `name`, or a name that is empty after sanitising is `400` `invalid_name`. `key` is the normalised name. `holders` is one entry per player who holds it (a profile `name_key`, or any score row whose name normalises to that key). Each entry is `{ player_id, profile, score_rows }`. `profile` is `{ name, avatar }` or `null` when that player has no profile. `score_rows` is every score of that player whose name normalises to the key: `{ id, name, score, created_at }`. A free name is `holders: []`. Read-only: no profile, no score, and no name-index change.
+- `GET /v1/admin/scores` → `200` `{ rows, total, offset }` (admin, D-047, D-060). Raw score rows, newest first (`created_at DESC, id DESC`, so rows that share a timestamp cannot land on two pages or on none): `{ id, player_id, name, score, client, created_at }`. Optional `player_id` (uuid v4, else `400` `invalid_player_id`); optional `limit` uses the same 1..50 clamp as the public board. Optional `offset` is an integer ≥ 0 (omitted means `0` and is echoed); anything else is `400` `invalid_offset`. `total` is the matching row count, not the page size. An offset past the end returns `rows: []` with the true `total`. `player_id` and `offset` combine. This is how a delete or relabel target is found — the public board has no row `id`.
+- `POST /v1/admin/scores/:id/relabel` → `200` `{ ok: true, id, player_id, name_before, name_after }` (admin, D-060). No body. Sets that row's `name` to its own player's current profile name and nothing else — there is no name argument, because an arbitrary rename can hand the hold to a different player. A missing or malformed id is `404`, the same as `DELETE /v1/scores/:id`. `409` `no_profile` when that player has no profile, and the row is left unchanged. `score`, `player_id`, `client`, and `created_at` stay as they were, and no other row changes.
 - `DELETE /v1/scores/:id` → `200` `{ ok: true }` (admin). `404` if the row does not exist.
 - `DELETE /v1/profile/:player_id` → `200` `{ ok: true }` (admin). `404` unknown; `400` `invalid_player_id` for a malformed uuid. Scores for that player stay.
 - `POST /v1/admin/reset` → `200` `{ ok: true }` (admin). Body must include `"confirm":"RESET"` or the request is `400` `confirmation_required` and nothing is deleted.
