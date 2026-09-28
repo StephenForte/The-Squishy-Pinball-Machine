@@ -11,9 +11,11 @@ import {
   getMe,
   getProfile,
   insertScore,
+  listHolders,
   listScores,
   lookupPlayer,
   mergePlayers,
+  relabelScore,
   openDb,
   resetAll,
   resolvePlayer,
@@ -26,6 +28,7 @@ import {
   normalizePlayerId,
   parseLimit,
   parseLookupName,
+  parseOffset,
   parseMergeBody,
   parseProfileBody,
   parseResolveBody,
@@ -96,8 +99,15 @@ function isAdminOptionsPath(path) {
 }
 
 function matchAdminRoute(method, path) {
+  if (method === 'GET' && path === '/v1/admin/holders') {
+    return { action: 'holders' };
+  }
   if (method === 'GET' && path === '/v1/admin/scores') {
     return { action: 'list_scores' };
+  }
+  if (method === 'POST') {
+    const relabel = /^\/v1\/admin\/scores\/([^/]+)\/relabel$/.exec(path);
+    if (relabel) return { action: 'relabel', id: relabel[1] };
   }
   if (method === 'POST' && path === '/v1/admin/merge') {
     return { action: 'merge' };
@@ -294,8 +304,45 @@ async function handleAdmin(req, res, ctx, route) {
       }
       playerId = normalizePlayerId(playerIdRaw);
     }
+    const offset = parseOffset(url.searchParams.get('offset'));
+    if (!offset.ok) {
+      send(res, 400, { error: offset.error });
+      return;
+    }
     const limit = parseLimit(url.searchParams.get('limit'));
-    send(res, 200, listScores(ctx.db, { playerId, limit }));
+    send(res, 200, listScores(ctx.db, { playerId, limit, offset: offset.value }));
+    return;
+  }
+
+  if (route.action === 'holders') {
+    const url = new URL(req.url, 'http://localhost');
+    const parsed = parseLookupName(url.searchParams.get('name'));
+    if (!parsed.ok) {
+      send(res, 400, { error: parsed.error });
+      return;
+    }
+    send(res, 200, listHolders(ctx.db, parsed.value.name));
+    return;
+  }
+
+  if (route.action === 'relabel') {
+    const id = Number(route.id);
+    if (!Number.isInteger(id) || id < 1 || String(id) !== route.id) {
+      send(res, 404, { error: 'not_found' });
+      return;
+    }
+    const relabeled = relabelScore(ctx.db, id);
+    if (!relabeled.ok) {
+      send(res, relabeled.status, { error: relabeled.error });
+      return;
+    }
+    send(res, 200, {
+      ok: true,
+      id: relabeled.id,
+      player_id: relabeled.player_id,
+      name_before: relabeled.name_before,
+      name_after: relabeled.name_after,
+    });
     return;
   }
 

@@ -34,6 +34,21 @@ export function parseLimit(raw, fallback = 10) {
   return Math.min(50, Math.max(1, Math.trunc(n)));
 }
 
+/**
+ * Page start for GET /v1/admin/scores (D-060). Omitted means the first page.
+ * Present values must be a canonical integer ≥ 0; floats, signs, and junk are
+ * invalid so a bad offset cannot silently clamp onto a real page.
+ */
+export function parseOffset(raw) {
+  if (raw === undefined || raw === null) return { ok: true, value: 0 };
+  if (typeof raw !== 'string' || !/^(0|[1-9][0-9]*)$/.test(raw)) {
+    return { ok: false, error: 'invalid_offset' };
+  }
+  const n = Number(raw);
+  if (!Number.isSafeInteger(n)) return { ok: false, error: 'invalid_offset' };
+  return { ok: true, value: n };
+}
+
 export function parseScoreBody(body) {
   if (body === null || typeof body !== 'object' || Array.isArray(body)) {
     return { ok: false, error: 'invalid_json' };

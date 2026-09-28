@@ -439,10 +439,78 @@ export function mergePlayers(db, { keep, drop }) {
 }
 
 /**
- * Raw score rows, newest first (created_at then id). `total` is the matching
- * row count, not the page size — deletion targets a row, not a board entry.
+ * Who holds a name, and which of their score rows carry it (D-060).
+ * Same holder rule as lookup and resolve. Read-only: no profile insert,
+ * no score change, no index rebuild.
  */
-export function listScores(db, { playerId = null, limit } = {}) {
+export function listHolders(db, name) {
+  const key = nameKey(name);
+  const holders = holdersOf(db, key)
+    .slice()
+    .sort()
+    .map((player_id) => {
+      const profile = getProfile(db, player_id);
+      const scores = db
+        .prepare(
+          `
+          SELECT id, name, score, created_at
+          FROM scores
+          WHERE player_id = ?
+          ORDER BY id ASC
+        `,
+        )
+        .all(player_id);
+      return {
+        player_id,
+        profile: profile ? { name: profile.name, avatar: profile.avatar } : null,
+        score_rows: scores
+          .filter((row) => nameKey(row.name) === key)
+          .map((row) => ({
+            id: Number(row.id),
+            name: row.name,
+            score: Number(row.score),
+            created_at: row.created_at,
+          })),
+      };
+    });
+  return { key, holders };
+}
+
+/**
+ * Point one score row at its own player's current profile name (D-060).
+ * There is no caller-supplied name: renaming to an arbitrary string can move
+ * the hold onto a name another player already owns. Score, player, client,
+ * and timestamp stay as they are, and no other row is written.
+ */
+export function relabelScore(db, id) {
+  return withImmediate(db, () => {
+    const row = db
+      .prepare(
+        'SELECT id, player_id, name, score, client, created_at FROM scores WHERE id = ?',
+      )
+      .get(id);
+    if (!row) return { ok: false, status: 404, error: 'not_found' };
+    const profile = db
+      .prepare('SELECT name FROM profiles WHERE player_id = ?')
+      .get(row.player_id);
+    if (!profile) return { ok: false, status: 409, error: 'no_profile' };
+    db.prepare('UPDATE scores SET name = ? WHERE id = ?').run(profile.name, row.id);
+    return {
+      ok: true,
+      id: Number(row.id),
+      player_id: row.player_id,
+      name_before: row.name,
+      name_after: profile.name,
+    };
+  });
+}
+
+/**
+ * Raw score rows, newest first (`created_at DESC, id DESC`). The id tie-break
+ * keeps pages disjoint when several rows share a `created_at`. `total` is the
+ * matching row count, not the page size. `offset` is echoed; 0 is the first page.
+ */
+export function listScores(db, { playerId = null, limit, offset = 0 } = {}) {
   const count = playerId
     ? db.prepare('SELECT COUNT(*) AS total FROM scores WHERE player_id = ?').get(playerId)
     : db.prepare('SELECT COUNT(*) AS total FROM scores').get();
@@ -454,6 +522,7 @@ export function listScores(db, { playerId = null, limit } = {}) {
         WHERE player_id = ?
         ORDER BY created_at DESC, id DESC
         LIMIT ?
+        OFFSET ?
       `,
       )
     : db.prepare(
@@ -462,9 +531,10 @@ export function listScores(db, { playerId = null, limit } = {}) {
         FROM scores
         ORDER BY created_at DESC, id DESC
         LIMIT ?
+        OFFSET ?
       `,
       );
-  const raw = playerId ? stmt.all(playerId, limit) : stmt.all(limit);
+  const raw = playerId ? stmt.all(playerId, limit, offset) : stmt.all(limit, offset);
   return {
     rows: raw.map((row) => ({
       id: Number(row.id),
@@ -475,6 +545,7 @@ export function listScores(db, { playerId = null, limit } = {}) {
       created_at: row.created_at,
     })),
     total: Number(count.total),
+    offset,
   };
 }
 
