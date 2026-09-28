@@ -59,9 +59,9 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T37 | Client: typing a name claims that player; remove the transfer/restore UI entirely (D-053) | 11 | **done** 2026-09-27 — merged, deployed; phone claimed Dad and posted two scores to the right player | mid | T36 |
 | T39 | **Title screen is colliding and oversized:** field on top of the title, Play over the HUD; plus the welcome-back confirm (D-056) | 12 | **done** — reviewed, approved and merged 2026-09-27 (PR #47, 61ffdad) | mid | — |
 | T42 | HIGH shows the device's best, not the player's: reconcile with the server's best after boot, claim and submit (D-057) | 12 | **done** 2026-09-27 — merged (PR #48, 8ed0ab0), deployed, verified on the phone | mid | — |
-| T43 | An avatar-less device with a refused id is never detected: the boot gap-fill PUT is skipped without an avatar, so its runs still 409 `name_taken` and are lost (D-058 gap, found in T40 review) | 12 | not started | cheap-mid | T40 |
+| T43 | An avatar-less device with a refused id is never detected: the boot gap-fill PUT is skipped without an avatar, so its runs still 409 `name_taken` and are lost (D-058 gap, found in T40 review) | 12 | brief written 2026-09-27, not dispatched | cheap-mid | T40 |
 | T41 | Name lookup should be read-only: the title probe POSTs to the creating resolve route and rebuilds its own HTTP path (D-056) | 12 | not started | cheap-mid | T40 |
-| T40 | A refused identity (404 then PUT 409 `name_taken`) is never reconciled and silently loses runs: confirm at boot, route game over through the save-your-score invite (D-056, D-058). CORS half closed (D-057) | 12 | **approved** 2026-09-27 (PR #49, dfd9146) — awaiting merge + static-site redeploy | mid | — |
+| T40 | A refused identity (404 then PUT 409 `name_taken`) is never reconciled and silently loses runs: confirm at boot, route game over through the save-your-score invite (D-056, D-058). CORS half closed (D-057) | 12 | **done** 2026-09-27 — merged (PR #49, 597a7e8), deployed `dep-dasqsk0473hc739ip58g` | mid | — |
 | T38 | Name holders are undiagnosable: resolve hides the blocker, admin scores caps at 50 with no paging, and a score row locks a name forever (D-055) | 11 | not started | mid | — |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8 → T10 → T9 →
@@ -1418,3 +1418,8 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   current id as the unconfirmed signal, which catches every path the boot check misses.
 - **State:** D-058 next free **D-059**; tasks through **T43**, next free **T44**. Order: merge #49 and
   redeploy → T43 → T41 (now smaller) → T38.
+- 2026-09-27: **T40 merged (PR #49 → 597a7e8) and deployed** (static `dep-dasqsk0473hc739ip58g`,
+  live 00:01:55 UTC). No refused-id device has booted since; the boot prompt is unobserved on hardware.
+- 2026-09-27: **T43 briefed.** Detection by a score POST's 409 `name_taken` (D-058 amendment), not by
+  dropping D-038's avatar condition — that would change `leaderboard_test` case 24 and register names
+  at boot. Order: T43 → T41 → T38.
