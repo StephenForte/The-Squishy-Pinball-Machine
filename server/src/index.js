@@ -12,6 +12,7 @@ import {
   getProfile,
   insertScore,
   listScores,
+  lookupPlayer,
   mergePlayers,
   openDb,
   resetAll,
@@ -24,6 +25,7 @@ import {
   isUuidV4,
   normalizePlayerId,
   parseLimit,
+  parseLookupName,
   parseMergeBody,
   parseProfileBody,
   parseResolveBody,
@@ -46,6 +48,7 @@ const PUBLIC_CORS_PATHS = new Set([
   '/v1/leaderboard/me',
   '/v1/profile',
   '/v1/players/resolve',
+  '/v1/players/lookup',
 ]);
 
 export function parseAllowedOrigins(raw) {
@@ -532,6 +535,24 @@ async function handle(req, res, ctx) {
       throw err;
     }
     send(res, 200, result, cors);
+    return;
+  }
+
+  if (req.method === 'GET' && path === '/v1/players/lookup') {
+    const parsed = parseLookupName(url.searchParams.get('name'));
+    if (!parsed.ok) {
+      send(res, 400, { error: parsed.error }, cors);
+      return;
+    }
+
+    const addr = clientAddress(req, ctx.addressFor);
+    if (!ctx.resolveLimiter.allow(addr)) {
+      send(res, 429, { error: 'rate_limited' }, cors);
+      return;
+    }
+
+    const looked = lookupPlayer(ctx.db, parsed.value.name);
+    send(res, 200, looked, cors);
     return;
   }
 

@@ -132,6 +132,25 @@ export function parseResolveBody(body) {
   };
 }
 
+/**
+ * Query `name` for GET /v1/players/lookup (D-059). Same accept/reject rules as
+ * parseResolveBody's name: a control character is invalid, and so is empty
+ * after sanitising. A missing query value is invalid too.
+ */
+export function parseLookupName(raw) {
+  if (typeof raw !== 'string') {
+    return { ok: false, error: 'invalid_name' };
+  }
+  if (/[\p{Cc}]/u.test(raw)) {
+    return { ok: false, error: 'invalid_name' };
+  }
+  const name = sanitizeName(raw);
+  if (!name) {
+    return { ok: false, error: 'invalid_name' };
+  }
+  return { ok: true, value: { name } };
+}
+
 /** Admin merge. `keep` survives; `drop` is absorbed. Ids are inputs, never implied. */
 export function parseMergeBody(body) {
   if (body === null || typeof body !== 'object' || Array.isArray(body)) {

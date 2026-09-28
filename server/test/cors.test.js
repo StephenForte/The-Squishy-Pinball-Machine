@@ -114,4 +114,42 @@ describe('CORS fail-closed (D-044)', () => {
       assert.notEqual(b.headers.get('access-control-allow-origin'), ORIGIN_A);
     }, { allowedOrigins: `${ORIGIN_A}, *, ${ORIGIN_B}` });
   });
+
+  it('lookup is on the public list: a listed origin is echoed on GET and OPTIONS', async () => {
+    await withServer(async ({ port }) => {
+      const got = await request(port, 'GET', '/v1/players/lookup?name=Dad', {
+        headers: { Origin: ORIGIN_A },
+      });
+      assert.equal(got.status, 200);
+      assert.equal(got.headers.get('access-control-allow-origin'), ORIGIN_A);
+      assert.equal(got.headers.get('vary'), 'Origin');
+
+      const preflight = await request(port, 'OPTIONS', '/v1/players/lookup', {
+        headers: {
+          Origin: ORIGIN_A,
+          'Access-Control-Request-Method': 'GET',
+        },
+      });
+      assert.equal(preflight.status, 204);
+      assert.equal(preflight.headers.get('access-control-allow-origin'), ORIGIN_A);
+      assert.match(preflight.headers.get('access-control-allow-methods'), /GET/);
+
+      const foreign = await request(port, 'GET', '/v1/players/lookup?name=Dad', {
+        headers: { Origin: FOREIGN },
+      });
+      assert.equal(foreign.status, 200);
+      assert.equal(foreign.headers.get('access-control-allow-origin'), null);
+      assert.equal(corsNames(foreign.headers).length, 0);
+
+      const foreignPreflight = await request(port, 'OPTIONS', '/v1/players/lookup', {
+        headers: {
+          Origin: FOREIGN,
+          'Access-Control-Request-Method': 'GET',
+        },
+      });
+      assert.equal(foreignPreflight.status, 204);
+      assert.equal(foreignPreflight.headers.get('access-control-allow-origin'), null);
+      assert.equal(corsNames(foreignPreflight.headers).length, 0);
+    }, { allowedOrigins: [ORIGIN_A] });
+  });
 });

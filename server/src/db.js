@@ -372,6 +372,34 @@ export function resolvePlayer(db, name) {
 }
 
 /**
+ * Read-only "is this name held?" (D-059).
+ * Same holder rule as resolvePlayer (profile name_key or any score row).
+ * Display is that holder's profile name, otherwise its latest score name.
+ * Two or more holders are held, with no single display — the claim still
+ * gets resolve's 409 name_ambiguous.
+ * This function must not insert a profile, rebuild profiles_name_key, or
+ * change a score. resolvePlayer's score-only branch writes a profile;
+ * this one only reads.
+ */
+export function lookupPlayer(db, name) {
+  const key = nameKey(name);
+  const holders = holdersOf(db, key);
+  if (holders.length === 0) {
+    return { held: false };
+  }
+  if (holders.length > 1) {
+    return { held: true };
+  }
+  const player_id = holders[0];
+  const profile = getProfile(db, player_id);
+  if (profile) {
+    return { held: true, name: profile.name };
+  }
+  const stored = latestScoreName(db, player_id);
+  return { held: true, name: stored || name };
+}
+
+/**
  * Absorb `drop` into `keep`. Survivor profile fields stay as they are.
  * Moved score rows take the survivor's display name so the board, which reads
  * scores.name, cannot keep showing the merged-away player.

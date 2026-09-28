@@ -385,11 +385,32 @@ func _case_ambiguous_no_score(main: Node) -> bool:
 		return false
 	var edit := _edit(main)
 	var prompt := _prompt(main)
-	if edit == null or prompt == null:
+	var welcome := main.get_node_or_null("GameOver/WelcomeLabel") as Label
+	var yes := _button(main, "YesButton")
+	if edit == null or prompt == null or welcome == null or yes == null:
 		return _fail("case 12: prompt missing")
 	edit.text = "Twin"
 	_arm()
 	edit.text_submitted.emit("Twin")
+	# Lookup reports the ambiguous name as held, so the invite asks before
+	# the claim. The claim that follows is still resolve's 409.
+	var start := Time.get_ticks_msec()
+	while Time.get_ticks_msec() - start < 2000:
+		if welcome.visible:
+			break
+		await process_frame
+	if not welcome.visible:
+		return _fail("case 12: held name did not ask welcome back")
+	if _got_resolve:
+		return _fail("case 12: ambiguous name resolved before That's me")
+	if not _identity_held(before_id, "", before_players):
+		return _fail("case 12: welcome changed identity")
+	if _attempt_snapshot() != before or _names.size() != names_before:
+		return _fail("case 12: welcome submitted")
+	if welcome.text.find("Twin") < 0:
+		return _fail("case 12: welcome '%s'" % welcome.text)
+	_arm()
+	yes.pressed.emit()
 	if not await _wait_resolve():
 		return _fail("case 12: resolve did not finish")
 	if _resolve_ok:
