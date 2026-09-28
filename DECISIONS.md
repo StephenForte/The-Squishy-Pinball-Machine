@@ -1307,3 +1307,30 @@ playing each time.
   is not shown for this case; the invite is the message. **D-038 is not changed:** removing the
   avatar condition would register names on the server merely by opening the game, which T38 already
   flags as a problem (a held name is held forever).
+
+## D-059 — "Is this name held?" is a read-only server lookup (planner, 2026-09-28)
+Closes the question D-056 opened and T40 isolated. Today `Leaderboard.lookup_name` (the single place
+the client asks, used by the title's typed-name probe and the game-over invite) POSTs
+`/v1/players/resolve` and reads `created`. That route **creates** a profile when the name is free
+(`resolvePlayer` → INSERT, 201), and also inserts a profile for a holder known only from score rows.
+So asking a question writes to the database: a probe for a free name mints a player before anyone
+has chosen it. It has been harmless only because every free-name probe is followed at once by the
+claim that would have created it anyway.
+**Contract:**
+- New route **`GET /v1/players/lookup?name=<url-encoded>`**. Same name validation as resolve
+  (control characters → 400 `invalid_name`; sanitised-empty → 400 `invalid_name`). Same holder rule
+  as resolve (`holdersOf`: profile `name_key` **or** any score row carrying the name).
+- Answers `200 {"held": false}` or `200 {"held": true, "name": "<display>"}`, display taken the way
+  resolve would (the holder's profile name, else its latest score name). Two or more holders →
+  `held: true` (the claim that follows gets resolve's existing 409 `name_ambiguous`).
+- **Writes nothing.** No profile insert, no index rebuild, no score change — for a free name, a
+  held name, and a score-only holder alike. This is the whole point and must be asserted on row
+  counts, not inferred.
+- Rate-limited by the same per-IP limiter as resolve (a lookup followed by a claim costs two
+  slots, exactly what probe-plus-claim costs today). On the public CORS path list.
+- `POST /v1/players/resolve` is unchanged and remains the only way a name is claimed.
+- Client: only the request inside `lookup_name` changes; its `name_lookup` signal shape
+  (`answered`, `held`, `display`, `queried`) stays, so `name_entry.gd` and `game_over.gd` are untouched.
+- Deploy order matters: the server auto-deploys on merge (`server/**`, checks pass); the static site
+  is redeployed by hand **after** the new route answers live. A client that meets an old server gets a
+  404 on the lookup, which it already treats as "unanswered" and falls back to the claim.
