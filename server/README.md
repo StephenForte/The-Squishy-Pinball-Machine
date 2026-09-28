@@ -66,7 +66,7 @@ answer a preflight.
   a missing address shares one `unknown` bucket. This is a speed bump, not
   authorization — `X-Forwarded-For` is client-controlled on a direct connection.
 
-## Routes (D-026, amended by D-037, D-044, D-046, D-047)
+## Routes (D-026, amended by D-037, D-044, D-046, D-047, D-059)
 
 - `GET /` → HTML top-10 board (same data as `/v1/leaderboard`; `Cache-Control: no-store`). Each row's avatar is a same-origin `<img src="/avatars/<id>.png">` when set.
 - `GET /healthz` → `{ ok, store }` (`memory` when `DB_PATH=:memory:`, otherwise `sqlite`)
@@ -75,6 +75,8 @@ answer a preflight.
 - `GET /v1/leaderboard/me?player_id=<uuid>` → `{ rank, best, name, avatar }` or `404`
 - `PUT /v1/profile` → `200` `{ player_id, name, avatar, updated_at }` (key + limiter, same 30/min per `player_id` as scores). `avatar` is `""` or a D-020 catalog id.
 - `GET /v1/profile?player_id=<uuid>` → the same object, or `404` `unknown_profile`. No key.
+- `GET /v1/players/lookup?name=<url-encoded>` → `200` `{"held": false}` when the name is free, or `200` `{"held": true, "name": "<display>"}` when one holder has it (D-059). The name is validated like resolve: a control character, a missing `name`, or a name that is empty after sanitising is `400` `invalid_name`. A holder is a profile `name_key` or any score row carrying the name. Display is that holder's profile name, otherwise its latest score name. Two or more holders answer `{"held": true}` with no display; claiming still goes through resolve and gets `409` `name_ambiguous`. This route writes nothing (no profile, no score, no index rebuild) and uses the same per-IP limiter as resolve.
+- `POST /v1/players/resolve` is unchanged and remains the only way a name is claimed.
 - `GET /avatars/<id>.png` → catalogued art only (`image/png`, `Cache-Control: public, max-age=86400`). The id is looked up in `assets/design/squishes/squishies_catalog.json`; the file path comes from that entry, never from the URL segment. PNGs stay in the repo — they are not copied into `server/`.
 
 - `OPTIONS` on the public routes above → `204` when CORS applies (or without CORS headers for an unlisted origin).

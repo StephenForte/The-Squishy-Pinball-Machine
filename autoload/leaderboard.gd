@@ -158,20 +158,22 @@ func retire_name_resolve() -> void:
 	_resolve_gen += 1
 
 
-## The one place that asks whether a name is already held (D-058).
-## Today this POSTs /v1/players/resolve and reads `created`, and does not adopt.
-## T41 replaces the request inside this function with a read-only lookup.
+## The one place that asks whether a name is already held (D-059).
+## GET /v1/players/lookup. The name is percent-encoded so a space, "&", "+",
+## "#", "%" or non-ASCII byte is the same name resolve would claim.
+## Does not adopt. A 200 with a boolean `held` is an answer; anything else
+## (transport, 4xx including an older server's 404, 5xx, bad JSON) is unanswered.
 func lookup_name(raw_name: String) -> int:
 	_lookup_gen += 1
 	var gen := _lookup_gen
 	if _profile_http_skipped():
 		_emit_lookup_unanswered.call_deferred(gen, raw_name)
 		return gen
-	var url := "%s/v1/players/resolve" % _base_url()
+	var url := "%s/v1/players/lookup?name=%s" % [_base_url(), raw_name.uri_encode()]
 	_http_request(
-		HTTPClient.METHOD_POST,
+		HTTPClient.METHOD_GET,
 		url,
-		JSON.stringify({"name": raw_name}),
+		"",
 		_on_lookup_finished.bind(gen, raw_name),
 		false
 	)
@@ -188,7 +190,17 @@ func _emit_lookup_unanswered(gen: int, raw_name: String) -> void:
 
 
 func _on_lookup_finished(ok: bool, code: int, parsed: Variant, reason: String, gen: int, raw_name: String) -> void:
-	if not ok or typeof(parsed) != TYPE_DICTIONARY:
+	var held_known := false
+	var held := false
+	var display := ""
+	if ok and typeof(parsed) == TYPE_DICTIONARY:
+		var data: Dictionary = parsed
+		if typeof(data.get("held")) == TYPE_BOOL:
+			held_known = true
+			held = bool(data["held"])
+			if typeof(data.get("name")) == TYPE_STRING:
+				display = String(data["name"]).strip_edges()
+	if not held_known:
 		name_lookup.emit(gen, {
 			"answered": false,
 			"held": false,
@@ -198,16 +210,9 @@ func _on_lookup_finished(ok: bool, code: int, parsed: Variant, reason: String, g
 			"reason": reason,
 		})
 		return
-	var data: Dictionary = parsed
-	# Missing `created` is not proof the name is held. Only an explicit
-	# existing name (`created: false`) waits for confirmation.
-	var created := bool(data.get("created", true))
-	var display := String(data.get("name", "")).strip_edges()
-	if display.is_empty():
-		display = raw_name.strip_edges()
 	name_lookup.emit(gen, {
 		"answered": true,
-		"held": not created,
+		"held": held,
 		"display": display,
 		"queried": raw_name,
 	})
