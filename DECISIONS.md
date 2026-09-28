@@ -1295,3 +1295,15 @@ playing each time.
     adopted or posted. This applies to every invite, unnamed or unconfirmed — it brings the game-over
     invite in line with D-056, which T39 applied to the title only.
   - The boot confirmation for an unconfirmed identity stands as written ("prompt at boot is great").
+- **Amended again, T43 (planner, 2026-09-27, after T40 review):** the boot signal alone misses a
+  device with no avatar. `_reconcile_boot_missing_cloud` sends the gap-fill PUT only when
+  `avatar_id` is non-empty — that is D-038 as built and enforced by `leaderboard_test` case 24
+  ("both-empty boot must send zero PUTs" and creates no cloud profile). Such a device with a dead id
+  is never marked unconfirmed, and its runs still get 409 `name_taken` and are lost.
+  **Rule:** a score POST answered **409 `name_taken`** for the id that is still `Profile.player_id`,
+  with a non-empty name, is the same signal as the boot 404+409: mark the identity unconfirmed, and
+  keep that run — the game-over screen showing that game opens the pre-filled invite, and a claim made
+  there posts that score once under the claimed id. The generic "The leaderboard said no (409)" line
+  is not shown for this case; the invite is the message. **D-038 is not changed:** removing the
+  avatar condition would register names on the server merely by opening the game, which T38 already
+  flags as a problem (a held name is held forever).
