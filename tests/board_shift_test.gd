@@ -34,7 +34,7 @@ func _run() -> void:
 		return
 	await process_frame
 	await physics_frame
-	_game = get_node_or_null("/root/Game")
+	_game = root.get_node_or_null("/root/Game")
 	_table = current_scene.get_node_or_null("Table") as Node2D
 	_hud = current_scene.get_node_or_null("HUD")
 	if _game == null or _table == null or _hud == null:
