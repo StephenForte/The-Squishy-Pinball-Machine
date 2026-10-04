@@ -7,6 +7,7 @@ var _game: Node
 @onready var _high_score_label: Label = $HighScoreLabel
 @onready var _streak_label: Label = $StreakLabel
 @onready var _board_label: Label = $BoardLabel
+@onready var _player_name_label: Label = $PlayerNameLabel
 
 
 func _ready() -> void:
@@ -28,6 +29,7 @@ func _ready() -> void:
 	theme_node.palette_changed.connect(_apply_theme)
 	_apply_theme(theme_node.palette_id)
 	_sync_from_game()
+	_sync_player_name()
 
 
 func _apply_theme(_id: String = "") -> void:
@@ -39,6 +41,11 @@ func _apply_theme(_id: String = "") -> void:
 	_streak_label.add_theme_color_override("font_color", theme_node.color("glow_gold"))
 	if _board_label != null:
 		_board_label.add_theme_color_override("font_color", theme_node.color("glow_gold"))
+	if _player_name_label != null:
+		_player_name_label.add_theme_color_override("font_color", primary)
+		_player_name_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+		_player_name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		_player_name_label.clip_text = true
 
 
 func _on_score_changed(new_score: int) -> void:
@@ -75,6 +82,7 @@ func _on_board_shifted(wave: int, bonus_count: int, bonus_points: int) -> void:
 
 func _on_name_changed(_name: String) -> void:
 	_set_high(_game.high_score)
+	_sync_player_name()
 
 
 func _on_high_score_changed(player_id: String, value: int) -> void:
@@ -91,6 +99,22 @@ func _sync_from_game() -> void:
 	_set_balls(_game.balls_left)
 	_set_high(_game.high_score)
 	_set_streak(int(_game.streak))
+	_sync_player_name()
+
+
+func _sync_player_name() -> void:
+	if _player_name_label == null:
+		return
+	var profile := get_node_or_null("/root/Profile")
+	var player_name := ""
+	if profile != null:
+		player_name = String(profile.player_name)
+	if player_name.is_empty():
+		_player_name_label.text = ""
+		_player_name_label.visible = false
+		return
+	_player_name_label.text = player_name
+	_player_name_label.visible = true
 
 
 func _set_score(value: int) -> void:

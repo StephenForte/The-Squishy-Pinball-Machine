@@ -55,6 +55,12 @@ var _skip_holding := false
 ## Set on Not now press-down so a blur queued by that gesture cannot commit
 ## after the finger lifts outside the button.
 var _suppress_blur_commit := false
+## Name and id read at submit_attempted, which is the same moment Leaderboard
+## reads them for the POST body. The 201 must show this pair, not whoever
+## Profile says when the response lands.
+var _bound_token := -1
+var _bound_id := ""
+var _bound_name := ""
 
 @onready var _celebration: Node = get_node_or_null("Celebration")
 @onready var _final_score_label: Label = $FinalScoreLabel
@@ -72,6 +78,8 @@ var _suppress_blur_commit := false
 @onready var _welcome: Label = $WelcomeLabel
 @onready var _yes: Button = $YesButton
 @onready var _no: Button = $NoButton
+@onready var _saved_as: Label = $SavedAsLabel
+@onready var _not_you: Button = $NotYouButton
 
 
 func _ready() -> void:
@@ -115,6 +123,11 @@ func _ready() -> void:
 			_leaderboard.name_lookup.connect(_on_name_lookup)
 		if _leaderboard.has_signal("refused_score") and not _leaderboard.refused_score.is_connected(_on_refused_score):
 			_leaderboard.refused_score.connect(_on_refused_score)
+		if _leaderboard.has_signal("submit_attempted") and not _leaderboard.submit_attempted.is_connected(_on_submit_attempted):
+			_leaderboard.submit_attempted.connect(_on_submit_attempted)
+	if _not_you != null:
+		_not_you.focus_mode = Control.FOCUS_ALL
+		_not_you.pressed.connect(_on_not_you_pressed)
 	var theme_node := get_node("/root/Theme")
 	theme_node.palette_changed.connect(_apply_theme)
 	_apply_theme(theme_node.palette_id)
@@ -146,6 +159,12 @@ func _apply_theme(_id: String = "") -> void:
 	_style_button(_skip_button, theme_node)
 	_style_button(_yes, theme_node)
 	_style_button(_no, theme_node)
+	_style_button(_not_you, theme_node)
+	if _saved_as != null:
+		_saved_as.add_theme_color_override("font_color", theme_node.color("glow_gold"))
+		_saved_as.autowrap_mode = TextServer.AUTOWRAP_OFF
+		_saved_as.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		_saved_as.clip_text = true
 	_style_name_edit(theme_node)
 	_paint_list_theme()
 
@@ -224,6 +243,13 @@ func _on_game_over(final_score: int, is_high_score: bool) -> void:
 	_sync_name_invite()
 	_apply_control_hints()
 	visible = true
+	# Leaderboard connects first, so its submit (and submit_attempted) has
+	# usually already snapshotted the posting id. Keep that snapshot; do not
+	# re-read Profile, which may already be someone else.
+	var keep_bound := _leaderboard != null and _bound_token >= 0 and int(_leaderboard._game_over_submit_token) == _bound_token
+	if not keep_bound:
+		_clear_bound()
+	_reveal_bound_save()
 	# Leaderboard may have handled this signal already, or it may run next.
 	# Both orders have to record this game's token before a late 409.
 	_apply_game_over_token()
@@ -244,6 +270,8 @@ func _on_game_restarted() -> void:
 	_stop_celebration()
 	_final_score = 0
 	_is_high_score = false
+	_clear_bound()
+	_hide_player_save()
 
 
 func _on_board_updated(entries: Array, _total_players: int) -> void:
@@ -257,7 +285,24 @@ func _on_submitted(result: Dictionary) -> void:
 	_last_submit = result
 	_offline_label.visible = false
 	_your_rank_label.text = _format_rank_line(result)
+	if visible and not _invite_open:
+		_show_saved_line(result)
 	_maybe_upgrade_celebration(result)
+
+
+func _on_submit_attempted(token: int, _attempt: int) -> void:
+	var profile := get_node_or_null("/root/Profile")
+	if profile == null:
+		return
+	var player_name := String(profile.player_name)
+	var player_id := String(profile.player_id)
+	if player_name.is_empty() or player_id.is_empty():
+		return
+	_bound_token = token
+	_bound_id = player_id
+	_bound_name = player_name
+	if visible and not _invite_open:
+		_show_saving_line()
 
 
 func _on_offline(reason: String) -> void:
@@ -268,6 +313,10 @@ func _on_offline(reason: String) -> void:
 	if _invite_open and _identity_unconfirmed() and reason == "http_409":
 		_offline_label.visible = false
 		return
+	# A failed save has no rank yet, so drop "SAVING AS". A score that already
+	# landed keeps "SAVED AS"; the failure still uses today's offline line.
+	if _last_submit.is_empty():
+		_hide_player_save()
 	_offline_label.text = _offline_line(reason)
 	_offline_label.visible = true
 
@@ -283,7 +332,99 @@ func _reset_leaderboard_ui() -> void:
 	_your_rank_label.text = ""
 	_offline_label.text = "Leaderboard offline"
 	_offline_label.visible = false
+	_hide_player_save()
 	_clear_list()
+
+
+func _clear_bound() -> void:
+	_bound_token = -1
+	_bound_id = ""
+	_bound_name = ""
+
+
+func _hide_player_save() -> void:
+	if _saved_as != null:
+		_saved_as.text = ""
+		_saved_as.visible = false
+	if _not_you != null:
+		_not_you.visible = false
+
+
+func _reveal_bound_save() -> void:
+	if _invite_open or _bound_name.is_empty():
+		_hide_player_save()
+		return
+	if not _last_submit.is_empty():
+		_show_saved_line(_last_submit)
+		return
+	if _bound_matches_inflight():
+		_show_saving_line()
+
+
+func _bound_matches_inflight() -> bool:
+	if _leaderboard == null or _bound_token < 0:
+		return false
+	if int(_leaderboard._game_over_submit_token) != _bound_token:
+		return false
+	var state: Dictionary = _leaderboard._submit_state.get(_bound_token, {})
+	if state.is_empty():
+		return false
+	if bool(_leaderboard._submitted_tokens.get(_bound_token, false)):
+		return false
+	return bool(state.get("in_flight", false)) or bool(state.get("retry_pending", false))
+
+
+func _show_saving_line() -> void:
+	if _saved_as == null or _bound_name.is_empty() or _invite_open:
+		return
+	_saved_as.text = "SAVING AS %s…" % _bound_name.to_upper()
+	_saved_as.visible = true
+	if _not_you != null:
+		_not_you.visible = false
+
+
+func _show_saved_line(result: Dictionary) -> void:
+	if _saved_as == null or _invite_open:
+		_hide_player_save()
+		return
+	var name := _name_for_posted_id()
+	if name.is_empty():
+		_hide_player_save()
+		return
+	var rank := int(result.get("rank", 0))
+	var total := int(result.get("total_players", 0))
+	_saved_as.text = "SAVED AS %s · %s OF %d" % [name.to_upper(), _ordinal(rank), total]
+	_saved_as.visible = true
+	if _not_you != null:
+		_not_you.visible = true
+
+
+## The id appended to score_post_ids is the one in the POST body. The name
+## snapshotted for that same id is what we show — not Profile's current name.
+func _name_for_posted_id() -> String:
+	if _bound_name.is_empty() or _leaderboard == null:
+		return ""
+	var ids: Array = _leaderboard.score_post_ids
+	if ids.is_empty():
+		return ""
+	if String(ids[ids.size() - 1]) != _bound_id:
+		return ""
+	return _bound_name
+
+
+func _ordinal(n: int) -> String:
+	var teen := n % 100
+	if teen >= 11 and teen <= 13:
+		return "%dTH" % n
+	match n % 10:
+		1:
+			return "%dST" % n
+		2:
+			return "%dND" % n
+		3:
+			return "%dRD" % n
+		_:
+			return "%dTH" % n
 
 
 func _format_rank_line(result: Dictionary) -> String:
@@ -447,6 +588,7 @@ func _open_invite(saved: String) -> void:
 	_name_edit.text = saved
 	if _name_prompt != null:
 		_name_prompt.text = _NAME_PROMPT
+	_hide_player_save()
 	_show_edit_row()
 	_place_list(true)
 
@@ -472,6 +614,8 @@ func _hide_invite() -> void:
 		_no.visible = false
 		_no.disabled = false
 	_place_list(false)
+	if visible:
+		_reveal_bound_save()
 
 
 func _show_edit_row() -> void:
@@ -555,7 +699,7 @@ func _place_list(invite_open: bool) -> void:
 		_leaderboard_list.offset_top = 700.0
 		_leaderboard_list.offset_bottom = 1120.0
 	else:
-		_leaderboard_list.offset_top = 208.0
+		_leaderboard_list.offset_top = 220.0
 		_leaderboard_list.offset_bottom = 500.0
 
 
@@ -798,6 +942,27 @@ func _release_name_focus() -> void:
 	var viewport := get_viewport()
 	if viewport != null:
 		viewport.gui_release_focus()
+
+
+func _on_not_you_pressed() -> void:
+	# The score already posted stays on the id it was posted to. This only
+	# opens the title rename so the next game can be someone else.
+	var main := get_parent()
+	if main != null and main.has_method("return_to_menu"):
+		main.return_to_menu()
+	if main == null:
+		return
+	var title := main.get_node_or_null("Title")
+	if title != null and title.has_method("open_rename"):
+		title.open_rename()
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if not visible or _not_you == null or not _not_you.visible:
+		return
+	if event.is_action_pressed("change_name"):
+		_on_not_you_pressed()
+		get_viewport().set_input_as_handled()
 
 
 func _on_restart_pressed() -> void:
