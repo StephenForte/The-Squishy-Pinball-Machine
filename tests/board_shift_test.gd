@@ -73,6 +73,8 @@ func _run() -> void:
 		return
 	if not await _case_7_later_waves():
 		return
+	if not await _case_8_other_ball_scores_after_cooldown():
+		return
 
 	print("BOARD_SHIFT PASS cases=%d" % _cases_passed)
 	quit(0)
@@ -337,6 +339,101 @@ func _case_7_later_waves() -> bool:
 		return _fail("case 7: label '%s'" % _board_label.text)
 	_cases_passed += 1
 	print("BOARD_SHIFT case 7 pass")
+	return true
+
+
+func _case_8_other_ball_scores_after_cooldown() -> bool:
+	print("BOARD_SHIFT case 8 second ball during cooldown")
+	_game.restart()
+	await process_frame
+	await _free_balls()
+	_game.add_score(5000)
+	var bonuses := _live_bonuses()
+	if bonuses.size() != 1:
+		return _fail("case 8: bonuses=%d" % bonuses.size())
+	var orb := bonuses[0] as Node2D
+	var worth := int(orb.get("points"))
+	var away := orb.global_position + Vector2(0, 180)
+	var first := await _spawn_ball(away + Vector2(-40, 0))
+	var second := await _spawn_ball(away + Vector2(40, 0))
+	if first == null or second == null:
+		return _fail("case 8: spawn failed")
+	var start := int(_game.score)
+	if not await _overlap_until_score(first, orb, start, worth, "case 8 first"):
+		return false
+	# Keep the first ball on the star so its visit stays open, and park the
+	# second ball on it while the 0.4s cooldown is running.
+	var parked := int(_game.score)
+	_place_ball(second, orb.global_position + Vector2(6, 0))
+	for _i in 12:
+		await physics_frame
+		_place_ball(first, orb.global_position + Vector2(-6, 0))
+		_place_ball(second, orb.global_position + Vector2(6, 0))
+	if int(_game.score) != parked:
+		return _fail("case 8: second ball scored during cooldown +%d" % (int(_game.score) - parked))
+	var paid := false
+	for _i in 80:
+		await physics_frame
+		_place_ball(first, orb.global_position + Vector2(-6, 0))
+		_place_ball(second, orb.global_position + Vector2(6, 0))
+		if int(_game.score) != parked:
+			paid = true
+			break
+	if not paid or int(_game.score) - parked != worth:
+		return _fail("case 8: held second ball +%d expected +%d" % [int(_game.score) - parked, worth])
+	var held := int(_game.score)
+	for _i in 80:
+		await physics_frame
+		_place_ball(first, orb.global_position + Vector2(-6, 0))
+		_place_ball(second, orb.global_position + Vector2(6, 0))
+	if int(_game.score) != held:
+		return _fail("case 8: held overlap scored again +%d" % (int(_game.score) - held))
+
+	# A pass-through that starts and ends during the cooldown still scores.
+	_place_ball(first, away + Vector2(-40, 0))
+	_place_ball(second, away + Vector2(40, 0))
+	for _i in 70:
+		await physics_frame
+	if int(_game.score) != held:
+		return _fail("case 8: leaving scored +%d" % (int(_game.score) - held))
+	if not await _overlap_until_score(first, orb, held, worth, "case 8 return"):
+		return false
+	_place_ball(first, away + Vector2(-40, 0))
+	var cooling := int(_game.score)
+	_place_ball(second, orb.global_position)
+	for _i in 20:
+		await physics_frame
+		_place_ball(first, away + Vector2(-40, 0))
+		_place_ball(second, orb.global_position)
+	_place_ball(second, away + Vector2(40, 0))
+	for _i in 10:
+		await physics_frame
+		_place_ball(first, away + Vector2(-40, 0))
+		_place_ball(second, away + Vector2(40, 0))
+	if int(_game.score) != cooling:
+		return _fail("case 8: pass-through scored during cooldown +%d" % (int(_game.score) - cooling))
+	paid = false
+	for _i in 80:
+		await physics_frame
+		if int(_game.score) != cooling:
+			paid = true
+			break
+	if not paid or int(_game.score) - cooling != worth:
+		return _fail("case 8: pass-through +%d expected +%d" % [int(_game.score) - cooling, worth])
+	_cases_passed += 1
+	print("BOARD_SHIFT case 8 pass")
+	return true
+
+
+func _overlap_until_score(ball: RigidBody2D, orb: Node2D, before: int, worth: int, label: String) -> bool:
+	_place_ball(ball, orb.global_position)
+	for _i in 20:
+		await physics_frame
+		_place_ball(ball, orb.global_position)
+		if int(_game.score) != before:
+			break
+	if int(_game.score) - before != worth:
+		return _fail("%s +%d expected +%d" % [label, int(_game.score) - before, worth])
 	return true
 
 
