@@ -244,7 +244,10 @@ describe('renderBoard', () => {
     assert.doesNotMatch(media.slice(media.lastIndexOf('}') + 1), /animation\s*:/);
     assert.match(style, /Press Start 2P/);
     assert.match(style, /monospace/);
-    assert.match(html, /family=Press\+Start\+2P/);
+    assert.match(style, /@font-face\{font-family:"Press Start 2P"/);
+    assert.match(html, /data:font\/woff2;base64,/);
+    assert.equal(html.includes('fonts.googleapis.com'), false);
+    assert.equal(html.includes('fonts.gstatic.com'), false);
   });
 });
 
