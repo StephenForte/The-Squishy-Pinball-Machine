@@ -1,10 +1,12 @@
 extends StaticBody2D
 
-## Stand-up target. First unlit hit scores 500 and lights; later hits score
-## nothing (D-013). Detection is this node's Area2D, not the ball scene.
+## Stand-up target. First unlit hit scores 500 and lights. A later hit scores
+## a flat 100 and still emits hit (D-061); the 0.12 s cooldown still applies.
+## Detection is this node's Area2D, not the ball scene.
 signal hit
 
 const SCORE := 500
+const LIT_SCORE := 100
 const COOLDOWN_SEC := 0.12
 const COLOR_UNLIT := Color(0.42, 0.48, 0.58, 1)
 const COLOR_LIT := Color(0.95, 0.82, 0.28, 1)
@@ -34,6 +36,10 @@ func _on_sensor_body_entered(body: Node2D) -> void:
 	_cooling = true
 	get_tree().create_timer(COOLDOWN_SEC).timeout.connect(_end_cooldown, CONNECT_ONE_SHOT)
 	if lit:
+		# Re-hit still emits hit so the squishy reacts. The bank ignores it
+		# while _bonus_pending, so this cannot pay the completion bonus again.
+		get_node("/root/Game").add_score(LIT_SCORE)
+		hit.emit()
 		return
 	lit = true
 	_update_visual()
