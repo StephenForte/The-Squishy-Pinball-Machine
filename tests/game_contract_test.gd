@@ -79,7 +79,14 @@ func _case_2_game_over_is_noop() -> bool:
 	_game.score_changed.connect(on_score)
 	_game.streak_changed.connect(on_streak)
 	_game.on_ball_drained()
+	var same_frame := int(_game.balls_left)
 	_game.on_ball_drained()
+	if int(_game.balls_left) != same_frame:
+		_disconnect_over(on_over, on_score, on_streak)
+		return _fail("case 2: same-frame drain consumed a second life (%s→%s)" % [same_frame, _game.balls_left])
+	await physics_frame
+	_game.on_ball_drained()
+	await physics_frame
 	_game.on_ball_drained()
 	if int(_game.state) != int(_game.GAME_OVER):
 		_disconnect_over(on_over, on_score, on_streak)
