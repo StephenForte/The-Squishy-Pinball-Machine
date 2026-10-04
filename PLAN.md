@@ -61,8 +61,8 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T42 | HIGH shows the device's best, not the player's: reconcile with the server's best after boot, claim and submit (D-057) | 12 | **done** 2026-09-27 — merged (PR #48, 8ed0ab0), deployed, verified on the phone | mid | — |
 | T44 | A lit stand-up target scores 100 on every later hit (D-061) | 13 | dispatched; PR #56 open | cheap | — |
 | T45 | Squishies swap to different catalog squishies on each board rotation (D-061) | 13 | dispatched; PR #58 open | mid | — |
-| T46 | Theme cycles through the JSON palettes every 10,000 points, for that game only (D-061) | 13 | dispatched; PR #59 open | mid | — |
-| T47 | Web leaderboard page in a traditional arcade high-score layout (D-061) | 13 | **approved** 2026-10-04 (PR #57, 0dc612c) — merge → confirm server deploy (live h1 → HIGH SCORES) | cheap-mid | — |
+| T46 | Theme cycles through the JSON palettes every 10,000 points, for that game only (D-061) | 13 | **approved** 2026-10-04 (PR #59, 627689a) — awaiting merge + static redeploy | mid | — |
+| T47 | Web leaderboard page in a traditional arcade high-score layout (D-061) | 13 | **done** 2026-10-04 — merged (#57), deployed; Steve: "looks bad" — redesign pending | cheap-mid | — |
 | T43 | An avatar-less device with a refused id is never detected: the boot gap-fill PUT is skipped without an avatar, so its runs still 409 `name_taken` and are lost (D-058 gap, found in T40 review) | 12 | **done** 2026-09-28 — merged (PR #50, b737f41), deployed `dep-dasrkd17lnhs73agq7a0` | cheap-mid | T40 |
 | T41 | Name lookup should be read-only: the title probe POSTs to the creating resolve route and rebuilds its own HTTP path (D-056) | 12 | **done** 2026-09-28 — merged (PR #51, 575e7d3); server `dep-dastu7fpn0mc73a22ug0` live 03:30:14, static live 03:27:34 (before the server; no player traffic in between); lookup verified live | cheap-mid | T40 |
 | T40 | A refused identity (404 then PUT 409 `name_taken`) is never reconciled and silently loses runs: confirm at boot, route game over through the save-your-score invite (D-056, D-058). CORS half closed (D-057) | 12 | **done** 2026-09-27 — merged (PR #49, 597a7e8), deployed `dep-dasqsk0473hc739ip58g` | mid | — |
@@ -1479,3 +1479,17 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   published Press Start 2P files. Mutation probes: unescaped name (3 fail), unescaped rank, 11–13
   ordinal exception, reduced-motion removal, Google link re-added — all caught. Live `/` still shows the
   old heading until the server deploys.
+- 2026-10-04: **T47 live; Steve: "looks bad".** Seen in the browser at 1280 px and 375 px: 8 px body text
+  on phones and 12 px on desktop; a narrow bordered table in ~30% of a black page; a spreadsheet look
+  (grid borders, a header row) instead of arcade rows. The brief specified ingredients (font, colours,
+  columns) but never the composition — the same planner failure as T39's title (D-056). Redesign
+  pending Steve's direction.
+- 2026-10-04: **T46 reviewed — approved** (PR #59, `627689a`). Gate 38 PASS; mutation probes on the
+  saved-vs-active split, the 10,000 interval and the saved-pick fallback all caught. **T45×T46 measured
+  together** in a scratch merge: correct at 5k/10k/15k/20k, direct and in-physics, because
+  `Game.add_score` emits `score_changed` (theme → `_apply_slots_in_tree` resets slots) before
+  `board_shifted` (swap). Positive control: deferring the slot reset → 8/8 squishies back to the
+  originals at 10,000. **Unguarded ordering coupling** — follow-up after both merge: a combined test.
+  One gate run failed `name_lookup_test` (fixed ports 18797–18799), unexplained, green alone and on
+  re-run; likely four parallel workers on one host. Future parallel dispatch: one gate at a time per
+  host, or per-worker ports.
