@@ -488,6 +488,30 @@ describe('admin merge', () => {
       });
       assert.equal(missingPlayer.status, 404);
       assert.equal(missingPlayer.json.error, 'not_found');
+
+      const missingBody = await request(port, 'POST', '/v1/admin/merge', {
+        headers: { 'X-Squish-Admin': ADMIN_KEY },
+      });
+      assert.equal(missingBody.status, 400);
+      assert.equal(missingBody.json.error, 'invalid_json');
+
+      const broken = await request(port, 'POST', '/v1/admin/merge', {
+        headers: { 'X-Squish-Admin': ADMIN_KEY },
+        body: '{not json',
+      });
+      assert.equal(broken.status, 400);
+      assert.equal(broken.json.error, 'invalid_json');
+
+      const huge = await request(port, 'POST', '/v1/admin/merge', {
+        headers: { 'X-Squish-Admin': ADMIN_KEY, 'content-type': 'application/json' },
+        body: JSON.stringify({
+          keep: DAD_KEEP,
+          drop: DAD_PHONE,
+          pad: 'x'.repeat(5000),
+        }),
+      });
+      assert.equal(huge.status, 400);
+      assert.equal(huge.json.error, 'body_too_large');
     }, { adminKey: ADMIN_KEY, allowedOrigins: [ORIGIN] });
   });
 });
