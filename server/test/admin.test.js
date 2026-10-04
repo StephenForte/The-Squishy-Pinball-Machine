@@ -157,6 +157,30 @@ describe('DELETE /v1/scores/:id', () => {
       assert.equal(res.json.error, 'not_found');
     }, { adminKey: ADMIN_KEY });
   });
+
+  it('non-canonical ids are 404 and leave every row in place', async () => {
+    await withServer(async ({ port }) => {
+      await postScore(port, { player_id: NATASHA, name: 'Natasha', score: 1000 });
+      const before = await request(port, 'GET', '/v1/admin/scores', {
+        headers: { 'X-Squish-Admin': ADMIN_KEY },
+      });
+      assert.equal(before.status, 200);
+      assert.equal(before.json.total, 1);
+
+      for (const id of ['0', '01', '-1', '1.5', 'abc']) {
+        const res = await request(port, 'DELETE', `/v1/scores/${id}`, {
+          headers: { 'X-Squish-Admin': ADMIN_KEY },
+        });
+        assert.equal(res.status, 404, id);
+        assert.deepEqual(res.json, { error: 'not_found' });
+      }
+
+      const after = await request(port, 'GET', '/v1/admin/scores', {
+        headers: { 'X-Squish-Admin': ADMIN_KEY },
+      });
+      assert.deepEqual(after.json, before.json);
+    }, { adminKey: ADMIN_KEY });
+  });
 });
 
 describe('DELETE /v1/profile/:player_id', () => {
@@ -217,6 +241,19 @@ describe('POST /v1/admin/reset', () => {
       });
       assert.equal(empty.status, 400);
       assert.equal(empty.json.error, 'confirmation_required');
+
+      const missingBody = await request(port, 'POST', '/v1/admin/reset', {
+        headers: { 'X-Squish-Admin': ADMIN_KEY },
+      });
+      assert.equal(missingBody.status, 400);
+      assert.equal(missingBody.json.error, 'invalid_json');
+
+      const broken = await request(port, 'POST', '/v1/admin/reset', {
+        headers: { 'X-Squish-Admin': ADMIN_KEY },
+        body: '{not json',
+      });
+      assert.equal(broken.status, 400);
+      assert.equal(broken.json.error, 'invalid_json');
 
       const wrong = await request(port, 'POST', '/v1/admin/reset', {
         headers: { 'X-Squish-Admin': ADMIN_KEY },

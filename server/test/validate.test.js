@@ -3,7 +3,9 @@ import { describe, it } from 'node:test';
 import {
   nameKey,
   parseLimit,
+  parseLookupName,
   parseMergeBody,
+  parseOffset,
   parseProfileBody,
   parseResolveBody,
   parseScoreBody,
@@ -57,6 +59,15 @@ describe('parseScoreBody', () => {
     assert.equal(parseScoreBody({ ...good, score: -1 }).error, 'invalid_score');
     assert.equal(parseScoreBody({ ...good, score: 1.5 }).error, 'invalid_score');
   });
+
+  it('rejects a score above the 9_999_999 cap, a missing client, and a non-object', () => {
+    assert.equal(parseScoreBody({ ...good, score: 10_000_000 }).error, 'invalid_score');
+    assert.equal(parseScoreBody({ ...good, score: 9_999_999 }).ok, true);
+    assert.equal(parseScoreBody({ ...good, client: 'other/1.0' }).error, 'invalid_client');
+    assert.equal(parseScoreBody({ player_id: ID, name: 'Natasha', score: 1 }).error, 'invalid_client');
+    assert.equal(parseScoreBody(null).error, 'invalid_json');
+    assert.equal(parseScoreBody([good]).error, 'invalid_json');
+  });
 });
 
 describe('parseProfileBody', () => {
@@ -86,6 +97,8 @@ describe('parseProfileBody', () => {
     assert.equal(parseProfileBody({ ...good, avatar: 'not_a_squishy' }, known).error, 'invalid_avatar');
     assert.equal(parseProfileBody({ ...good, avatar: 1 }, known).error, 'invalid_avatar');
     assert.equal(parseProfileBody({ ...good, client: 'nope' }, known).error, 'invalid_client');
+    assert.equal(parseProfileBody(null, known).error, 'invalid_json');
+    assert.equal(parseProfileBody([good], known).error, 'invalid_json');
   });
 });
 
@@ -130,6 +143,8 @@ describe('parseMergeBody', () => {
     assert.equal(parsed.value.drop, drop);
     assert.equal(parseMergeBody({ keep, drop: keep }).error, 'same_player');
     assert.equal(parseMergeBody({ keep: 'nope', drop }).error, 'invalid_player_id');
+    assert.equal(parseMergeBody(null).error, 'invalid_json');
+    assert.equal(parseMergeBody([keep, drop]).error, 'invalid_json');
   });
 });
 
@@ -140,5 +155,36 @@ describe('parseLimit', () => {
     assert.equal(parseLimit('0'), 1);
     assert.equal(parseLimit('100'), 50);
     assert.equal(parseLimit('5'), 5);
+    assert.equal(parseLimit(null), 10);
+    assert.equal(parseLimit(''), 10);
+    assert.equal(parseLimit(undefined, 7), 7);
+  });
+});
+
+describe('parseOffset', () => {
+  it('omitted is the first page; present values must be a canonical integer ≥ 0', () => {
+    assert.deepEqual(parseOffset(undefined), { ok: true, value: 0 });
+    assert.deepEqual(parseOffset(null), { ok: true, value: 0 });
+    assert.deepEqual(parseOffset('0'), { ok: true, value: 0 });
+    assert.deepEqual(parseOffset('50'), { ok: true, value: 50 });
+    assert.deepEqual(parseOffset(''), { ok: false, error: 'invalid_offset' });
+    assert.deepEqual(parseOffset('-1'), { ok: false, error: 'invalid_offset' });
+    assert.deepEqual(parseOffset('01'), { ok: false, error: 'invalid_offset' });
+    assert.deepEqual(parseOffset('1.5'), { ok: false, error: 'invalid_offset' });
+    assert.deepEqual(parseOffset('abc'), { ok: false, error: 'invalid_offset' });
+    assert.deepEqual(parseOffset(0), { ok: false, error: 'invalid_offset' });
+  });
+});
+
+describe('parseLookupName', () => {
+  it('accepts a display name and rejects empty, missing, and control characters', () => {
+    const parsed = parseLookupName('  Natasha ');
+    assert.equal(parsed.ok, true);
+    assert.equal(parsed.value.name, 'Natasha');
+    assert.equal(parseLookupName('').error, 'invalid_name');
+    assert.equal(parseLookupName('   ').error, 'invalid_name');
+    assert.equal(parseLookupName(null).error, 'invalid_name');
+    assert.equal(parseLookupName(undefined).error, 'invalid_name');
+    assert.equal(parseLookupName('Nat\u0001asha').error, 'invalid_name');
   });
 });

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import { originAllowed, parseAllowedOrigins } from '../src/index.js';
 import { postScore, request, withServer } from './helpers.js';
 
 const ORIGIN_A = 'https://play.example';
@@ -151,5 +152,33 @@ describe('CORS fail-closed (D-044)', () => {
       assert.equal(foreignPreflight.headers.get('access-control-allow-origin'), null);
       assert.equal(corsNames(foreignPreflight.headers).length, 0);
     }, { allowedOrigins: [ORIGIN_A] });
+  });
+});
+
+describe('parseAllowedOrigins and originAllowed', () => {
+  it('splits, trims, and drops empty parts and *', () => {
+    assert.deepEqual(parseAllowedOrigins(undefined), []);
+    assert.deepEqual(parseAllowedOrigins(null), []);
+    assert.deepEqual(parseAllowedOrigins(''), []);
+    assert.deepEqual(parseAllowedOrigins('*'), []);
+    assert.deepEqual(parseAllowedOrigins(' https://a.example , *, https://b.example '), [
+      'https://a.example',
+      'https://b.example',
+    ]);
+    assert.deepEqual(parseAllowedOrigins(['https://a.example', '', '*', 'https://b.example']), [
+      'https://a.example',
+      'https://b.example',
+    ]);
+  });
+
+  it('matches only an exact listed origin', () => {
+    const allowed = parseAllowedOrigins(`${ORIGIN_A}, ${ORIGIN_B}`);
+    assert.equal(originAllowed(ORIGIN_A, allowed), true);
+    assert.equal(originAllowed(ORIGIN_B, allowed), true);
+    assert.equal(originAllowed(FOREIGN, allowed), false);
+    assert.equal(originAllowed('', allowed), false);
+    assert.equal(originAllowed('*', allowed), false);
+    assert.equal(originAllowed(ORIGIN_A, []), false);
+    assert.equal(originAllowed(ORIGIN_A, null), false);
   });
 });

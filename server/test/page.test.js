@@ -32,8 +32,15 @@ describe('relativeTime', () => {
     assert.equal(relativeTime('2026-09-08T17:59:30.000Z', now), 'just now');
     assert.equal(relativeTime('2026-09-08T17:59:00.000Z', now), '1 minute ago');
     assert.equal(relativeTime('2026-09-08T17:40:00.000Z', now), '20 minutes ago');
+    assert.equal(relativeTime('2026-09-08T17:00:00.000Z', now), '1 hour ago');
     assert.equal(relativeTime('2026-09-08T16:00:00.000Z', now), '2 hours ago');
+    assert.equal(relativeTime('2026-09-07T18:00:00.000Z', now), '1 day ago');
     assert.equal(relativeTime('2026-09-06T18:00:00.000Z', now), '2 days ago');
+  });
+
+  it('treats an unparseable or future timestamp as just now', () => {
+    assert.equal(relativeTime('not-a-date', now), 'just now');
+    assert.equal(relativeTime('2026-09-08T19:00:00.000Z', now), 'just now');
   });
 });
 
@@ -48,6 +55,22 @@ describe('renderBoard', () => {
   it('does not throw when entries is missing', () => {
     const html = renderBoard({});
     assert.match(html, /No scores yet/);
+  });
+
+  it('uses the singular player label when total_players is 1', () => {
+    const html = renderBoard({
+      entries: [{
+        rank: 1,
+        player_id: NATASHA,
+        name: 'Natasha',
+        score: 100,
+        at: '2026-09-08T18:00:00.000Z',
+        avatar: '',
+      }],
+      total_players: 1,
+    });
+    assert.match(html, /1 player · /);
+    assert.doesNotMatch(html, /1 players/);
   });
 
   it('emits one same-origin img when avatar is set, and none when empty', () => {

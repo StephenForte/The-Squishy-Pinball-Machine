@@ -111,6 +111,22 @@ function seedPages(path) {
   db.close();
 }
 
+function seedTwoStrays(path) {
+  const db = openSchema(path);
+  const profile = db.prepare(
+    'INSERT INTO profiles (player_id, name, avatar, updated_at, name_key) VALUES (?, ?, ?, ?, ?)',
+  );
+  profile.run(NATASHA, 'Natasha', 'coffee_cuppa', UPDATED, 'natasha');
+  profile.run(DAD, 'Dad', 'dumpling_dottie', UPDATED, 'dad');
+  const score = db.prepare(
+    'INSERT INTO scores (id, player_id, name, score, client, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+  );
+  score.run(3, NATASHA, 'Dad', 5100, 'squish/1.0', STRAY_AT);
+  score.run(11, NATASHA, 'Tasha', 700, 'squish/web', STRAY_AT);
+  score.run(8, DAD, 'Dad', 8000, 'squish/1.0', DAD_AT);
+  db.close();
+}
+
 function seedManyRows(path) {
   const db = openSchema(path);
   const profile = db.prepare(
@@ -564,6 +580,64 @@ describe('POST /v1/admin/scores/:id/relabel', () => {
         assert.deepEqual(readProfiles(path), beforeProfiles);
         assert.equal(after.find((row) => row.id === 8).name, 'Dad');
         assert.equal(after.find((row) => row.id === 9).name, 'Ghost');
+      }, { dbPath: path, adminKey: ADMIN_KEY });
+    });
+  });
+
+  it('does not rewrite the same player\'s other differently-named rows (D-060)', async () => {
+    await withFile('squish-t38-m2-', seedTwoStrays, async (path) => {
+      await withServer(async ({ port }) => {
+        const before = readScores(path);
+        const beforeProfiles = readProfiles(path);
+        assert.equal(before.find((row) => row.id === 3).name, 'Dad');
+        assert.equal(before.find((row) => row.id === 11).name, 'Tasha');
+        assert.equal(before.find((row) => row.id === 11).player_id, NATASHA);
+
+        const relabeled = await request(port, 'POST', '/v1/admin/scores/3/relabel', {
+          headers: { 'X-Squish-Admin': ADMIN_KEY },
+        });
+        assert.equal(relabeled.status, 200);
+        assert.deepEqual(relabeled.json, {
+          ok: true,
+          id: 3,
+          player_id: NATASHA,
+          name_before: 'Dad',
+          name_after: 'Natasha',
+        });
+
+        const after = readScores(path);
+        assert.equal(after.find((row) => row.id === 3).name, 'Natasha');
+        assert.equal(after.find((row) => row.id === 11).name, 'Tasha');
+        assert.equal(after.find((row) => row.id === 11).player_id, NATASHA);
+        assert.equal(after.find((row) => row.id === 8).name, 'Dad');
+        assert.deepEqual(
+          after.find((row) => row.id === 11),
+          before.find((row) => row.id === 11),
+        );
+        assert.deepEqual(readProfiles(path), beforeProfiles);
+      }, { dbPath: path, adminKey: ADMIN_KEY });
+    });
+  });
+
+  it('a row that already matches its profile name is a no-op write of the same name', async () => {
+    await withFile('squish-t38-same-', seedStrayDad, async (path) => {
+      await withServer(async ({ port }) => {
+        const before = readScores(path);
+        const already = before.find((row) => row.id === 4);
+        assert.equal(already.name, 'Natasha');
+
+        const relabeled = await request(port, 'POST', '/v1/admin/scores/4/relabel', {
+          headers: { 'X-Squish-Admin': ADMIN_KEY },
+        });
+        assert.equal(relabeled.status, 200);
+        assert.deepEqual(relabeled.json, {
+          ok: true,
+          id: 4,
+          player_id: NATASHA,
+          name_before: 'Natasha',
+          name_after: 'Natasha',
+        });
+        assert.deepEqual(readScores(path), before);
       }, { dbPath: path, adminKey: ADMIN_KEY });
     });
   });
