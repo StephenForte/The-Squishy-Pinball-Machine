@@ -296,6 +296,14 @@ func _case_saved_binding() -> bool:
 		return false
 	if not _assert_overlap(panel, "saved", _HEADER_SEAM):
 		return false
+	# The current token's attempt already changed the line to "SAVING AS DAD…"
+	# above. An earlier token must not do that after the save has landed.
+	var stale_token := int(_leaderboard._submit_token) - 1
+	_capture_attempt = false
+	_leaderboard.submit_attempted.emit(stale_token, 2)
+	await process_frame
+	if saved.text != expected or not not_you.visible:
+		return _fail("stale retry rewrote '%s' not_you=%s" % [saved.text, not_you.visible])
 	var before := await _score_rows()
 	if before.is_empty() and int(before.get("total", -1)) < 1:
 		return _fail("no score row after 201: %s" % before)

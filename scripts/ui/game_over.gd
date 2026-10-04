@@ -291,6 +291,11 @@ func _on_submitted(result: Dictionary) -> void:
 
 
 func _on_submit_attempted(token: int, _attempt: int) -> void:
+	# Leaderboard emits this for every attempt, including a delayed retry of
+	# an earlier game. submitted only fires for the latest token, so adopting
+	# an older token would replace "SAVED AS" and hide "Not you?" for good.
+	if _leaderboard != null and token != int(_leaderboard._submit_token):
+		return
 	var profile := get_node_or_null("/root/Profile")
 	if profile == null:
 		return
