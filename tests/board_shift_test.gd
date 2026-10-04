@@ -75,6 +75,8 @@ func _run() -> void:
 		return
 	if not await _case_8_other_ball_scores_after_cooldown():
 		return
+	if not await _case_9_return_during_other_cooldown():
+		return
 
 	print("BOARD_SHIFT PASS cases=%d" % _cases_passed)
 	quit(0)
@@ -422,6 +424,68 @@ func _case_8_other_ball_scores_after_cooldown() -> bool:
 		return _fail("case 8: pass-through +%d expected +%d" % [int(_game.score) - cooling, worth])
 	_cases_passed += 1
 	print("BOARD_SHIFT case 8 pass")
+	return true
+
+
+func _case_9_return_during_other_cooldown() -> bool:
+	print("BOARD_SHIFT case 9 return during other cooldown")
+	_game.restart()
+	await process_frame
+	await _free_balls()
+	_game.add_score(5000)
+	var bonuses := _live_bonuses()
+	if bonuses.size() != 1:
+		return _fail("case 9: bonuses=%d" % bonuses.size())
+	var orb := bonuses[0] as Node2D
+	var worth := int(orb.get("points"))
+	var away := orb.global_position + Vector2(0, 180)
+	var first := await _spawn_ball(away + Vector2(-40, 0))
+	var second := await _spawn_ball(away + Vector2(40, 0))
+	if first == null or second == null:
+		return _fail("case 9: spawn failed")
+	var start := int(_game.score)
+	if not await _overlap_until_score(first, orb, start, worth, "case 9 first"):
+		return false
+	var after_first := int(_game.score)
+	for _i in 70:
+		await physics_frame
+		_place_ball(first, orb.global_position)
+	if int(_game.score) != after_first:
+		return _fail("case 9: first ball scored again +%d" % (int(_game.score) - after_first))
+	if not await _overlap_until_score(second, orb, after_first, worth, "case 9 second"):
+		return false
+	var during_second := int(_game.score)
+	_place_ball(first, away)
+	for _i in 10:
+		await physics_frame
+		_place_ball(first, away)
+		_place_ball(second, orb.global_position)
+	_place_ball(first, orb.global_position)
+	for _i in 12:
+		await physics_frame
+		_place_ball(first, orb.global_position)
+		_place_ball(second, orb.global_position)
+	if int(_game.score) != during_second:
+		return _fail("case 9: return scored during other cooldown +%d" % (int(_game.score) - during_second))
+	var paid := false
+	for _i in 80:
+		await physics_frame
+		_place_ball(first, orb.global_position)
+		_place_ball(second, orb.global_position)
+		if int(_game.score) != during_second:
+			paid = true
+			break
+	if not paid or int(_game.score) - during_second != worth:
+		return _fail("case 9: return visit +%d expected +%d" % [int(_game.score) - during_second, worth])
+	var held := int(_game.score)
+	for _i in 70:
+		await physics_frame
+		_place_ball(first, orb.global_position)
+		_place_ball(second, orb.global_position)
+	if int(_game.score) != held:
+		return _fail("case 9: held return scored again +%d" % (int(_game.score) - held))
+	_cases_passed += 1
+	print("BOARD_SHIFT case 9 pass")
 	return true
 
 

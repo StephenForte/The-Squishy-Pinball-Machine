@@ -5,8 +5,9 @@ extends Area2D
 ##
 ## COOLDOWN_SEC spaces awards. A ball that arrives during that window is
 ## recorded immediately and paid when the timer ends, including a visit that
-## has already left the star. The ball just paid is not queued again if it
-## flickers out and back during the cooldown.
+## has already left the star. Each ball ignores its own flicker re-entry for
+## COOLDOWN_SEC after it was paid. That window belongs to the ball, so a later
+## visit during some other ball's cooldown is still queued.
 
 const RADIUS := 22.0
 const COOLDOWN_SEC := 0.4
@@ -18,8 +19,8 @@ var _cooling: bool = false
 var _inside: Dictionary = {}
 ## Visits that have not been paid yet.
 var _pending: Dictionary = {}
-## Instance ids paid for an overlap that is still inside the debounce window.
-var _awarded: Dictionary = {}
+## Instance ids that cannot open a new visit until their own award window ends.
+var _suppress: Dictionary = {}
 
 
 func _ready() -> void:
@@ -52,54 +53,50 @@ func _on_body_entered(body: Node2D) -> void:
 	if _inside.has(id):
 		return
 	_inside[id] = true
-	# A re-entry of the ball we just paid is the same visit until it leaves
-	# after the cooldown. Other balls are queued even while cooling.
-	if _awarded.has(id):
+	# This ball's own award window. Another ball's cooldown must not swallow
+	# a later visit, so suppression is not the global cooling flag.
+	if _suppress.has(id):
 		return
 	_pending[id] = true
 	_pay_next()
 
 
 func _on_body_exited(body: Node2D) -> void:
-	var id := body.get_instance_id()
-	_inside.erase(id)
-	if _cooling:
-		return
-	_pending.erase(id)
-	_awarded.erase(id)
+	# Leave _pending set. A visit that ends during the global cooldown still pays.
+	_inside.erase(body.get_instance_id())
 
 
 func _end_cooldown() -> void:
 	if not is_inside_tree():
 		return
 	_cooling = false
-	var finished: Array = []
-	for id in _awarded.keys():
-		if not _inside.has(id):
-			finished.append(id)
-	for id in finished:
-		_awarded.erase(id)
 	_pay_next()
+
+
+func _release_suppress(id: int) -> void:
+	_suppress.erase(id)
 
 
 func _pay_next() -> void:
 	if _cooling:
 		return
 	for id in _pending.keys():
-		if _awarded.has(id):
-			_pending.erase(id)
+		var key := int(id)
+		if _suppress.has(key):
+			_pending.erase(key)
 			continue
-		_pending.erase(id)
-		if _inside.has(id):
-			_awarded[id] = true
+		_pending.erase(key)
+		_suppress[key] = true
 		_cooling = true
 		var game := get_node_or_null("/root/Game")
 		if game != null and game.has_method("add_score"):
 			game.add_score(points)
 		var tree := get_tree()
 		if tree != null:
+			tree.create_timer(COOLDOWN_SEC).timeout.connect(_release_suppress.bind(key), CONNECT_ONE_SHOT)
 			tree.create_timer(COOLDOWN_SEC).timeout.connect(_end_cooldown, CONNECT_ONE_SHOT)
 		else:
+			_suppress.erase(key)
 			_cooling = false
 		return
 
