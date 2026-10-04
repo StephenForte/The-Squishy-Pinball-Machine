@@ -59,9 +59,10 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T37 | Client: typing a name claims that player; remove the transfer/restore UI entirely (D-053) | 11 | **done** 2026-09-27 — merged, deployed; phone claimed Dad and posted two scores to the right player | mid | T36 |
 | T39 | **Title screen is colliding and oversized:** field on top of the title, Play over the HUD; plus the welcome-back confirm (D-056) | 12 | **done** — reviewed, approved and merged 2026-09-27 (PR #47, 61ffdad) | mid | — |
 | T42 | HIGH shows the device's best, not the player's: reconcile with the server's best after boot, claim and submit (D-057) | 12 | **done** 2026-09-27 — merged (PR #48, 8ed0ab0), deployed, verified on the phone | mid | — |
-| T44 | A lit stand-up target scores 100 on every later hit (D-061) | 13 | dispatched; PR #56 open | cheap | — |
-| T45 | Squishies swap to different catalog squishies on each board rotation (D-061) | 13 | **approved** 2026-10-04 (PR #58, 44192fd) — awaiting merge + static redeploy | mid | — |
-| T46 | Theme cycles through the JSON palettes every 10,000 points, for that game only (D-061) | 13 | **approved** 2026-10-04 (PR #59, 627689a) — awaiting merge + static redeploy | mid | — |
+| T44 | A lit stand-up target scores 100 on every later hit (D-061) | 13 | **approved** 2026-10-04 (PR #56, 74027b0) — awaiting merge + static redeploy | cheap | — |
+| T45 | Squishies swap to different catalog squishies on each board rotation (D-061) | 13 | **done** 2026-10-04 — merged (#58), deployed | mid | — |
+| T46 | Theme cycles through the JSON palettes every 10,000 points, for that game only (D-061) | 13 | **done** 2026-10-04 — merged (#59), deployed | mid | — |
+| T49 | Squishy swap: a fresh random seed per game; key "previous" on the assigned ids; one combined T45+T46 test (D-061) | 13 | brief written, not dispatched | cheap-mid | — |
 | T48 | Web high-score page: same layout, much bigger — measured sizes (D-061 amendment) | 13 | **cancelled** 2026-10-04 — planner misread "looks bad a$$" (it meant good); never dispatched | cheap-mid | T47 |
 | T47 | Web leaderboard page in a traditional arcade high-score layout (D-061) | 13 | **done** 2026-10-04 — merged (#57), deployed; Steve likes it | cheap-mid | — |
 | T43 | An avatar-less device with a refused id is never detected: the boot gap-fill PUT is skipped without an avatar, so its runs still 409 `name_taken` and are lost (D-058 gap, found in T40 review) | 12 | **done** 2026-09-28 — merged (PR #50, b737f41), deployed `dep-dasrkd17lnhs73agq7a0` | cheap-mid | T40 |
@@ -1508,3 +1509,12 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   seed, not by construction. Follow-up after both merge (with the #59 ordering coupling): a combined
   test, and key the swap's "previous" on `_assigned_squishy_ids`. **Design choice for Steve:** the seed
   is fixed in production (61061), so every game shows the same squishy sequence.
+- 2026-10-04: #58 and #59 merged (main `857eb10`) and redeployed. Steve: **random seed per game** → T49
+  (with the combined T45+T46 test and keying "no repeat" on `_assigned_squishy_ids`).
+- 2026-10-04: **T44 reviewed — approved** (PR #56, `74027b0`), gate on main+T44 **40 PASS**. Probes: old
+  rule, bank guard removed (+2600 / +5200 double bonus), cooldown skipped — all caught. Worker finding:
+  the old `scoring_test` "lit target +0" check ran inside the cooldown and was vacuous.
+- 2026-10-04: **Bug report (Steve):** a new personal best does not show on the board. Measured: all 23
+  `POST /v1/scores` today returned 201 (iPhone and Chromebook); board shows Dad 39,300 at 14:53 UTC and
+  no new player. So no score above 39,300 reached the server as Dad. Rows requested from Steve (admin
+  listing) before any diagnosis. Tasks through **T49**, next free **T50**.
