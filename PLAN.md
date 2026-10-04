@@ -59,10 +59,10 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T37 | Client: typing a name claims that player; remove the transfer/restore UI entirely (D-053) | 11 | **done** 2026-09-27 — merged, deployed; phone claimed Dad and posted two scores to the right player | mid | T36 |
 | T39 | **Title screen is colliding and oversized:** field on top of the title, Play over the HUD; plus the welcome-back confirm (D-056) | 12 | **done** — reviewed, approved and merged 2026-09-27 (PR #47, 61ffdad) | mid | — |
 | T42 | HIGH shows the device's best, not the player's: reconcile with the server's best after boot, claim and submit (D-057) | 12 | **done** 2026-09-27 — merged (PR #48, 8ed0ab0), deployed, verified on the phone | mid | — |
-| T44 | A lit stand-up target scores 100 on every later hit (D-061) | 13 | brief written, not dispatched | cheap | — |
-| T45 | Squishies swap to different catalog squishies on each board rotation (D-061) | 13 | brief written, not dispatched | mid | — |
-| T46 | Theme cycles through the JSON palettes every 10,000 points, for that game only (D-061) | 13 | brief written, not dispatched | mid | — |
-| T47 | Web leaderboard page in a traditional arcade high-score layout (D-061) | 13 | brief written, not dispatched | cheap-mid | — |
+| T44 | A lit stand-up target scores 100 on every later hit (D-061) | 13 | dispatched; PR #56 open | cheap | — |
+| T45 | Squishies swap to different catalog squishies on each board rotation (D-061) | 13 | dispatched; PR #58 open | mid | — |
+| T46 | Theme cycles through the JSON palettes every 10,000 points, for that game only (D-061) | 13 | dispatched; PR #59 open | mid | — |
+| T47 | Web leaderboard page in a traditional arcade high-score layout (D-061) | 13 | **approved** 2026-10-04 (PR #57, 0dc612c) — merge → confirm server deploy (live h1 → HIGH SCORES) | cheap-mid | — |
 | T43 | An avatar-less device with a refused id is never detected: the boot gap-fill PUT is skipped without an avatar, so its runs still 409 `name_taken` and are lost (D-058 gap, found in T40 review) | 12 | **done** 2026-09-28 — merged (PR #50, b737f41), deployed `dep-dasrkd17lnhs73agq7a0` | cheap-mid | T40 |
 | T41 | Name lookup should be read-only: the title probe POSTs to the creating resolve route and rebuilds its own HTTP path (D-056) | 12 | **done** 2026-09-28 — merged (PR #51, 575e7d3); server `dep-dastu7fpn0mc73a22ug0` live 03:30:14, static live 03:27:34 (before the server; no player traffic in between); lookup verified live | cheap-mid | T40 |
 | T40 | A refused identity (404 then PUT 409 `name_taken`) is never reconciled and silently loses runs: confirm at boot, route game over through the save-your-score invite (D-056, D-058). CORS half closed (D-057) | 12 | **done** 2026-09-27 — merged (PR #49, 597a7e8), deployed `dep-dasqsk0473hc739ip58g` | mid | — |
@@ -1472,3 +1472,10 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   the host before any worker runs the gate.
 - 2026-10-04: **Four features → D-061, T44–T47**, all four in parallel (disjoint files, separate
   clones). State: decisions through **D-061**, next free **D-062**; tasks through **T47**, next free **T48**.
+- 2026-10-04: **T47 reviewed — approved, merge as-is** (PR #57, head `0dc612c`, base `c915989` = main).
+  Server **123/123**, Godot **37 PASS**. **Planner error:** the brief allowed a Google Fonts `<link>`,
+  contradicting D-026/D-037 (no third-party assets); Bugbot caught it on `1eb560a`, worker embedded the
+  font in `0dc612c`. Verified the five base64 woff2 blobs are byte-identical (SHA-256 set) to Google's
+  published Press Start 2P files. Mutation probes: unescaped name (3 fail), unescaped rank, 11–13
+  ordinal exception, reduced-motion removal, Google link re-added — all caught. Live `/` still shows the
+  old heading until the server deploys.
