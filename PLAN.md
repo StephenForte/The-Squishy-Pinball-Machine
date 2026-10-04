@@ -60,7 +60,7 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T39 | **Title screen is colliding and oversized:** field on top of the title, Play over the HUD; plus the welcome-back confirm (D-056) | 12 | **done** — reviewed, approved and merged 2026-09-27 (PR #47, 61ffdad) | mid | — |
 | T42 | HIGH shows the device's best, not the player's: reconcile with the server's best after boot, claim and submit (D-057) | 12 | **done** 2026-09-27 — merged (PR #48, 8ed0ab0), deployed, verified on the phone | mid | — |
 | T44 | A lit stand-up target scores 100 on every later hit (D-061) | 13 | dispatched; PR #56 open | cheap | — |
-| T45 | Squishies swap to different catalog squishies on each board rotation (D-061) | 13 | dispatched; PR #58 open | mid | — |
+| T45 | Squishies swap to different catalog squishies on each board rotation (D-061) | 13 | **approved** 2026-10-04 (PR #58, 44192fd) — awaiting merge + static redeploy | mid | — |
 | T46 | Theme cycles through the JSON palettes every 10,000 points, for that game only (D-061) | 13 | **approved** 2026-10-04 (PR #59, 627689a) — awaiting merge + static redeploy | mid | — |
 | T48 | Web high-score page: same layout, much bigger — measured sizes (D-061 amendment) | 13 | **cancelled** 2026-10-04 — planner misread "looks bad a$$" (it meant good); never dispatched | cheap-mid | T47 |
 | T47 | Web leaderboard page in a traditional arcade high-score layout (D-061) | 13 | **done** 2026-10-04 — merged (#57), deployed; Steve likes it | cheap-mid | — |
@@ -1499,3 +1499,12 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
 - 2026-10-04: **Correction.** Steve: "you misinterpreted my comment, I thought it looked good". T48 is
   cancelled (never dispatched) and the D-061 sizing amendment is withdrawn. The T47 entry above that
   says "looks bad" — "redesign pending" is superseded: the page stands as shipped.
+- 2026-10-04: Steve reported #59 merged; GitHub shows **#59 open, merged=false**. Raised with him.
+- 2026-10-04: **T45 reviewed — approved** (PR #58, `44192fd`), gate re-run on current main `49010f5` +
+  T45: **38 PASS**. Mutation probes (keep id / duplicates / no restore) all caught. **Main + T45 + T46**
+  scratch build: 20 rotations to 100,000 → 0 repeated hosts, 0 duplicates; positive control (swap
+  disabled) → 160 repeats. Latent: the swap avoids the ids *currently* shown, which at 10,000 milestones
+  T46 has just reset to `first_table_slots`, so "no repeat of the previous rotation" holds by the fixed
+  seed, not by construction. Follow-up after both merge (with the #59 ordering coupling): a combined
+  test, and key the swap's "previous" on `_assigned_squishy_ids`. **Design choice for Steve:** the seed
+  is fixed in production (61061), so every game shows the same squishy sequence.
