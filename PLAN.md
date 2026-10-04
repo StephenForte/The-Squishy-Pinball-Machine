@@ -59,10 +59,14 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T37 | Client: typing a name claims that player; remove the transfer/restore UI entirely (D-053) | 11 | **done** 2026-09-27 — merged, deployed; phone claimed Dad and posted two scores to the right player | mid | T36 |
 | T39 | **Title screen is colliding and oversized:** field on top of the title, Play over the HUD; plus the welcome-back confirm (D-056) | 12 | **done** — reviewed, approved and merged 2026-09-27 (PR #47, 61ffdad) | mid | — |
 | T42 | HIGH shows the device's best, not the player's: reconcile with the server's best after boot, claim and submit (D-057) | 12 | **done** 2026-09-27 — merged (PR #48, 8ed0ab0), deployed, verified on the phone | mid | — |
+| T44 | A lit stand-up target scores 100 on every later hit (D-061) | 13 | brief written, not dispatched | cheap | — |
+| T45 | Squishies swap to different catalog squishies on each board rotation (D-061) | 13 | brief written, not dispatched | mid | — |
+| T46 | Theme cycles through the JSON palettes every 10,000 points, for that game only (D-061) | 13 | brief written, not dispatched | mid | — |
+| T47 | Web leaderboard page in a traditional arcade high-score layout (D-061) | 13 | brief written, not dispatched | cheap-mid | — |
 | T43 | An avatar-less device with a refused id is never detected: the boot gap-fill PUT is skipped without an avatar, so its runs still 409 `name_taken` and are lost (D-058 gap, found in T40 review) | 12 | **done** 2026-09-28 — merged (PR #50, b737f41), deployed `dep-dasrkd17lnhs73agq7a0` | cheap-mid | T40 |
 | T41 | Name lookup should be read-only: the title probe POSTs to the creating resolve route and rebuilds its own HTTP path (D-056) | 12 | **done** 2026-09-28 — merged (PR #51, 575e7d3); server `dep-dastu7fpn0mc73a22ug0` live 03:30:14, static live 03:27:34 (before the server; no player traffic in between); lookup verified live | cheap-mid | T40 |
 | T40 | A refused identity (404 then PUT 409 `name_taken`) is never reconciled and silently loses runs: confirm at boot, route game over through the save-your-score invite (D-056, D-058). CORS half closed (D-057) | 12 | **done** 2026-09-27 — merged (PR #49, 597a7e8), deployed `dep-dasqsk0473hc739ip58g` | mid | — |
-| T38 | Name holders are undiagnosable: resolve hides the blocker, admin scores caps at 50 with no paging, and a score row locks a name forever (D-055) | 11 | **approved** 2026-09-28 (PR #52, 936c079) — merge → confirm server deploy (holders route 404 → 401 without key) | mid | — |
+| T38 | Name holders are undiagnosable: resolve hides the blocker, admin scores caps at 50 with no paging, and a score row locks a name forever (D-055) | 11 | **done** 2026-09-28 — merged (PR #52, ea0c508); server live (holders 401 without key, verified 2026-10-04) | mid | — |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8 → T10 → T9 →
 **Phase 5:** T11 ∥ T12 → T11.1 (deploy) → T13.
@@ -1459,3 +1463,12 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   the fixture gives that player no second differently-named row. Shipped code is correct (`WHERE id`);
   recorded as a test-strength fact, not a defect. `admin.test.js` ADMIN_PATHS addition = strengthening.
   Production holders route 404 pre-merge; expect 401 (no key) once deployed.
+- 2026-10-04: **Merged without planner review:** PR #53 (test coverage: relabel, catalogs, Game
+  contract), PR #54 (board shift + bonus stars every 5,000), PR #55 (per-ball star cooldown). Not
+  reviewed here; recorded so a fresh session does not assume they were. Main `5becacc`.
+- 2026-10-04: **Gate fails on this Mac, not in the code.** macOS 27.0.1 dropped x86_64 support;
+  `/usr/local/bin/python3` (Intel Homebrew python@3.14) → "Bad CPU type" → `export_web_test` case 2.
+  With `/usr/bin/python3` first on PATH: Godot **37 PASS** (55 s); server **117/117**. Must be fixed on
+  the host before any worker runs the gate.
+- 2026-10-04: **Four features → D-061, T44–T47**, all four in parallel (disjoint files, separate
+  clones). State: decisions through **D-061**, next free **D-062**; tasks through **T47**, next free **T48**.
