@@ -69,7 +69,7 @@ answer a preflight.
 
 ## Routes (D-026, amended by D-037, D-044, D-046, D-047, D-059, D-060)
 
-- `GET /` → HTML top-10 board (same data as `/v1/leaderboard`; `Cache-Control: no-store`). Each row's avatar is a same-origin `<img src="/avatars/<id>.png">` when set.
+- `GET /` → HTML top-10 arcade high-score table (D-061): black background, neon, embedded Press Start 2P with a monospace fallback (no third-party request), columns RANK / NAME / SCORE (ordinal ranks; no relative-time column). Same data as `/v1/leaderboard`; `Cache-Control: no-store`. Each row's avatar is a same-origin `<img src="/avatars/<id>.png">` when set.
 - `GET /healthz` → `{ ok, store }` (`memory` when `DB_PATH=:memory:`, otherwise `sqlite`)
 - `POST /v1/scores` → `201` `{ rank, best, is_personal_best, total_players }`
 - `GET /v1/leaderboard?limit=10` → `{ entries, total_players }` (limit 1..50). Each entry includes `avatar` (`""` when the player has no profile).
