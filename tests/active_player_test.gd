@@ -142,6 +142,8 @@ func _case_hud() -> bool:
 		return _fail("hud: name colour %s is not text_primary %s" % [name_label.get_theme_color("font_color"), primary])
 	if not _assert_overlap(hud, "named-idle", _HUD_SEAM):
 		return false
+	if not _assert_name_clears_playfield(name_label, "named-idle"):
+		return false
 	_profile.call("set_name", "Mom")
 	await process_frame
 	if name_label.text != "Mom" or not name_label.visible:
@@ -155,6 +157,8 @@ func _case_hud() -> bool:
 		return _fail("hud: streak label did not show")
 	if not _assert_overlap(hud, "streak", _HUD_SEAM):
 		return false
+	if not _assert_name_clears_playfield(name_label, "streak"):
+		return false
 	_game.streak_changed.emit(0)
 	await process_frame
 	_game.board_shifted.emit(1, 2, 400)
@@ -163,6 +167,8 @@ func _case_hud() -> bool:
 	if board == null or not board.visible:
 		return _fail("hud: board label did not show")
 	if not _assert_overlap(hud, "board", _HUD_SEAM):
+		return false
+	if not _assert_name_clears_playfield(name_label, "board"):
 		return false
 	_game.board_shifted.emit(0, 0, 0)
 	await process_frame
@@ -173,6 +179,8 @@ func _case_hud() -> bool:
 	if not _assert_one_line(name_label, "hud sixteen-char"):
 		return false
 	if not _assert_overlap(hud, "sixteen-char", _HUD_SEAM):
+		return false
+	if not _assert_name_clears_playfield(name_label, "sixteen-char"):
 		return false
 	_profile.call("set_name", "")
 	await process_frame
@@ -396,6 +404,67 @@ func _case_offline() -> bool:
 		return _fail("failed save wrote a row\nbefore %s\nafter %s" % [_row_key(before), _row_key(after)])
 	_cases_passed += 1
 	print("ACTIVE_PLAYER case offline pass")
+	return true
+
+
+## Glyphs plus the outline, in viewport space. The control box is wider than
+## the text, so the box clearing a star does not mean the name does.
+func _drawn_text_rect(label: Label) -> Rect2:
+	var box := label.get_global_rect()
+	var font := label.get_theme_font("font")
+	var font_size := label.get_theme_font_size("font_size")
+	var text_size := font.get_string_size(label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size)
+	var origin := box.position
+	match label.horizontal_alignment:
+		HORIZONTAL_ALIGNMENT_CENTER:
+			origin.x += (box.size.x - text_size.x) * 0.5
+		HORIZONTAL_ALIGNMENT_RIGHT:
+			origin.x += box.size.x - text_size.x
+	match label.vertical_alignment:
+		VERTICAL_ALIGNMENT_CENTER:
+			origin.y += (box.size.y - text_size.y) * 0.5
+		VERTICAL_ALIGNMENT_BOTTOM:
+			origin.y += box.size.y - text_size.y
+	var outline := float(label.get_theme_constant("outline_size"))
+	return Rect2(origin - Vector2(outline, outline), text_size + Vector2(outline, outline) * 2.0)
+
+
+func _rect_hits_circle(rect: Rect2, center: Vector2, radius: float) -> bool:
+	var closest := Vector2(
+		clampf(center.x, rect.position.x, rect.end.x),
+		clampf(center.y, rect.position.y, rect.end.y)
+	)
+	return closest.distance_squared_to(center) <= radius * radius
+
+
+func _assert_name_clears_playfield(label: Label, state_name: String) -> bool:
+	var table := _main.get_node_or_null("Table")
+	if table == null:
+		return _fail("playfield %s: Table missing" % state_name)
+	var font := label.get_theme_font("font")
+	if font == null:
+		return _fail("playfield %s: no font" % state_name)
+	var rect := _drawn_text_rect(label)
+	var radius := float(load("res://scripts/bonus_orb.gd").RADIUS)
+	var slots: Array = table.BONUS_SLOTS
+	for i in slots.size():
+		var center: Vector2 = table.to_global(slots[i])
+		if _rect_hits_circle(rect, center, radius):
+			return _fail(
+				"playfield %s: name %s hits bonus slot %d at %s r=%.0f"
+				% [state_name, rect, i, center, radius]
+			)
+	var homes: Array = table._homes
+	var hosts: Array = table._hosts
+	if homes.is_empty() or homes.size() != hosts.size():
+		return _fail("playfield %s: homes %d hosts %d" % [state_name, homes.size(), hosts.size()])
+	for i in homes.size():
+		var host := hosts[i] as Node2D
+		var home: Vector2 = homes[i]
+		var global_home := host.global_position - host.position + home
+		if rect.has_point(global_home):
+			return _fail("playfield %s: name %s covers home %d at %s" % [state_name, rect, i, global_home])
+	print("ACTIVE_PLAYER playfield %s clear text_rect=%s" % [state_name, rect])
 	return true
 
 
