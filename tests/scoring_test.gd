@@ -164,14 +164,17 @@ func _case_2_targets() -> bool:
 			return _fail(
 				"case 2: target %d expected +500, got +%d" % [i, _game.score - before_partial]
 			)
+		# The re-drive used to land inside the 0.12 s cooldown, so "expected 0"
+		# never saw a lit-target score. Wait it out, then expect +100 (D-061).
+		await create_timer(0.15).timeout
 		var mid_partial: int = _game.score
 		if not await _drive_into_target(partial):
 			_bank.all_targets_hit.disconnect(on_bonus)
 			return false
-		if _game.score != mid_partial:
+		if _game.score - mid_partial != 100:
 			_bank.all_targets_hit.disconnect(on_bonus)
 			return _fail(
-				"case 2: lit target %d scored +%d, expected 0" % [i, _game.score - mid_partial]
+				"case 2: lit target %d scored +%d, expected 100" % [i, _game.score - mid_partial]
 			)
 	if bonus_emits[0] != 0:
 		_bank.all_targets_hit.disconnect(on_bonus)
@@ -192,14 +195,15 @@ func _case_2_targets() -> bool:
 				return _fail(
 					"case 2: target %d expected +500, got +%d" % [i, _game.score - before]
 				)
+		await create_timer(0.15).timeout
 		var mid: int = _game.score
 		if not await _drive_into_target(target):
 			_bank.all_targets_hit.disconnect(on_bonus)
 			return false
-		if _game.score != mid:
+		if _game.score - mid != 100:
 			_bank.all_targets_hit.disconnect(on_bonus)
 			return _fail(
-				"case 2: lit target %d scored +%d, expected 0" % [i, _game.score - mid]
+				"case 2: lit target %d scored +%d, expected 100" % [i, _game.score - mid]
 			)
 
 	if bonus_emits[0] != 1:
