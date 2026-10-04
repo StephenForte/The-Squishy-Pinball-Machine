@@ -10,6 +10,9 @@ signal high_score_changed(player_id: String, value: int)
 signal streak_changed(streak: int)
 signal big_score_reached(score: int)
 signal supercharged()
+## wave, how many bonus spots are live, points each spot awards.
+## Emitted when score crosses another multiple of BOARD_SHIFT_EVERY.
+signal board_shifted(wave: int, bonus_count: int, bonus_points: int)
 
 const SAVE_PATH := "user://highscore.save"
 const BALLS_PER_GAME := 3
@@ -17,6 +20,10 @@ const STREAK_WINDOW_SEC := 2.0
 const STREAK_CAP := 5
 const BUMPER_POINTS := 100
 const BIG_SCORE_THRESHOLD := 10000
+const BOARD_SHIFT_EVERY := 5000
+const BOARD_BONUS_CAP := 4
+const BOARD_BONUS_BASE := 1000
+const BOARD_BONUS_STEP := 500
 
 enum { READY, PLAYING, GAME_OVER }
 
@@ -36,6 +43,7 @@ var _drain_frame: int = -1
 var _streak_remaining: float = 0.0
 var _big_score_emitted: bool = false
 var _supercharged_emitted: bool = false
+var board_wave: int = 0
 
 
 func _ready() -> void:
@@ -52,6 +60,7 @@ func add_score(points: int) -> void:
 	score += points
 	score_changed.emit(score)
 	print("Game score_changed score=%d" % score)
+	_advance_board_wave()
 	if not _big_score_emitted and score >= BIG_SCORE_THRESHOLD:
 		_big_score_emitted = true
 		big_score_reached.emit(score)
@@ -119,14 +128,41 @@ func _process(delta: float) -> void:
 		_clear_streak()
 
 
+func bonus_offer(wave: int) -> Dictionary:
+	var count := mini(maxi(wave, 0), BOARD_BONUS_CAP)
+	var extra := maxi(0, wave - BOARD_BONUS_CAP)
+	return {
+		"count": count,
+		"points": BOARD_BONUS_BASE + BOARD_BONUS_STEP * extra,
+	}
+
+
+func _advance_board_wave() -> void:
+	var wave := int(score / BOARD_SHIFT_EVERY)
+	if wave <= board_wave:
+		return
+	board_wave = wave
+	var offer := bonus_offer(wave)
+	board_shifted.emit(wave, int(offer["count"]), int(offer["points"]))
+	print(
+		"Game board_shifted wave=%d bonuses=%d points=%d"
+		% [wave, int(offer["count"]), int(offer["points"])]
+	)
+
+
 func _reset_run() -> void:
+	var previous_wave := board_wave
 	score = 0
 	balls_left = BALLS_PER_GAME
 	state = READY
 	_drain_frame = -1
 	_big_score_emitted = false
 	_supercharged_emitted = false
+	board_wave = 0
 	_clear_streak()
+	if previous_wave != 0:
+		board_shifted.emit(0, 0, 0)
+		print("Game board_shifted wave=0 bonuses=0 points=0")
 
 
 func _clear_streak() -> void:
