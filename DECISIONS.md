@@ -1401,3 +1401,13 @@ is fine, the host is not.
   it looked good. The sizing amendment above and T48 are cancelled. T47's page stands as shipped.
   Lesson: when operator feedback is slang or ambiguous, ask what it means before diagnosing — the
   "diagnosis" here was real measurement attached to a problem nobody had.
+
+## D-062 — The active player is visible during play and at game over (Steve, 2026-10-04)
+Natasha played on Steve's iPhone; the phone stayed Natasha, and nine of Steve's games (14:55–20:03 UTC)
+posted under her id while he believed he was setting a personal best as Dad. No code defect: the
+device keeps the last confirmed player (D-053). The gap is that the active player was shown only on
+the title. **Rule:** during play the HUD shows the active player's name; at game over the result line
+says which player the score was saved to ("SAVED AS DAD", then the rank), and a "Not you?" control
+returns to the title with the rename entry open. A score already saved stays with the player it was
+saved to — moving a posted score is out of scope (the admin relabel, D-060, only rewrites a row to its
+own player's name). An unnamed run shows no name (D-049 is unchanged: it is not posted).
