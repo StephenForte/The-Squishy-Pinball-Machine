@@ -1,8 +1,10 @@
 extends SceneTree
 
 ## D-061 / T45. Each board presentation with wave > 0 gives every host a new
-## catalog squishy. Wave 0 restores the scene ids. The draw uses table.gd's
-## fixed SQUISHY_SWAP_SEED, reseeded on wave 0.
+## catalog squishy. Wave 0 restores the scene ids. The draw is pinned with
+## table.squishy_seed_override (T49). Production leaves that unset and draws
+## a fresh seed on every wave 0; cases 4, 6, and 7 compare two restarts, which
+## only match when the seed is pinned.
 
 const HOST_PATHS: Array[String] = [
 	"Bumper1",
@@ -51,6 +53,9 @@ func _run() -> void:
 	if _host_count() != HOST_PATHS.size():
 		_fail("hosts=%d" % _host_count())
 		return
+	# Was the constant SQUISHY_SWAP_SEED inside table.gd. The pin lives here
+	# now so a real run is not stuck on one sequence.
+	_table.set("squishy_seed_override", 61061)
 
 	if not await _case_1_first_rotation():
 		return
@@ -245,7 +250,7 @@ func _case_5_palette_keeps_ids() -> bool:
 
 
 func _case_6_seed_repeats() -> bool:
-	print("SQUISHY_SWAP case 6 fixed seed repeats")
+	print("SQUISHY_SWAP case 6 pinned seed repeats")
 	var first := await _ten_rotations()
 	if first.is_empty():
 		return false

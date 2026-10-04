@@ -28,9 +28,6 @@ const BONUS_SLOTS: Array[Vector2] = [
 	Vector2(330, 860),
 ]
 const SHOVE_RADIUS := 64.0
-## One catalog draw per board presentation (D-061). Reseeded on wave 0 so a
-## restarted run repeats. Tests rely on this fixed seed.
-const SQUISHY_SWAP_SEED := 61061
 
 var _supercharge_generation: int = 0
 var _layout_token: int = 0
@@ -38,6 +35,12 @@ var _hosts: Array[Node2D] = []
 var _homes: Array[Vector2] = []
 var _orbs: Array = []
 var _squishy_rng := RandomNumberGenerator.new()
+## Draws the per-run seed. Separate from _squishy_rng so a wave-0 reseed does
+## not continue the previous run's shuffle.
+var _seed_rng := RandomNumberGenerator.new()
+## When set to an int, wave 0 reseeds from it. Production leaves this null and
+## each new run draws a fresh seed (T49 / D-061).
+var squishy_seed_override: Variant = null
 var _original_squishy_ids: Array[String] = []
 var _assigned_squishy_ids: Array[String] = []
 var _presented_wave: int = 0
@@ -60,7 +63,8 @@ func _ready() -> void:
 	if theme_node != null and theme_node.has_signal("palette_changed"):
 		if not theme_node.palette_changed.is_connected(_on_palette_changed):
 			theme_node.palette_changed.connect(_on_palette_changed)
-	_squishy_rng.seed = SQUISHY_SWAP_SEED
+	_seed_rng.randomize()
+	_reseed_squishy_draw()
 	spawn_ball()
 
 
@@ -135,8 +139,9 @@ func _present_board(wave: int, bonus_count: int, bonus_points: int) -> void:
 
 
 func _on_palette_changed(_id: String = "") -> void:
-	# Theme.set_palette writes first_table_slots back onto the hosts before it
-	# emits. Re-apply the ids this presentation already chose.
+	# Title and game over still paint first_table_slots before this signal.
+	# Put back the ids this presentation already chose. Mid-run, Theme does
+	# not paint identities (T49); this covers a reset that still emits.
 	if _presented_wave <= 0:
 		return
 	_apply_squishy_ids(_assigned_squishy_ids)
@@ -146,13 +151,18 @@ func _present_squishies(wave: int) -> void:
 	if _original_squishy_ids.size() != _hosts.size():
 		_capture_original_squishy_ids()
 	if wave <= 0:
-		_squishy_rng.seed = SQUISHY_SWAP_SEED
+		_reseed_squishy_draw()
 		squishy_swap_count = 0
 		_presented_wave = 0
 		_assigned_squishy_ids = _copy_ids(_original_squishy_ids)
 		_apply_squishy_ids(_assigned_squishy_ids)
 		return
-	var next := _next_squishy_ids(_current_squishy_ids())
+	# Avoid the last assignment, not whatever the hosts show right now. A
+	# theme reset can paint the starting set onto the hosts before this runs.
+	var previous := _assigned_squishy_ids
+	if previous.size() != _hosts.size():
+		previous = _current_squishy_ids()
+	var next := _next_squishy_ids(previous)
 	if next.size() != _hosts.size():
 		return
 	_assigned_squishy_ids = next
@@ -169,6 +179,8 @@ func _capture_original_squishy_ids() -> void:
 		if id.is_empty():
 			id = _host_squishy_id(host)
 		_original_squishy_ids.append(id)
+	if _assigned_squishy_ids.size() != _original_squishy_ids.size():
+		_assigned_squishy_ids = _copy_ids(_original_squishy_ids)
 
 
 func _current_squishy_ids() -> Array[String]:
@@ -236,6 +248,13 @@ func _next_squishy_ids(current: Array[String]) -> Array[String]:
 		pick[i] = pick[partner]
 		pick[partner] = tmp
 	return pick
+
+
+func _reseed_squishy_draw() -> void:
+	var seed_value := _seed_rng.randi()
+	if squishy_seed_override != null:
+		seed_value = int(squishy_seed_override)
+	_squishy_rng.seed = seed_value
 
 
 func _loadable_catalog_ids() -> Array[String]:

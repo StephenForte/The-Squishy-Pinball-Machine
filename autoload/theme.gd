@@ -333,6 +333,12 @@ func _apply_table(table: Node) -> void:
 
 
 func _apply_slots(table: Node) -> void:
+	# Mid-run the table owns host identities (T49). Painting first_table_slots
+	# here races the swap: score_changed runs before board_shifted, and a
+	# deferred paint lands after palette_changed, so all 8 hosts snap back to
+	# the starting set. Title and game over still show the catalog slots.
+	if not _show_saved_pick():
+		return
 	var slots: Dictionary = SquishyCatalog.first_table_slots()
 	for key in slots.keys():
 		if key == "decor":
