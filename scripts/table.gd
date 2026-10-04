@@ -28,12 +28,22 @@ const BONUS_SLOTS: Array[Vector2] = [
 	Vector2(330, 860),
 ]
 const SHOVE_RADIUS := 64.0
+## One catalog draw per board presentation (D-061). Reseeded on wave 0 so a
+## restarted run repeats. Tests rely on this fixed seed.
+const SQUISHY_SWAP_SEED := 61061
 
 var _supercharge_generation: int = 0
 var _layout_token: int = 0
 var _hosts: Array[Node2D] = []
 var _homes: Array[Vector2] = []
 var _orbs: Array = []
+var _squishy_rng := RandomNumberGenerator.new()
+var _original_squishy_ids: Array[String] = []
+var _assigned_squishy_ids: Array[String] = []
+var _presented_wave: int = 0
+## Reassignments since the last wave-0 presentation. One _present_board with
+## wave > 0 increments this once, including a score jump that skips waves.
+var squishy_swap_count: int = 0
 
 
 func _ready() -> void:
@@ -46,6 +56,11 @@ func _ready() -> void:
 		game.game_restarted.connect(_on_game_restarted)
 	if game != null and game.has_signal("board_shifted"):
 		game.board_shifted.connect(_on_board_shifted)
+	var theme_node := get_node_or_null("/root/Theme")
+	if theme_node != null and theme_node.has_signal("palette_changed"):
+		if not theme_node.palette_changed.is_connected(_on_palette_changed):
+			theme_node.palette_changed.connect(_on_palette_changed)
+	_squishy_rng.seed = SQUISHY_SWAP_SEED
 	spawn_ball()
 
 
@@ -105,16 +120,164 @@ func _capture_homes() -> void:
 			continue
 		_hosts.append(host)
 		_homes.append(host.position)
+	_capture_original_squishy_ids()
 
 
 func _present_board(wave: int, bonus_count: int, bonus_points: int) -> void:
 	_apply_layout(wave)
 	_sync_bonuses(bonus_count, bonus_points)
+	_present_squishies(wave)
 	if wave > 0:
 		var effects := get_node_or_null("Effects")
 		if effects != null and effects.has_method("shake"):
 			effects.shake()
 	print("Table board wave=%d bonuses=%d points=%d" % [wave, bonus_count, bonus_points])
+
+
+func _on_palette_changed(_id: String = "") -> void:
+	# Theme.set_palette writes first_table_slots back onto the hosts before it
+	# emits. Re-apply the ids this presentation already chose.
+	if _presented_wave <= 0:
+		return
+	_apply_squishy_ids(_assigned_squishy_ids)
+
+
+func _present_squishies(wave: int) -> void:
+	if _original_squishy_ids.size() != _hosts.size():
+		_capture_original_squishy_ids()
+	if wave <= 0:
+		_squishy_rng.seed = SQUISHY_SWAP_SEED
+		squishy_swap_count = 0
+		_presented_wave = 0
+		_assigned_squishy_ids = _copy_ids(_original_squishy_ids)
+		_apply_squishy_ids(_assigned_squishy_ids)
+		return
+	var next := _next_squishy_ids(_current_squishy_ids())
+	if next.size() != _hosts.size():
+		return
+	_assigned_squishy_ids = next
+	_presented_wave = wave
+	squishy_swap_count += 1
+	_apply_squishy_ids(_assigned_squishy_ids)
+
+
+func _capture_original_squishy_ids() -> void:
+	_original_squishy_ids.clear()
+	var slots: Dictionary = SquishyCatalog.first_table_slots()
+	for host in _hosts:
+		var id := String(slots.get(String(host.name), ""))
+		if id.is_empty():
+			id = _host_squishy_id(host)
+		_original_squishy_ids.append(id)
+
+
+func _current_squishy_ids() -> Array[String]:
+	var ids: Array[String] = []
+	for host in _hosts:
+		ids.append(_host_squishy_id(host))
+	return ids
+
+
+func _host_squishy_id(host: Node) -> String:
+	var squishy := host.get_node_or_null("Squishy")
+	if squishy == null:
+		return ""
+	return String(squishy.get("catalog_id"))
+
+
+func _apply_squishy_ids(ids: Array[String]) -> void:
+	var count := mini(ids.size(), _hosts.size())
+	for i in count:
+		if ids[i].is_empty():
+			continue
+		var squishy := _hosts[i].get_node_or_null("Squishy")
+		if squishy != null and squishy.has_method("setup"):
+			squishy.setup(ids[i])
+
+
+func _next_squishy_ids(current: Array[String]) -> Array[String]:
+	var pool := _loadable_catalog_ids()
+	if pool.size() < current.size() or current.is_empty():
+		push_warning("Table: not enough loadable squishies to swap (%d hosts, %d art)" % [current.size(), pool.size()])
+		return _empty_ids()
+	_shuffle_ids(pool)
+	var pick: Array[String] = []
+	for i in current.size():
+		pick.append(pool[i])
+	var used := {}
+	for id in pick:
+		used[id] = true
+	for i in pick.size():
+		if pick[i] != current[i]:
+			continue
+		var replacement := ""
+		for id in pool:
+			if used.has(id) or id == current[i]:
+				continue
+			replacement = id
+			break
+		if not replacement.is_empty():
+			used.erase(pick[i])
+			pick[i] = replacement
+			used[replacement] = true
+			continue
+		var partner := -1
+		for j in pick.size():
+			if j == i:
+				continue
+			if pick[j] == current[i] or pick[i] == current[j]:
+				continue
+			partner = j
+			break
+		if partner < 0:
+			push_warning("Table: squishy swap could not avoid a repeat")
+			return _empty_ids()
+		var tmp := pick[i]
+		pick[i] = pick[partner]
+		pick[partner] = tmp
+	return pick
+
+
+func _loadable_catalog_ids() -> Array[String]:
+	var ids: Array[String] = []
+	var seen := {}
+	var entries: Array = SquishyCatalog.data().get("squishies", [])
+	for item in entries:
+		if typeof(item) != TYPE_DICTIONARY:
+			continue
+		var id := String(item.get("id", ""))
+		if id.is_empty() or seen.has(id) or not _sprite_loads(id):
+			continue
+		seen[id] = true
+		ids.append(id)
+	return ids
+
+
+func _sprite_loads(id: String) -> bool:
+	var path := SquishyCatalog.sprite_path(id)
+	if path.is_empty() or not ResourceLoader.exists(path):
+		return false
+	return load(path) is Texture2D
+
+
+func _shuffle_ids(order: Array[String]) -> void:
+	for i in range(order.size() - 1, 0, -1):
+		var j := _squishy_rng.randi_range(0, i)
+		var swap := order[i]
+		order[i] = order[j]
+		order[j] = swap
+
+
+func _copy_ids(ids: Array[String]) -> Array[String]:
+	var out: Array[String] = []
+	for id in ids:
+		out.append(id)
+	return out
+
+
+func _empty_ids() -> Array[String]:
+	var empty: Array[String] = []
+	return empty
 
 
 func _apply_layout(wave: int) -> void:
