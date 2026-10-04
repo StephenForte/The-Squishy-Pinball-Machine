@@ -62,7 +62,8 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T44 | A lit stand-up target scores 100 on every later hit (D-061) | 13 | **done** 2026-10-04 — merged (#56) | cheap | — |
 | T45 | Squishies swap to different catalog squishies on each board rotation (D-061) | 13 | **done** 2026-10-04 — merged (#58), deployed | mid | — |
 | T46 | Theme cycles through the JSON palettes every 10,000 points, for that game only (D-061) | 13 | **done** 2026-10-04 — merged (#59), deployed | mid | — |
-| T49 | Squishy swap: a fresh random seed per game; key "previous" on the assigned ids; one combined T45+T46 test (D-061) | 13 | **approved** 2026-10-04 (PR #60, 1d58f0a) — awaiting merge + static redeploy | cheap-mid | — |
+| T50 | Show the active player on the HUD and "Saved as X" + "Not you?" at game over (D-062) | 13 | brief written, not dispatched | cheap-mid | — |
+| T49 | Squishy swap: a fresh random seed per game; key "previous" on the assigned ids; one combined T45+T46 test (D-061) | 13 | **done** 2026-10-04 — merged (#60, 2e37386) | cheap-mid | — |
 | T48 | Web high-score page: same layout, much bigger — measured sizes (D-061 amendment) | 13 | **cancelled** 2026-10-04 — planner misread "looks bad a$$" (it meant good); never dispatched | cheap-mid | T47 |
 | T47 | Web leaderboard page in a traditional arcade high-score layout (D-061) | 13 | **done** 2026-10-04 — merged (#57), deployed; Steve likes it | cheap-mid | — |
 | T43 | An avatar-less device with a refused id is never detected: the boot gap-fill PUT is skipped without an avatar, so its runs still 409 `name_taken` and are lost (D-058 gap, found in T40 review) | 12 | **done** 2026-09-28 — merged (PR #50, b737f41), deployed `dep-dasrkd17lnhs73agq7a0` | cheap-mid | T40 |
@@ -1529,3 +1530,5 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   looked up and confirmed, and every later iPhone score landed as Dad. Steve: Natasha played on his
   phone and he likely skipped "That's me" afterwards. Gap: the active player is only visible on the
   title. Offered **T50** (player name on the HUD and "Saved as X" at game over), awaiting Steve.
+- 2026-10-04: Steve: yes to T50 → **D-062**. #60 merged (`2e37386`). Decisions through **D-062**, next
+  free **D-063**; tasks through **T50**, next free **T51**.
