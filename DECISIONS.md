@@ -1360,3 +1360,31 @@ by a stray row **without deleting history**.
   the static site went live first, at 03:27:34. Only operator curls hit the lookup route in between
   (404, then 502 during the restart, then 200). Server merges should not be assumed to auto-deploy:
   verify the route live before redeploying the static site, as the T41 note said.
+
+## D-061 — Four play features: lit targets pay, squishies swap on rotation, themes cycle per 10,000, arcade web board (Steve, 2026-10-04)
+Steve asked for five features (one withdrawn). Each was mapped to the code before anything was decided,
+and the ambiguous ones were put to him:
+- **Lit targets keep scoring (T44).** The 3 pop bumpers already score every visit; what goes dead is the
+  5 round stand-up targets (the ones under squishy sprites, D-022): first hit 500 and lights, then 0
+  until the bank completes (D-013). **Steve: a hit on a lit target scores 100.** Plain `add_score(100)`
+  (no streak, same as D-013's flat target scoring). The first hit still scores 500 and lights; the
+  bank bonus (2,500) still fires exactly once per completion; a re-hit never completes a bank.
+  Supersedes D-013's "later hits score nothing". `scoring_test` case 2 encodes the old rule and changes.
+- **Squishies swap on each board rotation (T45).** PR #54 rotates the 8 hosts (3 bumpers + 5 targets)
+  every 5,000 points (`Game.board_shifted`). **Steve: on each rotation, every squishy changes to a
+  different one from the catalog** (`assets/design/squishes/squishies_catalog.json`, 16 entries).
+  Each new id differs from that host's current id; no two hosts show the same squishy at once; a run
+  restart (wave 0) restores the scene's original ids. Player avatars are unaffected.
+- **Themes cycle every 10,000 points, for that game only (T46).** **Steve: game only.** Palette index =
+  (the player's saved pick + floor(score / 10,000)) mod the palette count (4 today, JSON order), so a
+  jump across a milestone lands on the right theme. Never written to `settings.save`. At game over,
+  and at any new run or title, the saved pick is restored. A pick made in settings is always saved.
+- **Arcade web board (T47).** **Steve: the web page only** (`GET /` on the leaderboard server), not the
+  title or game-over boards. "Ready Player One" traditional arcade high-score table: black screen,
+  neon, pixel font, RANK / NAME / SCORE. Escaping of player names is unchanged (XSS).
+**Process notes.** PRs #53, #54, #55 (test coverage; board shift + bonus stars every 5,000; star
+cooldown per ball) were merged on 2026-10-04 without a planner review; they are recorded in PLAN.md
+as merged-unreviewed. **Host trap:** macOS 27.0.1 no longer runs x86_64 binaries; the Intel Homebrew
+`python3` at `/usr/local/bin` fails with "Bad CPU type", which fails `export_web_test` case 2
+(`tools/export_web.sh` line 115). With `/usr/bin/python3` first on PATH, main passes 37/37 — the code
+is fine, the host is not.
