@@ -1523,3 +1523,9 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   swap case 5 red), fresh seed per run (M3 → diversity red). M4 (`previous` = on-screen) passes —
   redundant behind M1+M2, disclosed by the worker. T44 merged (#56, main `2c0c66a`).
 - **Still open:** Steve's personal-best report — waiting on the admin row listing.
+- 2026-10-04: **Personal-best report closed — not a code defect.** Admin rows: Dad's best 39,300 (14:53
+  UTC); later Dad rows 21,000 / 18,500 / 13,400 (20:08–20:14). Request log: the iPhone booted as
+  **Natasha** (`6c107d4d`) and posted 9 scores as her between 14:55 and 20:03; at 20:06:43–45 "Dad" was
+  looked up and confirmed, and every later iPhone score landed as Dad. Steve: Natasha played on his
+  phone and he likely skipped "That's me" afterwards. Gap: the active player is only visible on the
+  title. Offered **T50** (player name on the HUD and "Saved as X" at game over), awaiting Steve.
