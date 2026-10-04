@@ -62,6 +62,7 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T44 | A lit stand-up target scores 100 on every later hit (D-061) | 13 | dispatched; PR #56 open | cheap | — |
 | T45 | Squishies swap to different catalog squishies on each board rotation (D-061) | 13 | dispatched; PR #58 open | mid | — |
 | T46 | Theme cycles through the JSON palettes every 10,000 points, for that game only (D-061) | 13 | **approved** 2026-10-04 (PR #59, 627689a) — awaiting merge + static redeploy | mid | — |
+| T48 | Web high-score page: same layout, much bigger — measured sizes (D-061 amendment) | 13 | brief written, not dispatched | cheap-mid | T47 |
 | T47 | Web leaderboard page in a traditional arcade high-score layout (D-061) | 13 | **done** 2026-10-04 — merged (#57), deployed; Steve: "looks bad" — redesign pending | cheap-mid | — |
 | T43 | An avatar-less device with a refused id is never detected: the boot gap-fill PUT is skipped without an avatar, so its runs still 409 `name_taken` and are lost (D-058 gap, found in T40 review) | 12 | **done** 2026-09-28 — merged (PR #50, b737f41), deployed `dep-dasrkd17lnhs73agq7a0` | cheap-mid | T40 |
 | T41 | Name lookup should be read-only: the title probe POSTs to the creating resolve route and rebuilds its own HTTP path (D-056) | 12 | **done** 2026-09-28 — merged (PR #51, 575e7d3); server `dep-dastu7fpn0mc73a22ug0` live 03:30:14, static live 03:27:34 (before the server; no player traffic in between); lookup verified live | cheap-mid | T40 |
@@ -1493,3 +1494,5 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   One gate run failed `name_lookup_test` (fixed ports 18797–18799), unexplained, green alone and on
   re-run; likely four parallel workers on one host. Future parallel dispatch: one gate at a time per
   host, or per-worker ports.
+- 2026-10-04: Steve chose **"same layout, just bigger"** for the web page → **T48** with numeric,
+  browser-measured sizes (D-061 amendment). Tasks through **T48**, next free **T49**.
