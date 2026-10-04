@@ -1397,3 +1397,7 @@ is fine, the host is not.
   no horizontal scroll at 375 px with a 16-character name and a 7-digit score (names wrap, scores never
   do). Press Start 2P is ~1 em per glyph, so fixed large sizes cannot fit a phone — sizes scale with
   viewport width.
+- **Withdrawn the same day.** The planner misread Steve's "looks bad a$$" as a complaint; Steve meant
+  it looked good. The sizing amendment above and T48 are cancelled. T47's page stands as shipped.
+  Lesson: when operator feedback is slang or ambiguous, ask what it means before diagnosing — the
+  "diagnosis" here was real measurement attached to a problem nobody had.
