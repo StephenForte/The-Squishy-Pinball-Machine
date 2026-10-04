@@ -1388,3 +1388,12 @@ as merged-unreviewed. **Host trap:** macOS 27.0.1 no longer runs x86_64 binaries
 `python3` at `/usr/local/bin` fails with "Bad CPU type", which fails `export_web_test` case 2
 (`tools/export_web.sh` line 115). With `/usr/bin/python3` first on PATH, main passes 37/37 — the code
 is fine, the host is not.
+- **Amended 2026-10-04 (T47 → T48), Steve: "looks bad", then "same layout, just bigger".** T47 shipped
+  8 px rows on phones and 12 px on desktop in a narrow bordered table filling ~30% of the page. The
+  brief named ingredients and never the composition. The layout (bordered table, RANK/NAME/SCORE header,
+  pixel font, neon) stays; **sizes are now numbers, measured in a browser:** row text ≥ 14 px at 375 px
+  wide and ≥ 24 px at 1280 px; heading ≥ 24 px at 375 and ≥ 48 px at 1280; the table spans the
+  viewport minus a 16 px gutter on phones and ≥ 90% of the viewport (capped at 1200 px) on desktop;
+  no horizontal scroll at 375 px with a 16-character name and a 7-digit score (names wrap, scores never
+  do). Press Start 2P is ~1 em per glyph, so fixed large sizes cannot fit a phone — sizes scale with
+  viewport width.
