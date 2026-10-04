@@ -62,7 +62,7 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T44 | A lit stand-up target scores 100 on every later hit (D-061) | 13 | **done** 2026-10-04 — merged (#56) | cheap | — |
 | T45 | Squishies swap to different catalog squishies on each board rotation (D-061) | 13 | **done** 2026-10-04 — merged (#58), deployed | mid | — |
 | T46 | Theme cycles through the JSON palettes every 10,000 points, for that game only (D-061) | 13 | **done** 2026-10-04 — merged (#59), deployed | mid | — |
-| T50 | Show the active player on the HUD and "Saved as X" + "Not you?" at game over (D-062) | 13 | brief written, not dispatched | cheap-mid | — |
+| T50 | Show the active player on the HUD and "Saved as X" + "Not you?" at game over (D-062) | 13 | changes requested 2026-10-04 (PR #61, cc6074f) — HUD name covers bonus star slot 0 | cheap-mid | — |
 | T49 | Squishy swap: a fresh random seed per game; key "previous" on the assigned ids; one combined T45+T46 test (D-061) | 13 | **done** 2026-10-04 — merged (#60, 2e37386) | cheap-mid | — |
 | T48 | Web high-score page: same layout, much bigger — measured sizes (D-061 amendment) | 13 | **cancelled** 2026-10-04 — planner misread "looks bad a$$" (it meant good); never dispatched | cheap-mid | T47 |
 | T47 | Web leaderboard page in a traditional arcade high-score layout (D-061) | 13 | **done** 2026-10-04 — merged (#57), deployed; Steve likes it | cheap-mid | — |
@@ -1532,3 +1532,10 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   title. Offered **T50** (player name on the HUD and "Saved as X" at game over), awaiting Steve.
 - 2026-10-04: Steve: yes to T50 → **D-062**. #60 merged (`2e37386`). Decisions through **D-062**, next
   free **D-063**; tasks through **T50**, next free **T51**.
+- 2026-10-04: **T50 reviewed — changes requested** (PR #61, `cc6074f`). Gate 42 PASS; logic correct; Bugbot's
+  stale-retry finding real on `229ce5c`, fixed in `cc6074f`. **Blocking:** `PlayerNameLabel` (x 20–700,
+  y 228–280, centred, HUD layer) covers `BONUS_SLOTS[0]` (360, 280, r 22) — the first star, every game
+  past 5,000. Planner omission again: the brief's overlap rule covered HUD labels, not the playfield.
+  Fix proven in scratch: `offset_right 330`, left-aligned → all 10 states pass, 16-char name ends at
+  x 304 < 338. A y 108–160 / x 20–250 attempt failed (284 px > 230). Asked for a playfield-clearance
+  property too.
