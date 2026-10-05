@@ -62,7 +62,7 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T44 | A lit stand-up target scores 100 on every later hit (D-061) | 13 | **done** 2026-10-04 — merged (#56) | cheap | — |
 | T45 | Squishies swap to different catalog squishies on each board rotation (D-061) | 13 | **done** 2026-10-04 — merged (#58), deployed | mid | — |
 | T46 | Theme cycles through the JSON palettes every 10,000 points, for that game only (D-061) | 13 | **done** 2026-10-04 — merged (#59), deployed | mid | — |
-| T50 | Show the active player on the HUD and "Saved as X" + "Not you?" at game over (D-062) | 13 | changes requested 2026-10-04 (PR #61, cc6074f) — HUD name covers bonus star slot 0 | cheap-mid | — |
+| T50 | Show the active player on the HUD and "Saved as X" + "Not you?" at game over (D-062) | 13 | **approved** 2026-10-04 (PR #61, d5533f9) — awaiting merge + static redeploy | cheap-mid | — |
 | T49 | Squishy swap: a fresh random seed per game; key "previous" on the assigned ids; one combined T45+T46 test (D-061) | 13 | **done** 2026-10-04 — merged (#60, 2e37386) | cheap-mid | — |
 | T48 | Web high-score page: same layout, much bigger — measured sizes (D-061 amendment) | 13 | **cancelled** 2026-10-04 — planner misread "looks bad a$$" (it meant good); never dispatched | cheap-mid | T47 |
 | T47 | Web leaderboard page in a traditional arcade high-score layout (D-061) | 13 | **done** 2026-10-04 — merged (#57), deployed; Steve likes it | cheap-mid | — |
@@ -1539,3 +1539,7 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   Fix proven in scratch: `offset_right 330`, left-aligned → all 10 states pass, 16-char name ends at
   x 304 < 338. A y 108–160 / x 20–250 attempt failed (284 px > 230). Asked for a playfield-clearance
   property too.
+- 2026-10-04: **T50 re-reviewed — approved** (PR #61, `d5533f9`). The fix is the two proven lines plus a
+  playfield-clearance property against live `BONUS_SLOTS` and host homes; gate 42 PASS; the property
+  goes red on `cc6074f`'s centred layout. Standing lesson for UI briefs: the overlap rule must include
+  the playfield (stars, hosts), not only other UI labels.
