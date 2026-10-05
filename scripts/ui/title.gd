@@ -253,6 +253,16 @@ func _placeholder_texture() -> Texture2D:
 	return _placeholder_avatar
 
 
+## Same state as tapping the name on the title: the menu is up and the
+## rename field is open. Game over's "Not you?" uses this. It does not
+## submit or move a score.
+func open_rename() -> void:
+	if not visible:
+		show_menu()
+	_dismissed = false
+	_open_name()
+
+
 func _open_name() -> void:
 	if _dismissed or _is_capturing_name():
 		return
