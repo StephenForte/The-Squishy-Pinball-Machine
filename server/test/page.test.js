@@ -15,6 +15,11 @@ function namedRows(html) {
   return [...html.matchAll(/<td class="name">([\s\S]*?)<\/td>/g)].map((m) => m[1]);
 }
 
+/** Name cell for a display name that needs no HTML escaping. */
+function linkedName(name) {
+  return `<a href="/player?name=${encodeURIComponent(name)}">${name}</a>`;
+}
+
 function rankRows(html) {
   return [...html.matchAll(/<td class="rank">([\s\S]*?)<\/td>/g)].map((m) => m[1]);
 }
@@ -178,7 +183,8 @@ describe('renderBoard', () => {
     });
     assert.equal(html.split(escaped).length - 1, 2);
     assert.ok(html.includes(`alt="${escaped}"`));
-    assert.ok(html.includes(`<td class="name"><img src="/avatars/bear_bounce.png" alt="${escaped}">${escaped}</td>`));
+    const href = `/player?name=${encodeURIComponent(nasty)}`;
+    assert.ok(html.includes(`<td class="name"><img src="/avatars/bear_bounce.png" alt="${escaped}"><a href="${href}">${escaped}</a></td>`));
     assert.equal(html.includes(nasty), false);
     const imgs = [...html.matchAll(/<img\b[^>]*>/g)].map((m) => m[0]);
     assert.equal(imgs.length, 1);
@@ -294,13 +300,13 @@ describe('GET /', () => {
       const names = namedRows(res.text);
       const ranks = rankRows(res.text);
       assert.equal(names.length, 10);
-      assert.equal(names[0], 'Latest');
+      assert.equal(names[0], linkedName('Latest'));
       assert.doesNotMatch(res.text, /OldName/);
       assert.equal(ranks[0], '1ST');
       assert.match(res.text, /11 players/);
       assert.match(res.text, />9000</);
       for (let i = 0; i < 10; i += 1) {
-        assert.equal(names[i], json.json.entries[i].name);
+        assert.equal(names[i], linkedName(json.json.entries[i].name));
         assert.equal(ranks[i], arcadeOrdinal(json.json.entries[i].rank));
       }
     });
