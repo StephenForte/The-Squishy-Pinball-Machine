@@ -15,6 +15,7 @@ import {
   listScores,
   lookupPlayer,
   mergePlayers,
+  playerHistory,
   relabelScore,
   openDb,
   resetAll,
@@ -22,7 +23,7 @@ import {
   storeLabel,
   upsertProfile,
 } from './db.js';
-import { renderBoard } from './page.js';
+import { renderBoard, renderPlayer, renderPlayerMessage } from './page.js';
 import {
   isUuidV4,
   normalizePlayerId,
@@ -454,6 +455,31 @@ async function handle(req, res, ctx) {
 
   if (req.method === 'GET' && path === '/') {
     sendHtml(res, 200, renderBoard(getLeaderboard(ctx.db, 10)), cors);
+    return;
+  }
+
+  if (req.method === 'GET' && path === '/player') {
+    const rawName = url.searchParams.get('name');
+    const parsed = parseLookupName(rawName);
+    if (!parsed.ok) {
+      const controls = typeof rawName === 'string' && /[\p{Cc}]/u.test(rawName);
+      const status = controls ? 400 : 404;
+      sendHtml(res, status, renderPlayerMessage(status), cors);
+      return;
+    }
+
+    const addr = clientAddress(req, ctx.addressFor);
+    if (!ctx.resolveLimiter.allow(addr)) {
+      sendHtml(res, 429, renderPlayerMessage(429), cors);
+      return;
+    }
+
+    const history = playerHistory(ctx.db, parsed.value.name);
+    if (!history.ok) {
+      sendHtml(res, 404, renderPlayerMessage(404, parsed.value.name), cors);
+      return;
+    }
+    sendHtml(res, 200, renderPlayer(history), cors);
     return;
   }
 

@@ -50,6 +50,12 @@ function ordinalRank(rank) {
   return `${n}${suffix}`;
 }
 
+/** Board and player links address a name, never a player id (D-063). */
+function playerNameLink(name) {
+  const href = escapeHtml(`/player?name=${encodeURIComponent(name ?? '')}`);
+  return `<a href="${href}">${escapeHtml(name ?? '')}</a>`;
+}
+
 function avatarImg(row) {
   const avatar = typeof row.avatar === 'string' ? row.avatar : '';
   if (!avatar) return '';
@@ -67,7 +73,7 @@ function rowsHtml(entries) {
   const body = rows
     .map((row) => {
       const rank = escapeHtml(ordinalRank(row.rank));
-      const name = escapeHtml(row.name ?? '');
+      const name = playerNameLink(row.name ?? '');
       const score = escapeHtml(row.score ?? '');
       return `<tr><td class="rank">${rank}</td><td class="name">${avatarImg(row)}${name}</td><td class="score">${score}</td></tr>`;
     })
@@ -79,22 +85,13 @@ function rowsHtml(entries) {
     </table>`;
 }
 
-/**
- * HTML board. Inline CSS, no scripts, no third-party requests (D-026 / D-037).
- * Press Start 2P is embedded as the pixel face (D-061); a monospace stack is
- * the fallback. Same-origin /avatars/<id>.png images only, and only when
- * avatar is set. RANK / NAME / SCORE; no relative-time column.
- */
-export function renderBoard({ entries = [], total_players = 0 } = {}) {
-  const count = escapeHtml(playerCountLabel(total_players));
-  const board = rowsHtml(entries);
-
+function documentShell(mainInner, title = 'Squishy Leaderboard') {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Squishy Leaderboard</title>
+<title>${title}</title>
 <style>
 /* Press Start 2P (c) 2012 Cody Boisclair, SIL Open Font License 1.1. Embedded so the page stays self-contained. */
 @font-face{font-family:"Press Start 2P";font-style:normal;font-weight:400;font-display:swap;src:url(data:font/woff2;base64,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) format("woff2");unicode-range:U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F}
@@ -107,7 +104,7 @@ export function renderBoard({ entries = [], total_players = 0 } = {}) {
 html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text);font-family:"Press Start 2P",ui-monospace,"Courier New",monospace;font-size:8px;line-height:1.7}
 body{background-image:repeating-linear-gradient(to bottom,rgba(255,255,255,.035),rgba(255,255,255,.035) 1px,transparent 1px,transparent 3px)}
 main{max-width:48rem;margin:0 auto;padding:1.5rem .75rem 2.5rem}
-h1{margin:0 0 1.1rem;font-size:16px;line-height:1.6;text-align:center;color:var(--gold);text-shadow:0 0 10px var(--gold);animation:arcade-blink 1.2s steps(2,end) infinite}
+h1{margin:0 0 1.1rem;font-size:16px;line-height:1.6;text-align:center;color:var(--gold);text-shadow:0 0 10px var(--gold);overflow-wrap:anywhere;animation:arcade-blink 1.2s steps(2,end) infinite}
 @keyframes arcade-blink{0%,49%{opacity:1}50%,100%{opacity:.4}}
 .meta{margin:0 0 1.4rem;text-align:center;color:var(--cyan)}
 .meta a{color:var(--pink)}
@@ -117,7 +114,12 @@ th{color:var(--cyan);font-size:.85rem;border-bottom:2px solid var(--pink)}
 td.rank,th.rank{width:6rem;color:var(--gold);white-space:nowrap}
 td.score,th.score{width:9rem;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--text)}
 td.name{overflow-wrap:anywhere}
-td.name img{display:inline-block;width:1.75rem;height:1.3rem;max-width:100%;object-fit:contain;vertical-align:middle;margin-right:.4rem}
+td.name img,h1 img{display:inline-block;width:1.75rem;height:1.3rem;max-width:100%;object-fit:contain;vertical-align:middle;margin-right:.4rem}
+td.name a{color:inherit;text-decoration:none}
+td.name a:hover,td.name a:focus{color:var(--pink)}
+table.games td.mark,table.games th.mark{width:6rem;color:var(--gold);text-align:right;white-space:nowrap}
+table.games td.date,table.games th.date{overflow-wrap:anywhere}
+tr.best td.score,tr.best td.mark{color:var(--gold)}
 tbody tr:nth-child(even) td{background:rgba(22,207,224,.06)}
 .empty{margin:0;padding:1.4rem 1rem;text-align:center;color:var(--muted);border:2px solid var(--pink);box-shadow:0 0 12px rgba(255,43,214,.35)}
 @media (min-width:480px){
@@ -132,11 +134,86 @@ tbody tr:nth-child(even) td{background:rgba(22,207,224,.06)}
 </head>
 <body>
 <main>
-<h1>HIGH SCORES</h1>
-<p class="meta">${count} · <a href="/v1/leaderboard">JSON</a></p>
-${board}
+${mainInner}
 </main>
 </body>
 </html>
 `;
+}
+
+/**
+ * HTML board. Inline CSS, no scripts, no third-party requests (D-026 / D-037).
+ * Press Start 2P is embedded as the pixel face (D-061); a monospace stack is
+ * the fallback. Same-origin /avatars/<id>.png images only, and only when
+ * avatar is set. RANK / NAME / SCORE; no relative-time column. Each name
+ * links to that player's games (D-063).
+ */
+export function renderBoard({ entries = [], total_players = 0 } = {}) {
+  const count = escapeHtml(playerCountLabel(total_players));
+  const board = rowsHtml(entries);
+  return documentShell(`<h1>HIGH SCORES</h1>
+<p class="meta">${count} · <a href="/v1/leaderboard">JSON</a></p>
+${board}`);
+}
+
+function formatUtc(iso) {
+  const match = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})/.exec(String(iso ?? ''));
+  if (!match) return `${escapeHtml(iso ?? '')} UTC`;
+  return `${match[1]} ${match[2]} UTC`;
+}
+
+function gamesTable(games) {
+  const rows = Array.isArray(games) ? games.slice(0, 100) : [];
+  if (rows.length === 0) {
+    return '<p class="empty">No games yet</p>';
+  }
+  const body = rows
+    .map((game) => {
+      const when = formatUtc(game.at);
+      const score = escapeHtml(game.score ?? '');
+      const mark = game.best ? 'BEST' : '';
+      const cls = game.best ? ' class="best"' : '';
+      return `<tr${cls}><td class="date">${when}</td><td class="score">${score}</td><td class="mark">${mark}</td></tr>`;
+    })
+    .join('');
+  return `<table class="games">
+      <thead><tr><th class="date">DATE</th><th class="score">SCORE</th><th class="mark"></th></tr></thead>
+      <tbody>${body}</tbody>
+    </table>`;
+}
+
+/**
+ * One player's games. Same arcade shell as the board (D-063): inline CSS,
+ * no scripts, no third-party requests. The caller passes display fields
+ * only — never a player id.
+ */
+export function renderPlayer(history = {}) {
+  const name = escapeHtml(history.name ?? '');
+  const avatar = avatarImg({ name: history.name ?? '', avatar: history.avatar });
+  const best = history.best === null || history.best === undefined ? 'NONE' : escapeHtml(history.best);
+  const rank = history.rank === null || history.rank === undefined
+    ? 'UNRANKED'
+    : escapeHtml(ordinalRank(history.rank));
+  const total = Number.isFinite(Number(history.total)) ? Number(history.total) : 0;
+  const games = Array.isArray(history.games) ? history.games : [];
+  const shown = Math.min(games.length, 100);
+  const gamesWord = total === 1 ? '1 GAME' : `${total} GAMES`;
+  return documentShell(`<h1>${avatar}${name}</h1>
+<p class="meta">BEST ${best} · ${rank} · ${gamesWord}</p>
+<p class="meta">showing ${shown} of ${total}</p>
+<p class="meta"><a href="/">HIGH SCORES</a></p>
+${gamesTable(games)}`, `${name} - Squishy Leaderboard`);
+}
+
+/** Styled 400 / 404 / 429 for the player page. `name` is omitted on 400 and 429. */
+export function renderPlayerMessage(status, name) {
+  let heading = 'NO SUCH PLAYER';
+  if (status === 400) heading = 'BAD NAME';
+  else if (status === 429) heading = 'TOO MANY REQUESTS';
+  const who = status === 404 && typeof name === 'string' && name !== ''
+    ? `<p class="meta">${escapeHtml(name)}</p>`
+    : '';
+  return documentShell(`<h1>${heading}</h1>
+${who}
+<p class="meta"><a href="/">HIGH SCORES</a></p>`);
 }

@@ -66,10 +66,14 @@ answer a preflight.
   left-most `X-Forwarded-For` entry when present, otherwise the socket;
   a missing address shares one `unknown` bucket. This is a speed bump, not
   authorization — `X-Forwarded-For` is client-controlled on a direct connection.
+- Per IP: 60 requests / 60 s shared by `GET /v1/players/lookup`,
+  `POST /v1/players/resolve`, and `GET /player` (D-059, D-063). Same address
+  rule as the write limit. Over the limit, the player page answers `429` HTML.
 
-## Routes (D-026, amended by D-037, D-044, D-046, D-047, D-059, D-060)
+## Routes (D-026, amended by D-037, D-044, D-046, D-047, D-059, D-060, D-063)
 
-- `GET /` → HTML top-10 arcade high-score table (D-061): black background, neon, embedded Press Start 2P with a monospace fallback (no third-party request), columns RANK / NAME / SCORE (ordinal ranks; no relative-time column). Same data as `/v1/leaderboard`; `Cache-Control: no-store`. Each row's avatar is a same-origin `<img src="/avatars/<id>.png">` when set.
+- `GET /` → HTML top-10 arcade high-score table (D-061): black background, neon, embedded Press Start 2P with a monospace fallback (no third-party request), columns RANK / NAME / SCORE (ordinal ranks; no relative-time column). Same data as `/v1/leaderboard`; `Cache-Control: no-store`. Each row's avatar is a same-origin `<img src="/avatars/<id>.png">` when set. Each name links to `/player?name=` plus that cell's URL-encoded display name (D-063). The link does not carry `player_id`.
+- `GET /player?name=<url-encoded>` → HTML page for that one player (D-063), the same arcade shell as `/` (inline CSS, no scripts, no third-party requests, `Cache-Control: no-store`). The name is validated like lookup: a control character is `400`; a missing `name`, or one that is empty after sanitising, is `404`. A name longer than 16 characters is clamped by that same sanitising, then looked up. An unknown name or more than one holder is `404`. The page writes nothing. It shows the current display name (profile name, otherwise the latest score name) and a same-origin avatar only when one is set, then best score, board rank, and total games. Games are every `scores` row for that player, including rows posted under an earlier name, newest first (`created_at DESC, id DESC`), at most the 100 newest. Each row is a UTC date and time (labelled UTC) and the score; the best game is marked once. The total is always shown (`showing 100 of 240`). A link returns to `/`. `player_id` is not in the page. The route uses the lookup per-IP limiter; over the limit is `429` HTML.
 - `GET /healthz` → `{ ok, store }` (`memory` when `DB_PATH=:memory:`, otherwise `sqlite`)
 - `POST /v1/scores` → `201` `{ rank, best, is_personal_best, total_players }`
 - `GET /v1/leaderboard?limit=10` → `{ entries, total_players }` (limit 1..50). Each entry includes `avatar` (`""` when the player has no profile).

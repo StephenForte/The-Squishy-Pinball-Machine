@@ -399,6 +399,64 @@ export function lookupPlayer(db, name) {
   return { held: true, name: stored || name };
 }
 
+const PLAYER_HISTORY_LIMIT = 100;
+
+/**
+ * Read-only games for the one player who holds `name` (D-063).
+ * Same holder rule as lookupPlayer: profile name_key or any score row.
+ * Does not insert a profile, rebuild an index, or change a score.
+ * History is every scores row for that player_id (newest first), including
+ * rows posted under an earlier name. The result has no player_id.
+ */
+export function playerHistory(db, name) {
+  const key = nameKey(name);
+  const holders = holdersOf(db, key);
+  if (holders.length !== 1) return { ok: false };
+
+  const playerId = holders[0];
+  const profile = getProfile(db, playerId);
+  const display = (profile && profile.name) || latestScoreName(db, playerId) || name;
+  const avatar = profile && typeof profile.avatar === 'string' ? profile.avatar : '';
+  const total = Number(
+    db.prepare('SELECT COUNT(*) AS n FROM scores WHERE player_id = ?').get(playerId).n,
+  );
+  const rows = db
+    .prepare(
+      `
+      SELECT id, score, created_at
+      FROM scores
+      WHERE player_id = ?
+      ORDER BY created_at DESC, id DESC
+      LIMIT ?
+    `,
+    )
+    .all(playerId, PLAYER_HISTORY_LIMIT);
+  const best = playerBest(db, playerId);
+  let bestId = null;
+  if (best !== null && best !== undefined) {
+    for (let i = rows.length - 1; i >= 0; i -= 1) {
+      if (Number(rows[i].score) === Number(best)) {
+        bestId = rows[i].id;
+        break;
+      }
+    }
+  }
+  const standing = playerStanding(db, playerId);
+  return {
+    ok: true,
+    name: display,
+    avatar,
+    best: best === null || best === undefined ? null : Number(best),
+    rank: standing.rank,
+    total,
+    games: rows.map((row) => ({
+      score: Number(row.score),
+      at: row.created_at,
+      best: row.id === bestId,
+    })),
+  };
+}
+
 /**
  * Absorb `drop` into `keep`. Survivor profile fields stay as they are.
  * Moved score rows take the survivor's display name so the board, which reads
