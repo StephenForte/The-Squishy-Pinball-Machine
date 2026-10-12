@@ -30,6 +30,11 @@ const BONUS_SLOTS: Array[Vector2] = [
 const SHOVE_RADIUS := 64.0
 
 var _supercharge_generation: int = 0
+## Score-milestone trio. Owed until a live ball can be split; an in-flight
+## attempt id lets a restart drop a callback without cancelling a newer one.
+var _rainbow_owed: bool = false
+var _rainbow_split_queued: bool = false
+var _rainbow_attempt: int = 0
 var _layout_token: int = 0
 var _hosts: Array[Node2D] = []
 var _homes: Array[Vector2] = []
@@ -55,6 +60,8 @@ func _ready() -> void:
 	var game := get_node_or_null("/root/Game")
 	if game != null and game.has_signal("supercharged"):
 		game.supercharged.connect(_on_supercharged)
+	if game != null and game.has_signal("rainbow_recalled"):
+		game.rainbow_recalled.connect(_on_rainbow_recalled)
 	if game != null and game.has_signal("game_restarted"):
 		game.game_restarted.connect(_on_game_restarted)
 	if game != null and game.has_signal("board_shifted"):
@@ -95,8 +102,16 @@ func _on_drain_body_entered(body: Node2D) -> void:
 
 func _on_game_restarted() -> void:
 	_supercharge_generation += 1
+	_rainbow_owed = false
+	_rainbow_attempt += 1
+	_rainbow_split_queued = false
 	_layout_token += 1
 	_present_board(0, 0, 0)
+
+
+func _process(_delta: float) -> void:
+	if _rainbow_owed and not _rainbow_split_queued and not _live_balls().is_empty():
+		_queue_rainbow_split()
 
 
 func _on_board_shifted(wave: int, bonus_count: int, bonus_points: int) -> void:
@@ -370,6 +385,33 @@ func _sync_bonuses(count: int, points: int) -> void:
 
 func _on_supercharged() -> void:
 	_split_supercharge_deferred.call_deferred(_supercharge_generation)
+
+
+func _on_rainbow_recalled() -> void:
+	_rainbow_owed = true
+	_queue_rainbow_split()
+
+
+func _queue_rainbow_split() -> void:
+	if not _rainbow_owed or _rainbow_split_queued:
+		return
+	_rainbow_split_queued = true
+	_rainbow_attempt += 1
+	_split_rainbow_deferred.call_deferred(_supercharge_generation, _rainbow_attempt)
+
+
+func _split_rainbow_deferred(generation: int, attempt: int) -> void:
+	if attempt != _rainbow_attempt:
+		return
+	_rainbow_split_queued = false
+	if generation != _supercharge_generation or not _rainbow_owed:
+		return
+	if not _split_supercharge():
+		return
+	_rainbow_owed = false
+	var game := get_node_or_null("/root/Game")
+	if game != null and game.has_method("note_rainbow_recall_applied"):
+		game.note_rainbow_recall_applied()
 
 
 func _split_supercharge_deferred(generation: int) -> void:
