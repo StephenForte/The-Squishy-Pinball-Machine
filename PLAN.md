@@ -62,7 +62,8 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T44 | A lit stand-up target scores 100 on every later hit (D-061) | 13 | **done** 2026-10-04 — merged (#56) | cheap | — |
 | T45 | Squishies swap to different catalog squishies on each board rotation (D-061) | 13 | **done** 2026-10-04 — merged (#58), deployed | mid | — |
 | T46 | Theme cycles through the JSON palettes every 10,000 points, for that game only (D-061) | 13 | **done** 2026-10-04 — merged (#59), deployed | mid | — |
-| T50 | Show the active player on the HUD and "Saved as X" + "Not you?" at game over (D-062) | 13 | **approved** 2026-10-04 (PR #61, d5533f9) — awaiting merge + static redeploy | cheap-mid | — |
+| T50 | Show the active player on the HUD and "Saved as X" + "Not you?" at game over (D-062) | 13 | **merged** (PR #61 → 18d1504); static redeploy not yet verified | cheap-mid | — |
+| T51 | Web board: click a name → that player's games, score and date, newest first (D-063) | 14 | **briefed** 2026-10-12 — main checkout, Sonnet | cheap-mid | — |
 | T49 | Squishy swap: a fresh random seed per game; key "previous" on the assigned ids; one combined T45+T46 test (D-061) | 13 | **done** 2026-10-04 — merged (#60, 2e37386) | cheap-mid | — |
 | T48 | Web high-score page: same layout, much bigger — measured sizes (D-061 amendment) | 13 | **cancelled** 2026-10-04 — planner misread "looks bad a$$" (it meant good); never dispatched | cheap-mid | T47 |
 | T47 | Web leaderboard page in a traditional arcade high-score layout (D-061) | 13 | **done** 2026-10-04 — merged (#57), deployed; Steve likes it | cheap-mid | — |
@@ -1543,3 +1544,8 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   playfield-clearance property against live `BONUS_SLOTS` and host homes; gate 42 PASS; the property
   goes red on `cc6074f`'s centred layout. Standing lesson for UI briefs: the overlap rule must include
   the playfield (stars, hosts), not only other UI labels.
+- 2026-10-12: Steve asked for a per-player history from the leaderboard ("all of their plays and scores and
+  date"), only if cheap. Checked: every game is already a `scores` row with `created_at`; the web board is
+  one server-rendered page. Web-only accepted → **D-063, T51** (server only, no Godot). Baseline on main
+  `20a16da`: `npm test` 123 pass / 46 suites. No open PRs. Decisions through **D-063**, next free **D-064**;
+  tasks through **T51**, next free **T52**. After merge the planner triggers the Render server deploy (D-028).

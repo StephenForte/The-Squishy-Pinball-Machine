@@ -1411,3 +1411,24 @@ says which player the score was saved to ("SAVED AS DAD", then the rank), and a 
 returns to the title with the rename entry open. A score already saved stays with the player it was
 saved to — moving a posted score is out of scope (the admin relabel, D-060, only rewrites a row to its
 own player's name). An unnamed run shows no name (D-049 is unchanged: it is not posted).
+
+## D-063 — Click a name on the web board to see that player's games (Steve, 2026-10-12)
+Steve: click a player's name on the leaderboard and see all of their plays, with each play's score and
+date. Web board only; the in-game board is unchanged (a tappable title top-5 plus a history panel is a
+separate, larger Godot task, declined for now). No new data is needed: `scores` already keeps one row per
+posted game with `created_at` (D-026).
+- **Address by name, never by `player_id`.** The page is `GET /player?name=<name>`. `player_id` is the
+  bearer credential (D-048); D-052 already notes the JSON board leaks it — this page must not add a
+  second, more linkable leak. Names resolve to one player (D-053/D-060).
+- **Read-only.** Resolution uses the read-only holder lookup that `GET /v1/players/lookup` uses (D-059),
+  never `resolvePlayer`, which claims an unheld name by creating a profile. A GET that creates a player
+  is the D-059 defect again.
+- **Content:** the player's current display name and avatar, best score, board rank, total games, then
+  one row per game newest first: date-time (UTC, labelled, since the page has no scripts — D-026/D-037)
+  and score, with the best game marked. At most the 100 newest rows; the total count is always shown.
+  Unknown or ambiguous name → a 404 page in the same style with a link back to the board.
+- **Board change:** every name on `/` links to its player page. Same arcade style (D-061); no scripts,
+  no third-party requests; names stay escaped (XSS) in text and URL-encoded in links.
+- **Abuse:** the page answers through the same per-IP limiter as the lookup route (60/min), since it
+  also tells a caller whether a name exists.
+- Task **T51**.
