@@ -21,6 +21,8 @@ func _ready() -> void:
 	game.big_score_reached.connect(_on_big_score_reached)
 	if game.has_signal("supercharged"):
 		game.supercharged.connect(_on_supercharged)
+	if game.has_signal("rainbow_recalled"):
+		game.rainbow_recalled.connect(_on_supercharged)
 	game.game_restarted.connect(_on_game_restarted)
 	for bumper in get_tree().get_nodes_in_group("bumpers"):
 		if bumper.has_signal("hit"):

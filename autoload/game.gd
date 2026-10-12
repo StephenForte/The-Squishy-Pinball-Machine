@@ -10,6 +10,10 @@ signal high_score_changed(player_id: String, value: int)
 signal streak_changed(streak: int)
 signal big_score_reached(score: int)
 signal supercharged()
+## The rainbow trio again, after a score milestone. Independent of the
+## once-per-game streak supercharge. 100_000, then 250_000, then double
+## (500_000, 1_000_000, 2_000_000, ...).
+signal rainbow_recalled()
 ## wave, how many bonus spots are live, points each spot awards.
 ## Emitted when score crosses another multiple of BOARD_SHIFT_EVERY.
 signal board_shifted(wave: int, bonus_count: int, bonus_points: int)
@@ -21,6 +25,10 @@ const STREAK_CAP := 5
 const BUMPER_POINTS := 100
 const BIG_SCORE_THRESHOLD := 10000
 const BOARD_SHIFT_EVERY := 5000
+## First two rainbow-trio recalls. Later ones double from the second.
+const RAINBOW_RECALL_FIRST := 100000
+const RAINBOW_RECALL_SECOND := 250000
+const _INT64_MAX := 9223372036854775807
 const BOARD_BONUS_CAP := 4
 const BOARD_BONUS_BASE := 1000
 const BOARD_BONUS_STEP := 500
@@ -43,6 +51,11 @@ var _drain_frame: int = -1
 var _streak_remaining: float = 0.0
 var _big_score_emitted: bool = false
 var _supercharged_emitted: bool = false
+## Next rainbow-recall milestone. 0 is 100_000, 1 is 250_000, then doubles.
+var _rainbow_recall_index: int = 0
+## True from emit until the split lands or the run resets. A miss (no ball
+## in play) stays pending so the trio still arrives with the next ball.
+var _rainbow_recall_pending: bool = false
 var board_wave: int = 0
 
 
@@ -61,6 +74,7 @@ func add_score(points: int) -> void:
 	score_changed.emit(score)
 	print("Game score_changed score=%d" % score)
 	_advance_board_wave()
+	_try_rainbow_recall()
 	if not _big_score_emitted and score >= BIG_SCORE_THRESHOLD:
 		_big_score_emitted = true
 		big_score_reached.emit(score)
@@ -114,6 +128,42 @@ func note_supercharge_applied() -> void:
 	_supercharged_emitted = true
 
 
+## Milestone index → score. 100_000, 250_000, 500_000, 1_000_000, ...
+## Returns -1 past the positive int64 range.
+func rainbow_recall_threshold(index: int) -> int:
+	if index < 0:
+		return -1
+	if index == 0:
+		return RAINBOW_RECALL_FIRST
+	var steps := index - 1
+	if steps >= 62:
+		return -1
+	if RAINBOW_RECALL_SECOND > (_INT64_MAX >> steps):
+		return -1
+	return RAINBOW_RECALL_SECOND << steps
+
+
+## Table calls this after the milestone split actually puts balls in play.
+## A trigger with no ball leaves the milestone pending.
+func note_rainbow_recall_applied() -> void:
+	if not _rainbow_recall_pending:
+		return
+	_rainbow_recall_pending = false
+	_rainbow_recall_index += 1
+	_try_rainbow_recall()
+
+
+func _try_rainbow_recall() -> void:
+	if state == GAME_OVER or _rainbow_recall_pending:
+		return
+	var threshold := rainbow_recall_threshold(_rainbow_recall_index)
+	if threshold < 0 or score < threshold:
+		return
+	_rainbow_recall_pending = true
+	rainbow_recalled.emit()
+	print("Game rainbow_recalled score=%d threshold=%d" % [score, threshold])
+
+
 func restart() -> void:
 	_reset_run()
 	game_restarted.emit()
@@ -158,6 +208,8 @@ func _reset_run() -> void:
 	_drain_frame = -1
 	_big_score_emitted = false
 	_supercharged_emitted = false
+	_rainbow_recall_index = 0
+	_rainbow_recall_pending = false
 	board_wave = 0
 	_clear_streak()
 	if previous_wave != 0:

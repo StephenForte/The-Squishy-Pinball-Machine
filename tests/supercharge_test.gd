@@ -44,6 +44,12 @@ func _run() -> void:
 		return
 	if not await _case_11_three_lives():
 		return
+	if not await _case_13_recall_thresholds():
+		return
+	if not await _case_14_score_recalls():
+		return
+	if not await _case_15_recall_waits_for_ball():
+		return
 	if not await _case_12_supercharged_soak():
 		return
 
@@ -444,6 +450,166 @@ func _case_11_three_lives() -> bool:
 	_cases_passed += 1
 	print("SUPERCHARGE case 11 pass lives=3")
 	return true
+
+
+func _case_13_recall_thresholds() -> bool:
+	print("SUPERCHARGE case 13 recall thresholds")
+	var expected: Array[int] = [100000, 250000, 500000, 1000000, 2000000, 4000000]
+	for i in expected.size():
+		var got := int(_game.call("rainbow_recall_threshold", i))
+		if got != expected[i]:
+			return _fail("case 13: index %d = %d expected %d" % [i, got, expected[i]])
+	if int(_game.call("rainbow_recall_threshold", -1)) != -1:
+		return _fail("case 13: negative index")
+	if int(_game.call("rainbow_recall_threshold", 47)) != -1:
+		return _fail("case 13: index 47 should stop before int64 overflow")
+	_cases_passed += 1
+	print("SUPERCHARGE case 13 pass thresholds=%s" % [expected])
+	return true
+
+
+func _case_14_score_recalls() -> bool:
+	print("SUPERCHARGE case 14 score recalls")
+	await _reset_and_place(Vector2(360, 520), Vector2(80, -20))
+	if _live_balls().size() != 1:
+		return _fail("case 14: expected 1 ball before scoring, got %d" % _live_balls().size())
+	var recalls: Array[int] = []
+	var on_recall := func() -> void:
+		recalls.append(int(_game.score))
+	_game.rainbow_recalled.connect(on_recall)
+	_game.add_score(99999)
+	await process_frame
+	await process_frame
+	if not recalls.is_empty() or _live_balls().size() != 1:
+		_game.rainbow_recalled.disconnect(on_recall)
+		return _fail("case 14: 99999 recalled %s balls=%d" % [recalls, _live_balls().size()])
+	_game.add_score(1)
+	if not await _expect_trio("case 14 at 100000"):
+		_game.rainbow_recalled.disconnect(on_recall)
+		return false
+	if recalls != [100000]:
+		_game.rainbow_recalled.disconnect(on_recall)
+		return _fail("case 14: 100000 recalls=%s" % [recalls])
+	# The 3x streak split is still once per game, and still available.
+	if not await _drain_to_one():
+		_game.rainbow_recalled.disconnect(on_recall)
+		return _fail("case 14: could not drain the 100000 trio to one")
+	_game._clear_streak()
+	await _trigger_split()
+	if not await _wait_for_ball_count(3, 8):
+		_game.rainbow_recalled.disconnect(on_recall)
+		return _fail("case 14: streak split after 100000 balls=%d" % _live_balls().size())
+	if recalls != [100000]:
+		_game.rainbow_recalled.disconnect(on_recall)
+		return _fail("case 14: streak emitted a score recall %s" % [recalls])
+	if not await _drain_to_one():
+		_game.rainbow_recalled.disconnect(on_recall)
+		return _fail("case 14: could not drain the streak trio")
+	_game._clear_streak()
+	await _trigger_split()
+	await process_frame
+	if _live_balls().size() != 1:
+		_game.rainbow_recalled.disconnect(on_recall)
+		return _fail("case 14: second streak split balls=%d" % _live_balls().size())
+	if not await _recall_to(250000, "case 14 at 250000"):
+		_game.rainbow_recalled.disconnect(on_recall)
+		return false
+	if not await _drain_to_one():
+		_game.rainbow_recalled.disconnect(on_recall)
+		return _fail("case 14: could not drain the 250000 trio")
+	if not await _recall_to(500000, "case 14 at 500000"):
+		_game.rainbow_recalled.disconnect(on_recall)
+		return false
+	if not await _drain_to_one():
+		_game.rainbow_recalled.disconnect(on_recall)
+		return _fail("case 14: could not drain the 500000 trio")
+	if not await _recall_to(1000000, "case 14 at 1000000"):
+		_game.rainbow_recalled.disconnect(on_recall)
+		return false
+	if not await _drain_to_one():
+		_game.rainbow_recalled.disconnect(on_recall)
+		return _fail("case 14: could not drain the 1000000 trio")
+	if not await _recall_to(2000000, "case 14 at 2000000"):
+		_game.rainbow_recalled.disconnect(on_recall)
+		return false
+	if recalls != [100000, 250000, 500000, 1000000, 2000000]:
+		_game.rainbow_recalled.disconnect(on_recall)
+		return _fail("case 14: recalls=%s" % [recalls])
+	_game.rainbow_recalled.disconnect(on_recall)
+	await _reset_and_place(Vector2(360, 520), Vector2(80, -20))
+	_game.add_score(100000)
+	if not await _expect_trio("case 14 restart 100000"):
+		return false
+	_cases_passed += 1
+	print("SUPERCHARGE case 14 pass recalls=100000,250000,500000,1000000,2000000")
+	return true
+
+
+func _case_15_recall_waits_for_ball() -> bool:
+	print("SUPERCHARGE case 15 recall waits for a ball")
+	_game.restart()
+	await process_frame
+	await physics_frame
+	await _free_balls()
+	if not _live_balls().is_empty():
+		return _fail("case 15: balls left after free %d" % _live_balls().size())
+	_game.add_score(100000)
+	await process_frame
+	await process_frame
+	if not _live_balls().is_empty():
+		return _fail("case 15: no-ball recall spawned %d" % _live_balls().size())
+	await _place_ball(Vector2(360, 520), Vector2(40, -10))
+	if not await _wait_for_ball_count(3, 12):
+		return _fail("case 15: ball did not bring the trio, balls=%d" % _live_balls().size())
+	if not _trio_is_rainbow():
+		return _fail("case 15: waiting trio is not rainbow")
+	_cases_passed += 1
+	print("SUPERCHARGE case 15 pass waited_for_ball")
+	return true
+
+
+func _recall_to(target: int, label: String) -> bool:
+	var gap := target - int(_game.score)
+	if gap <= 0:
+		return _fail("%s: score %s already past %s" % [label, _game.score, target])
+	_game.add_score(gap)
+	if int(_game.score) != target:
+		return _fail("%s: score=%s" % [label, _game.score])
+	return await _expect_trio(label)
+
+
+func _expect_trio(label: String) -> bool:
+	if not await _wait_for_ball_count(3, 12):
+		return _fail("%s: balls=%d expected 3" % [label, _live_balls().size()])
+	await process_frame
+	if _live_balls().size() != 3:
+		return _fail("%s: chained into %d balls" % [label, _live_balls().size()])
+	if not _trio_is_rainbow():
+		return _fail("%s: trio is not 3 rainbow with one turbo" % label)
+	return true
+
+
+func _trio_is_rainbow() -> bool:
+	var balls := _live_balls()
+	if balls.size() != 3:
+		return false
+	var turbo := 0
+	for ball in balls:
+		if not bool(ball.call("has_trait", "rainbow")):
+			return false
+		if bool(ball.call("has_trait", "turbo")):
+			turbo += 1
+	return turbo == 1
+
+
+func _drain_to_one() -> bool:
+	var guard := 0
+	while _live_balls().size() > 1 and guard < 8:
+		var balls := _live_balls()
+		_table.call("_on_drain_body_entered", balls[balls.size() - 1])
+		await process_frame
+		guard += 1
+	return _live_balls().size() == 1
 
 
 func _case_12_supercharged_soak() -> bool:
