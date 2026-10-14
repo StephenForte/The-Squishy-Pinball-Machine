@@ -567,19 +567,18 @@ func _on_game_over(final_score: int, _is_high_score: bool) -> void:
 		return
 	if final_score <= 0:
 		return
-	# The board rejects anything above its max. Posting it comes back 400
-	# and the game-over screen says the leaderboard refused the answer,
-	# which reads as the high scores disappearing. Skip the post; the
-	# fetch above still paints the real board.
-	var game := get_node_or_null("/root/Game")
-	if game != null and game.has_method("score_is_postable") and not bool(game.score_is_postable(final_score)):
-		print("Leaderboard skip score=%d over posted max" % final_score)
-		return
-	_start_new_submit(final_score)
-	_game_over_submit_token = _submit_token
+	# Same door as a name-claim invite: both call _start_new_submit.
+	if _start_new_submit(final_score):
+		_game_over_submit_token = _submit_token
 
 
-func _start_new_submit(score: int) -> void:
+## False when the board would reject this score. Game over posts through
+## here, and so do the name-claim and invite posts (Leaderboard.submit).
+## A 400 on either path paints "the leaderboard said no" over the board.
+func _start_new_submit(score: int) -> bool:
+	if not _score_is_postable(score):
+		print("Leaderboard skip score=%d over posted max" % score)
+		return false
 	_submit_token += 1
 	var token := _submit_token
 	_submit_state[token] = {
@@ -588,6 +587,14 @@ func _start_new_submit(score: int) -> void:
 		"retry_pending": false,
 	}
 	_begin_submit(token)
+	return true
+
+
+func _score_is_postable(score: int) -> bool:
+	var game := get_node_or_null("/root/Game")
+	if game != null and game.has_method("score_is_postable"):
+		return bool(game.score_is_postable(score))
+	return score > 0 and score <= 9999999
 
 
 func _begin_submit(token: int) -> void:
@@ -605,9 +612,16 @@ func _begin_submit(token: int) -> void:
 	var player_id := String(profile.player_id)
 	if player_name.is_empty() or player_id.is_empty():
 		return
+	var score := int(state.get("score", 0))
+	# Retries call this directly, so the cap has to hold here too.
+	if not _score_is_postable(score):
+		_submitted_tokens[token] = true
+		state["in_flight"] = false
+		state["retry_pending"] = false
+		print("Leaderboard skip score=%d over posted max" % score)
+		return
 	state["in_flight"] = true
 	state["retry_pending"] = false
-	var score := int(state.get("score", 0))
 	_record_attempt(token)
 	score_post_ids.append(player_id)
 	var body := JSON.stringify({
