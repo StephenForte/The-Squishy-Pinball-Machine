@@ -32,6 +32,14 @@ const _INT64_MAX := 9223372036854775807
 const BOARD_BONUS_CAP := 4
 const BOARD_BONUS_BASE := 1000
 const BOARD_BONUS_STEP := 500
+## Bonus stars stop growing once the score reaches this. Count and points
+## stay at the offer for this score; later waves keep the same stars.
+const BONUS_FREEZE_SCORE := 1000000
+## Matches server/src/validate.js MAX_SCORE. Anything larger is refused by
+## the board, so it is not a high score: not saved, not submitted, and a
+## value already in the file is dropped on load. Otherwise one runaway
+## game (the local "Dad" best) blocks every later high.
+const POSTED_SCORE_MAX := 9999999
 
 enum { READY, PLAYING, GAME_OVER }
 
@@ -117,7 +125,9 @@ func on_ball_drained() -> void:
 	if balls_left > 0:
 		return
 	state = GAME_OVER
-	var is_high := score > high_score
+	# A score the board will refuse must not become the stored best. The
+	# run still reports its real total; HIGH stays the last legal one.
+	var is_high := score <= POSTED_SCORE_MAX and score > high_score
 	if is_high:
 		high_score = score
 	game_over.emit(score, is_high)
@@ -179,12 +189,18 @@ func _process(delta: float) -> void:
 
 
 func bonus_offer(wave: int) -> Dictionary:
-	var count := mini(maxi(wave, 0), BOARD_BONUS_CAP)
-	var extra := maxi(0, wave - BOARD_BONUS_CAP)
+	var freeze_wave := int(BONUS_FREEZE_SCORE / BOARD_SHIFT_EVERY)
+	var used := mini(maxi(wave, 0), freeze_wave)
+	var count := mini(used, BOARD_BONUS_CAP)
+	var extra := maxi(0, used - BOARD_BONUS_CAP)
 	return {
 		"count": count,
 		"points": BOARD_BONUS_BASE + BOARD_BONUS_STEP * extra,
 	}
+
+
+func score_is_postable(value: int) -> bool:
+	return value > 0 and value <= POSTED_SCORE_MAX
 
 
 func _advance_board_wave() -> void:
@@ -242,6 +258,8 @@ func _high_for(player_id: String) -> int:
 func _set_high_for(player_id: String, value: int) -> void:
 	if player_id.is_empty():
 		return
+	if not _accept_high(value):
+		return
 	high_scores[player_id] = int(value)
 	_save_high_scores()
 
@@ -252,7 +270,11 @@ func _set_high_for(player_id: String, value: int) -> void:
 func reconcile_best(player_id: String, server_best: int) -> void:
 	if player_id.is_empty():
 		return
+	if not _accept_high(server_best):
+		return
 	var device := _high_for(player_id)
+	if not _accept_high(device):
+		device = 0
 	if server_best <= device:
 		return
 	_set_high_for(player_id, server_best)
@@ -276,14 +298,23 @@ func _load_high_scores() -> void:
 	var parsed: Dictionary = data
 	if parsed.has("high_scores") and typeof(parsed["high_scores"]) == TYPE_DICTIONARY:
 		var src: Dictionary = parsed["high_scores"]
+		var dropped := false
 		for key_variant in src.keys():
-			high_scores[String(key_variant)] = int(src[key_variant])
+			var value := int(src[key_variant])
+			if not _accept_high(value):
+				dropped = true
+				continue
+			high_scores[String(key_variant)] = value
+		if dropped:
+			_save_high_scores()
 		return
 	if parsed.has("high_score"):
 		var id := _current_player_id()
 		if id.is_empty():
 			return
-		high_scores[id] = int(parsed["high_score"])
+		var legacy := int(parsed["high_score"])
+		if _accept_high(legacy):
+			high_scores[id] = legacy
 		_save_high_scores()
 
 
@@ -293,6 +324,10 @@ func _save_high_scores() -> void:
 		push_warning("Game: could not write %s" % SAVE_PATH)
 		return
 	file.store_string(JSON.stringify({"high_scores": high_scores}))
+
+
+func _accept_high(value: int) -> bool:
+	return value >= 0 and value <= POSTED_SCORE_MAX
 
 
 func _state_name() -> String:

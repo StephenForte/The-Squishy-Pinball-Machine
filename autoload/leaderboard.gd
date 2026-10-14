@@ -567,6 +567,14 @@ func _on_game_over(final_score: int, _is_high_score: bool) -> void:
 		return
 	if final_score <= 0:
 		return
+	# The board rejects anything above its max. Posting it comes back 400
+	# and the game-over screen says the leaderboard refused the answer,
+	# which reads as the high scores disappearing. Skip the post; the
+	# fetch above still paints the real board.
+	var game := get_node_or_null("/root/Game")
+	if game != null and game.has_method("score_is_postable") and not bool(game.score_is_postable(final_score)):
+		print("Leaderboard skip score=%d over posted max" % final_score)
+		return
 	_start_new_submit(final_score)
 	_game_over_submit_token = _submit_token
 
