@@ -35,6 +35,8 @@ func _run() -> void:
 		return
 	if not await _case_3_reconcile_edges():
 		return
+	if not await _case_4_over_cap_high_is_dropped():
+		return
 
 	print("GAME_CONTRACT PASS cases=%d" % _cases_passed)
 	quit(0)
@@ -165,6 +167,85 @@ func _case_3_reconcile_edges() -> bool:
 
 	_cases_passed += 1
 	print("GAME_CONTRACT case 3 pass")
+	return true
+
+
+func _case_4_over_cap_high_is_dropped() -> bool:
+	print("GAME_CONTRACT case 4 over-cap high is dropped")
+	if int(_game.POSTED_SCORE_MAX) != 9999999:
+		return _fail("case 4: cap %s" % _game.POSTED_SCORE_MAX)
+	if not bool(_game.score_is_postable(9999999)) or bool(_game.score_is_postable(10000000)):
+		return _fail("case 4: score_is_postable")
+	if _profile == null or String(_profile.player_id).is_empty():
+		return _fail("case 4: profile missing")
+	var player_id := String(_profile.player_id)
+	var write := FileAccess.open("user://highscore.save", FileAccess.WRITE)
+	if write == null:
+		return _fail("case 4: could not write save")
+	write.store_string(JSON.stringify({
+		"high_scores": {player_id: 3000000001, ID_B: 5000},
+	}))
+	write = null
+	_game._load_high_scores()
+	if _game.high_scores.has(player_id) or int(_game.high_score) != 0:
+		return _fail("case 4: over-cap stayed %s high=%s" % [_game.high_scores, _game.high_score])
+	if int(_game.high_scores.get(ID_B, 0)) != 5000:
+		return _fail("case 4: legal slot dropped %s" % _game.high_scores)
+	var parsed: Variant = JSON.parse_string(_high_file())
+	var stored: Dictionary = (parsed as Dictionary).get("high_scores", {})
+	if stored.has(player_id) or int(stored.get(ID_B, 0)) != 5000:
+		return _fail("case 4: file %s" % parsed)
+	_game.reconcile_best(player_id, 3000000001)
+	if int(_game.high_scores.get(player_id, 0)) != 0:
+		return _fail("case 4: over-cap server best stored %s" % _game.high_scores)
+	_game.reconcile_best(player_id, 305600)
+	if int(_game.high_score) != 305600:
+		return _fail("case 4: server best did not fill the hole %s" % _game.high_score)
+	var leaderboard := root.get_node_or_null("/root/Leaderboard")
+	var restore_name := String(_profile.player_name)
+	if restore_name.is_empty():
+		# A name is what makes game over post. Set it in memory so this
+		# case does not write profile.save or switch to another id.
+		_profile.player_name = "Dad"
+	if leaderboard != null:
+		leaderboard.retry_delays_sec = []
+		for token in leaderboard._submit_state.keys():
+			leaderboard._submitted_tokens[token] = true
+	var posts_before := 0
+	if leaderboard != null:
+		posts_before = (leaderboard.score_post_ids as Array).size()
+	_game.restart()
+	await process_frame
+	_game.add_score(int(_game.POSTED_SCORE_MAX) + 1)
+	_game.on_ball_drained()
+	await physics_frame
+	_game.on_ball_drained()
+	await physics_frame
+	_game.on_ball_drained()
+	if int(_game.state) != int(_game.GAME_OVER):
+		return _fail("case 4: state=%s" % _game.state)
+	if int(_game.high_score) != 305600:
+		return _fail("case 4: over-cap game became the high %s" % _game.high_score)
+	if leaderboard != null and (leaderboard.score_post_ids as Array).size() != posts_before:
+		return _fail("case 4: over-cap score was posted %s" % leaderboard.score_post_ids)
+	if leaderboard != null and int(leaderboard._game_over_submit_token) != -1:
+		return _fail("case 4: submit token %s" % leaderboard._game_over_submit_token)
+	_game.restart()
+	await process_frame
+	_game.add_score(400000)
+	_game.on_ball_drained()
+	await physics_frame
+	_game.on_ball_drained()
+	await physics_frame
+	_game.on_ball_drained()
+	if int(_game.high_score) != 400000:
+		return _fail("case 4: legal game did not stick %s" % _game.high_score)
+	if leaderboard != null and (leaderboard.score_post_ids as Array).size() != posts_before + 1:
+		return _fail("case 4: legal score was not posted %s" % leaderboard.score_post_ids)
+	if restore_name.is_empty():
+		_profile.player_name = ""
+	_cases_passed += 1
+	print("GAME_CONTRACT case 4 pass")
 	return true
 
 

@@ -77,6 +77,8 @@ func _run() -> void:
 		return
 	if not await _case_9_return_during_other_cooldown():
 		return
+	if not await _case_10_bonuses_freeze_at_one_million():
+		return
 
 	print("BOARD_SHIFT PASS cases=%d" % _cases_passed)
 	quit(0)
@@ -529,6 +531,53 @@ func _layout_is_permutation() -> bool:
 			return false
 		used[matched] = true
 	return used.size() == HOST_PATHS.size()
+
+
+func _case_10_bonuses_freeze_at_one_million() -> bool:
+	print("BOARD_SHIFT case 10 bonuses freeze at 1_000_000")
+	_game.restart()
+	await process_frame
+	var freeze_wave := int(_game.BONUS_FREEZE_SCORE / _game.BOARD_SHIFT_EVERY)
+	var at_freeze: Dictionary = _game.bonus_offer(freeze_wave)
+	var past: Dictionary = _game.bonus_offer(freeze_wave * 3)
+	var just_before: Dictionary = _game.bonus_offer(freeze_wave - 1)
+	if int(at_freeze["count"]) != 4 or int(at_freeze["points"]) != 99000:
+		return _fail("case 10: freeze offer %s" % at_freeze)
+	if int(past["count"]) != int(at_freeze["count"]) or int(past["points"]) != int(at_freeze["points"]):
+		return _fail("case 10: later offer grew %s" % past)
+	if int(just_before["points"]) >= int(at_freeze["points"]):
+		return _fail("case 10: wave before freeze was not still climbing %s" % just_before)
+	_game.add_score(int(_game.BONUS_FREEZE_SCORE))
+	await process_frame
+	if int(_game.board_wave) != freeze_wave:
+		return _fail("case 10: wave=%s" % _game.board_wave)
+	if not _bonuses_worth(int(at_freeze["points"]), 4):
+		return false
+	if _board_label.text != "LAYOUT %d  ·  BONUS ×4  %d" % [freeze_wave, int(at_freeze["points"])]:
+		return _fail("case 10: label '%s'" % _board_label.text)
+	_game.add_score(int(_game.BONUS_FREEZE_SCORE))
+	await process_frame
+	if int(_game.board_wave) != freeze_wave * 2:
+		return _fail("case 10: layout stopped at wave=%s" % _game.board_wave)
+	if not _bonuses_worth(int(at_freeze["points"]), 4):
+		return false
+	if _board_label.text != "LAYOUT %d  ·  BONUS ×4  %d" % [freeze_wave * 2, int(at_freeze["points"])]:
+		return _fail("case 10: label after freeze '%s'" % _board_label.text)
+	_cases_passed += 1
+	print("BOARD_SHIFT case 10 pass")
+	return true
+
+
+func _bonuses_worth(points: int, count: int) -> bool:
+	var bonuses := _live_bonuses()
+	if bonuses.size() != count:
+		_fail("case 10: bonuses=%d want %d" % [bonuses.size(), count])
+		return false
+	for node in bonuses:
+		if int(node.get("points")) != points:
+			_fail("case 10: points=%s want %d" % [node.get("points"), points])
+			return false
+	return true
 
 
 func _live_bonuses() -> Array:
