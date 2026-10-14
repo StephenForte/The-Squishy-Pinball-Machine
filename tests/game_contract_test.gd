@@ -242,6 +242,34 @@ func _case_4_over_cap_high_is_dropped() -> bool:
 		return _fail("case 4: legal game did not stick %s" % _game.high_score)
 	if leaderboard != null and (leaderboard.score_post_ids as Array).size() != posts_before + 1:
 		return _fail("case 4: legal score was not posted %s" % leaderboard.score_post_ids)
+	# Name-claim and the invite call Leaderboard.submit, not game over.
+	if leaderboard != null:
+		var invite_before := (leaderboard.score_post_ids as Array).size()
+		var token_before := int(leaderboard._submit_token)
+		leaderboard.submit(int(_game.POSTED_SCORE_MAX) + 5)
+		if int(leaderboard._submit_token) != token_before:
+			return _fail("case 4: invite submit started a token for an over-cap score")
+		if (leaderboard.score_post_ids as Array).size() != invite_before:
+			return _fail("case 4: invite submit posted over-cap %s" % leaderboard.score_post_ids)
+		leaderboard.submit(410000)
+		if int(leaderboard._submit_token) != token_before + 1:
+			return _fail("case 4: invite submit dropped a legal score")
+		if (leaderboard.score_post_ids as Array).size() != invite_before + 1:
+			return _fail("case 4: invite submit did not post 410000 %s" % leaderboard.score_post_ids)
+		# A retry calls _begin_submit with the score already stored.
+		var retry_before := (leaderboard.score_post_ids as Array).size()
+		var retry_token := int(leaderboard._submit_token) + 1
+		leaderboard._submit_token = retry_token
+		leaderboard._submit_state[retry_token] = {
+			"score": int(_game.POSTED_SCORE_MAX) + 9,
+			"in_flight": false,
+			"retry_pending": true,
+		}
+		leaderboard._begin_submit(retry_token)
+		if (leaderboard.score_post_ids as Array).size() != retry_before:
+			return _fail("case 4: retry posted an over-cap score %s" % leaderboard.score_post_ids)
+		if not leaderboard._submitted_tokens.has(retry_token):
+			return _fail("case 4: over-cap retry was left pending")
 	if restore_name.is_empty():
 		_profile.player_name = ""
 	_cases_passed += 1
