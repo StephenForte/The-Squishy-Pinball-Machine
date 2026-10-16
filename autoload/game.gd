@@ -32,9 +32,11 @@ const _INT64_MAX := 9223372036854775807
 const BOARD_BONUS_CAP := 4
 const BOARD_BONUS_BASE := 1000
 const BOARD_BONUS_STEP := 500
-## Bonus stars stop growing once the score reaches this. Count and points
-## stay at the offer for this score; later waves keep the same stars.
-const BONUS_FREEZE_SCORE := 1000000
+## Bonus stars stop growing once the score reaches this. Later waves keep
+## the same stars. Points also never pass BONUS_FREEZE_POINTS, so the
+## climb levels off at 25_000 (score 260_000) and stays there.
+const BONUS_FREEZE_SCORE := 500000
+const BONUS_FREEZE_POINTS := 25000
 ## Matches server/src/validate.js MAX_SCORE. Anything larger is refused by
 ## the board, so it is not a high score: not saved, not submitted, and a
 ## value already in the file is dropped on load. Otherwise one runaway
@@ -193,9 +195,12 @@ func bonus_offer(wave: int) -> Dictionary:
 	var used := mini(maxi(wave, 0), freeze_wave)
 	var count := mini(used, BOARD_BONUS_CAP)
 	var extra := maxi(0, used - BOARD_BONUS_CAP)
+	var points := BOARD_BONUS_BASE + BOARD_BONUS_STEP * extra
+	if points > BONUS_FREEZE_POINTS:
+		points = BONUS_FREEZE_POINTS
 	return {
 		"count": count,
-		"points": BOARD_BONUS_BASE + BOARD_BONUS_STEP * extra,
+		"points": points,
 	}
 
 

@@ -77,7 +77,7 @@ func _run() -> void:
 		return
 	if not await _case_9_return_during_other_cooldown():
 		return
-	if not await _case_10_bonuses_freeze_at_one_million():
+	if not await _case_10_bonuses_freeze_at_500k():
 		return
 
 	print("BOARD_SHIFT PASS cases=%d" % _cases_passed)
@@ -533,20 +533,24 @@ func _layout_is_permutation() -> bool:
 	return used.size() == HOST_PATHS.size()
 
 
-func _case_10_bonuses_freeze_at_one_million() -> bool:
-	print("BOARD_SHIFT case 10 bonuses freeze at 1_000_000")
+func _case_10_bonuses_freeze_at_500k() -> bool:
+	print("BOARD_SHIFT case 10 bonuses freeze at 500_000")
 	_game.restart()
 	await process_frame
 	var freeze_wave := int(_game.BONUS_FREEZE_SCORE / _game.BOARD_SHIFT_EVERY)
 	var at_freeze: Dictionary = _game.bonus_offer(freeze_wave)
 	var past: Dictionary = _game.bonus_offer(freeze_wave * 3)
-	var just_before: Dictionary = _game.bonus_offer(freeze_wave - 1)
-	if int(at_freeze["count"]) != 4 or int(at_freeze["points"]) != 99000:
+	# +500 per wave reaches 25_000 at wave 52 (score 260_000), then holds.
+	var still_climbing: Dictionary = _game.bonus_offer(51)
+	var at_cap: Dictionary = _game.bonus_offer(52)
+	if int(_game.BONUS_FREEZE_POINTS) != 25000:
+		return _fail("case 10: freeze points %s" % _game.BONUS_FREEZE_POINTS)
+	if int(at_freeze["count"]) != 4 or int(at_freeze["points"]) != 25000:
 		return _fail("case 10: freeze offer %s" % at_freeze)
-	if int(past["count"]) != int(at_freeze["count"]) or int(past["points"]) != int(at_freeze["points"]):
+	if int(past["count"]) != 4 or int(past["points"]) != 25000:
 		return _fail("case 10: later offer grew %s" % past)
-	if int(just_before["points"]) >= int(at_freeze["points"]):
-		return _fail("case 10: wave before freeze was not still climbing %s" % just_before)
+	if int(still_climbing["points"]) != 24500 or int(at_cap["points"]) != 25000:
+		return _fail("case 10: cap ramp %s -> %s" % [still_climbing, at_cap])
 	_game.add_score(int(_game.BONUS_FREEZE_SCORE))
 	await process_frame
 	if int(_game.board_wave) != freeze_wave:
