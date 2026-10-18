@@ -85,7 +85,7 @@ function rowsHtml(entries) {
     </table>`;
 }
 
-function documentShell(mainInner, title = 'Squishy Leaderboard') {
+function documentShell(mainInner, title = 'Squishy Leaderboard', after = '') {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -136,6 +136,7 @@ tbody tr:nth-child(even) td{background:rgba(22,207,224,.06)}
 <main>
 ${mainInner}
 </main>
+${after}
 </body>
 </html>
 `;
@@ -156,10 +157,49 @@ export function renderBoard({ entries = [], total_players = 0 } = {}) {
 ${board}`);
 }
 
+/** Absolute instants stored by `toISOString()`. Offset-less strings are not instants. */
+const ISO_UTC = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})(?:\.\d+)?Z$/;
+
+/**
+ * Date and time a browser reports for `iso` in `timeZone`, or in the
+ * browser's own zone when `timeZone` is omitted. Locale is the environment's.
+ */
+export function browserDateTime(iso, timeZone) {
+  const then = new Date(iso);
+  if (Number.isNaN(then.getTime())) return '';
+  const options = {
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    second: '2-digit',
+  };
+  if (typeof timeZone === 'string' && timeZone !== '') options.timeZone = timeZone;
+  return then.toLocaleString(undefined, options);
+}
+
 function formatUtc(iso) {
-  const match = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})/.exec(String(iso ?? ''));
+  const match = ISO_UTC.exec(String(iso ?? ''));
   if (!match) return `${escapeHtml(iso ?? '')} UTC`;
   return `${match[1]} ${match[2]} UTC`;
+}
+
+/** UTC text is the no-script fallback. A valid instant also carries the raw timestamp. */
+function dateCell(iso) {
+  const raw = String(iso ?? '');
+  const fallback = formatUtc(raw);
+  if (!ISO_UTC.test(raw)) return fallback;
+  return `<time datetime="${escapeHtml(raw)}">${fallback}</time>`;
+}
+
+/**
+ * Static script: no user data is interpolated. It rewrites each instant to
+ * the date and time the browser reports for the viewer's zone and locale.
+ */
+function localTimeScript() {
+  const fn = browserDateTime.toString();
+  return `<script>(function(){${fn};var nodes=document.querySelectorAll("time[datetime]");for(var i=0;i<nodes.length;i++){var next=browserDateTime(nodes[i].getAttribute("datetime"));if(next)nodes[i].textContent=next;}})();</script>`;
 }
 
 function gamesTable(games) {
@@ -169,7 +209,7 @@ function gamesTable(games) {
   }
   const body = rows
     .map((game) => {
-      const when = formatUtc(game.at);
+      const when = dateCell(game.at);
       const score = escapeHtml(game.score ?? '');
       const mark = game.best ? 'BEST' : '';
       const cls = game.best ? ' class="best"' : '';
@@ -184,8 +224,9 @@ function gamesTable(games) {
 
 /**
  * One player's games. Same arcade shell as the board (D-063): inline CSS,
- * no scripts, no third-party requests. The caller passes display fields
- * only — never a player id.
+ * no third-party requests. The caller passes display fields only — never a
+ * player id. When a row has an instant, one static inline script shows that
+ * instant in the browser's local date and time.
  */
 export function renderPlayer(history = {}) {
   const name = escapeHtml(history.name ?? '');
@@ -198,11 +239,13 @@ export function renderPlayer(history = {}) {
   const games = Array.isArray(history.games) ? history.games : [];
   const shown = Math.min(games.length, 100);
   const gamesWord = total === 1 ? '1 GAME' : `${total} GAMES`;
+  const table = gamesTable(games);
+  const script = table.includes('<time ') ? localTimeScript() : '';
   return documentShell(`<h1>${avatar}${name}</h1>
 <p class="meta">BEST ${best} · ${rank} · ${gamesWord}</p>
 <p class="meta">showing ${shown} of ${total}</p>
 <p class="meta"><a href="/">HIGH SCORES</a></p>
-${gamesTable(games)}`, `${name} - Squishy Leaderboard`);
+${table}`, `${name} - Squishy Leaderboard`, script);
 }
 
 /** Styled 400 / 404 / 429 for the player page. `name` is omitted on 400 and 429. */
