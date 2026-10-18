@@ -4,7 +4,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { describe, it } from 'node:test';
+import { Script, createContext } from 'node:vm';
 import { createRateLimiter } from '../src/index.js';
+import { browserDateTime, renderPlayer } from '../src/page.js';
 import { postScore, putProfile, request, uuid, withServer } from './helpers.js';
 
 const KEY = 'devkey';
@@ -33,13 +35,41 @@ async function getHtml(port, path) {
 }
 
 function gameRows(html) {
-  return [...html.matchAll(/<tr( class="best")?><td class="date">([^<]*)<\/td><td class="score">([^<]*)<\/td><td class="mark">([^<]*)<\/td><\/tr>/g)]
-    .map((m) => ({
-      best: Boolean(m[1]),
-      at: m[2],
-      score: m[3],
-      mark: m[4],
-    }));
+  return [...html.matchAll(/<tr( class="best")?><td class="date">(.*?)<\/td><td class="score">([^<]*)<\/td><td class="mark">([^<]*)<\/td><\/tr>/g)]
+    .map((m) => {
+      const time = m[2].match(/^<time datetime="([^"]*)">([^<]*)<\/time>$/);
+      return {
+        best: Boolean(m[1]),
+        datetime: time ? time[1] : '',
+        at: time ? time[2] : m[2],
+        score: m[3],
+        mark: m[4],
+      };
+    });
+}
+
+/** Run the page's own script against its `<time>` nodes and return the visible text. */
+function applyBrowserTimes(html) {
+  const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];
+  assert.equal(scripts.length, 1);
+  const nodes = [...html.matchAll(/<time datetime="([^"]*)">([^<]*)<\/time>/g)].map((m) => ({
+    datetime: m[1],
+    textContent: m[2],
+    getAttribute(name) {
+      return name === 'datetime' ? this.datetime : null;
+    },
+  }));
+  const sandbox = {
+    document: {
+      querySelectorAll(selector) {
+        assert.equal(selector, 'time[datetime]');
+        return nodes;
+      },
+    },
+  };
+  createContext(sandbox);
+  new Script(scripts[0][1]).runInContext(sandbox);
+  return nodes.map((node) => node.textContent);
 }
 
 function arcadeOrdinal(rank) {
@@ -164,7 +194,6 @@ describe('GET /player', () => {
       assert.match(page.text, /href="\/"/);
       assert.equal(page.text.includes(bea), false);
       assert.equal(page.text.includes(ada), false);
-      assert.doesNotMatch(page.text, /<script/i);
       assert.equal(page.text.includes('fonts.googleapis.com'), false);
       assert.equal(page.text.includes('fonts.gstatic.com'), false);
 
@@ -174,9 +203,13 @@ describe('GET /player', () => {
       assert.equal(rows.filter((row) => row.best).length, 1);
       for (const row of rows) {
         assert.match(row.at, /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} UTC$/);
+        assert.match(row.datetime, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
       }
       const stamps = rows.map((row) => row.at);
       assert.deepEqual(stamps, [...stamps].sort().reverse());
+      const shown = applyBrowserTimes(page.text);
+      assert.deepEqual(shown, rows.map((row) => browserDateTime(row.datetime)));
+      assert.equal(shown.some((text) => text.includes('UTC')), false);
 
       const adaPage = await getHtml(port, playerPath('Ada'));
       assert.match(adaPage.text, /1 GAME/);
@@ -291,7 +324,12 @@ describe('GET /player', () => {
       assert.equal(page.text.includes(id), false);
       assert.match(page.text, /&lt;script&gt; &quot;&amp;/);
       assert.match(page.text, /<title>&lt;script&gt; &quot;&amp; - Squishy Leaderboard<\/title>/);
-      assert.doesNotMatch(page.text, /<script/i);
+      const scripts = [...page.text.matchAll(/<script>([\s\S]*?)<\/script>/g)];
+      assert.equal(scripts.length, 1);
+      assert.equal(scripts[0][1].includes(nasty), false);
+      assert.equal(scripts[0][1].includes('alert'), false);
+      assert.match(scripts[0][1], /querySelectorAll\("time\[datetime\]"\)/);
+      assert.match(scripts[0][1], /textContent/);
 
       const quotePage = await getHtml(port, playerPath(quoted));
       assert.equal(quotePage.status, 200);
@@ -393,7 +431,51 @@ describe('GET /player', () => {
       assert.match(page.text, /No games yet/);
       assert.equal(page.text.includes(claimed.json.player_id), false);
       assert.doesNotMatch(page.text, /<img\b/);
+      assert.doesNotMatch(page.text, /<script/i);
     });
+  });
+
+  it('shows the browser local date and time, and refuses a hostile timestamp', () => {
+    const iso = '2026-01-15T20:05:06.000Z';
+    const html = renderPlayer({
+      name: 'Ada',
+      best: 40,
+      rank: 1,
+      total: 1,
+      games: [{ at: iso, score: 40, best: true }],
+    });
+    assert.match(html, /<time datetime="2026-01-15T20:05:06.000Z">2026-01-15 20:05:06 UTC<\/time>/);
+    assert.deepEqual(applyBrowserTimes(html), [browserDateTime(iso)]);
+    assert.equal(browserDateTime(iso, 'America/Los_Angeles').includes('UTC'), false);
+    assert.notEqual(browserDateTime(iso, 'America/Los_Angeles'), browserDateTime(iso, 'UTC'));
+    assert.notEqual(browserDateTime(iso, 'Asia/Tokyo'), browserDateTime(iso, 'UTC'));
+    assert.notEqual(browserDateTime('2026-07-15T20:05:06.000Z', 'America/Los_Angeles'), browserDateTime('2026-07-15T20:05:06.000Z', 'UTC'));
+
+    const winter = new Date(iso);
+    const laHour = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/Los_Angeles',
+      hour: 'numeric',
+      hourCycle: 'h23',
+    }).format(winter);
+    const tokyoDay = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Tokyo',
+      day: 'numeric',
+    }).format(winter);
+    assert.equal(laHour, '12');
+    assert.equal(tokyoDay, '16');
+    assert.match(browserDateTime(iso, 'America/Los_Angeles'), /12:05:06/);
+    assert.match(browserDateTime(iso, 'Asia/Tokyo'), /\b16\b/);
+
+    const hostile = renderPlayer({
+      name: 'Ada',
+      best: 1,
+      rank: 1,
+      total: 1,
+      games: [{ at: '"><script>alert(1)</script>', score: 1, best: false }],
+    });
+    assert.equal(hostile.includes('<script'), false);
+    assert.equal(hostile.includes('<time'), false);
+    assert.match(hostile, /&lt;script&gt;alert\(1\)&lt;\/script&gt; UTC/);
   });
 
   it('shares the lookup limiter; the 61st request from one IP is 429 HTML', async () => {
