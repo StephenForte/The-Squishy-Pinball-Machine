@@ -1432,3 +1432,36 @@ posted game with `created_at` (D-026).
 - **Abuse:** the page answers through the same per-IP limiter as the lookup route (60/min), since it
   also tells a caller whether a name exists.
 - Task **T51**.
+
+## D-064 — Polish: smaller Game Over buttons, a drawn plunger, a "Ready Player One.." intro (Steve, 2026-10-19)
+Steve asked for three polish items; each was mapped to the code and the open choices put to him.
+- **Buttons (T52).** Asked which buttons felt wrong. Measured first: at 720x1280 `keep`, an iPhone (~390 pt
+  wide, ~664 pt tall in Safari) scales the canvas by ~0.52, so Restart/Menu (310x124, font 36) and Not you?
+  (640x128, font 32) render ~64-67 pt tall; the small ones are Settings Close (60 px tall), the picker arrows
+  (64 and 100 px wide, 68-84 tall) and the title Settings/Name buttons (80 px, font 22-26).
+  **Steve: "Restart, menu, not you seem a little big and ugly."** So T52 makes those three *smaller and
+  better looking*, not bigger. The 64-pt-at-375 floor (`game_over_touch_test` `MIN_PX` = 122.9 px;
+  `active_player_test` `MIN_TOUCH` = 64) was a phone touch minimum applied to the 720 canvas without a
+  layout budget (D-056 already said so). **New floor for these three: 48 pt at 375 pt wide = 92.2 px**
+  (Apple's minimum is 44 pt). Target height 96 px (~50 pt on an iPhone), font 28-30. "Ugly" is addressed
+  by real hover/pressed states (today `_style_button` uses one StyleBoxFlat for normal, hover and pressed,
+  so a tap gives no feedback), a larger corner radius and a subtle shadow; the pink fill stays (it is
+  what makes them visible, D-051). Other buttons are out of scope — Steve did not name them.
+- **Plunger (T53). Steve: visual only.** A spring/plunger is drawn at the bottom of the shooter lane
+  (lane interior x 636-696, floor top y 1232, ball spawns at (666, 1219)) with a "pull" cue while a ball
+  waits in the lane; on every launch it plays a release (snap) animation. Launch power, timing and every
+  input path are unchanged (`LAUNCH_IMPULSE` 1850, one tap = full power). Known wrinkle, **not** changed
+  here: on touch, a finger in the lane's screen area is in the right-flipper band (D-043), so tapping
+  the drawn plunger holds the right flipper rather than launching. Whether tapping the plunger should
+  launch is an open question for Steve; T53's cue must not say "tap here".
+- **Intro (T54). Steve: on every Play press, and on Restart.** A full-screen black card with
+  "Ready Player One.." (Steve's text, verbatim) in the web board's arcade style (D-061/T47: Press Start 2P,
+  gold `#FFD21C` with a gold glow, the h1's 1.2 s two-step blink, faint scanlines on `#000000`), then the
+  board. Not on boot (the title shows as today), not on Menu, not on "Not you?". About 2 s, not
+  skippable; during it no launch, flipper, restart or menu input acts. After it, the ball waits in the
+  lane for a deliberate launch. The font comes from the Latin subset already embedded in
+  `server/src/page.js` (SIL OFL 1.1, attribution in that file) — no download.
+- Process note: PRs #66-#69 (score cap, bonus freeze at 500k, invite post cap, local-time board) were
+  merged 2026-10-14 to 2026-10-18 from `cursor/` branches without a planner review or a PLAN row.
+- Tasks **T52**, **T53**, **T54**.
+

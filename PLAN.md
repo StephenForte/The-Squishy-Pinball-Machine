@@ -71,12 +71,17 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T41 | Name lookup should be read-only: the title probe POSTs to the creating resolve route and rebuilds its own HTTP path (D-056) | 12 | **done** 2026-09-28 — merged (PR #51, 575e7d3); server `dep-dastu7fpn0mc73a22ug0` live 03:30:14, static live 03:27:34 (before the server; no player traffic in between); lookup verified live | cheap-mid | T40 |
 | T40 | A refused identity (404 then PUT 409 `name_taken`) is never reconciled and silently loses runs: confirm at boot, route game over through the save-your-score invite (D-056, D-058). CORS half closed (D-057) | 12 | **done** 2026-09-27 — merged (PR #49, 597a7e8), deployed `dep-dasqsk0473hc739ip58g` | mid | — |
 | T38 | Name holders are undiagnosable: resolve hides the blocker, admin scores caps at 50 with no paging, and a score row locks a name forever (D-055) | 11 | **done** 2026-09-28 — merged (PR #52, ea0c508); server live (holders 401 without key, verified 2026-10-04) | mid | — |
+| T52 | Game Over Restart/Menu/Not you? smaller and nicer: 96 px tall, real pressed/hover states; floor 48 pt (D-064) | 15 | **done** 2026-10-19 — merged (PR #72 → 7e8da6c) | cheap (Sonnet) | — |
+| T53 | Drawn plunger in the shooter lane: "pull" cue while a ball waits, release animation on launch; visual only (D-064) | 15 | **done** 2026-10-19 — merged (PR #71 → 6c2c595) | mid | — |
+| T54 | "Ready Player One.." intro card on Play and Restart, arcade font/style, input blocked ~2 s (D-064) | 15 | **approved** 2026-10-19 — PR #73 (`1a4f91a`), merge as-is | mid | — |
+| T55 | `active_player_test` races: a restart out of the unconfirmed invite adopts "Dad" after the test switches to Mom, failing the saved-binding case (3 of 5 runs on main `fe616c1`, reported by the T52 worker) | hygiene  T54 retired the in-flight resolve in the test, so the suite no longer shows it; open question: can a late resolve adopt the wrong player in real play (e.g. "Not you?" while a resolve is in flight)? | **open** — not dispatched; needs a planner repro before a brief | mid | — |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8 → T10 → T9 →
 **Phase 5:** T11 ∥ T12 → T11.1 (deploy) → T13.
 **Phase 6:** T17 → T17b (T17b touches `title.tscn`; run it alone) → **T13b ∥ T18** (disjoint files; T18 runs in a clone).
 **Phase 7:** T19 → T20a → *(planner deploys)* → T20b. Sequential, all in the main checkout: they share `profile.gd`, and the
 clone rule has now been ignored by two separate workers (T13b, T18) — do not run them in parallel.
+**Phase 15 (D-064):** T52 ∥ T53 ∥ T54 — disjoint files (T52 `game_over.*` + two tests; T53 `launcher.gd`, `table.tscn`, new plunger files; T54 new intro files, `main.tscn`, `touch_controls.gd`, font asset). Each in its own clone `Pinball-T5x` if run at the same time.
 T5 and T6 are the only truly parallel pair; ownership below is drawn to keep them apart.
 
 ## Running the game after a pull
@@ -385,6 +390,21 @@ The trap is the existing reconcilers: `_adopt_cloud_avatar_if_local_empty` and b
 `_reconcile_boot_*` guard on `data.player_id == profile.player_id`, so a fetch for an id the device
 does **not** yet hold is silently ignored by all three. Restore therefore needs its own callback,
 not a reuse of `_on_fetch_profile_finished`’s adopt path.
+
+### T52 — Game Over buttons smaller and nicer (Steve, 2026-10-19)
+Contract D-064. Owns `scenes/ui/game_over.tscn` (RestartButton, MenuButton, NotYouButton, HintLabel geometry),
+`scripts/ui/game_over.gd` (`_style_button` only), `tests/game_over_touch_test.gd` and `tests/active_player_test.gd`
+(size floor 122.9/64 → 92.2 px — a declared loosening Steve asked for). Branch `task/T52-gameover-buttons`.
+
+### T53 — Drawn plunger (Steve, 2026-10-19)
+Contract D-064. Owns `scripts/launcher.gd` (additive `launched` signal), new `scripts/plunger.gd` (+ scene if wanted),
+`scenes/table.tscn` (additive: instance under Launcher), new `tests/plunger_test.gd`. Visual only. Branch
+`task/T53-plunger`.
+
+### T54 — "Ready Player One.." intro (Steve, 2026-10-19)
+Contract D-064. Owns new `scenes/ui/intro.tscn`, `scripts/ui/intro.gd`, `assets/fonts/` (Latin Press Start 2P
+woff2 extracted from `server/src/page.js` + OFL text), `scenes/main.tscn` (additive instance), `scripts/ui/touch_controls.gd`
+(additive `_blocked()` clause), new `tests/intro_test.gd`. Branch `task/T54-intro`.
 
 ### T24 — Touch controls (Steve, 2026-09-19)
 Contract D-043. Critical path for both target devices. Measured before designing: zero touch or
@@ -1558,3 +1578,27 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   `dep-db6m16s9v7es7381t260` (brief 502 during the instance swap). Live: board names link to `/player?name=`;
   `/player?name=Dad` 200 — avatar, BEST 251400 · 2ND · 87 GAMES, "showing 87 of 87", UTC dates newest first;
   no UUID in the page; unknown name 404.
+- 2026-10-19: Steve asked for three polish items. Clarified with him before scoping: buttons = Restart/Menu/Not you?
+  are "a little big and ugly" (make smaller, not bigger); plunger = visual only; intro = every Play and Restart.
+  Measured: those buttons are 124-128 px tall (~64-67 pt on an iPhone at scale ~0.52); lane interior x 636-696,
+  floor y 1232, spawn (666, 1219); Title is layer 15, GameOver 20, TouchControls 12, HUD 10; the web board's
+  Press Start 2P Latin subset is embedded in `server/src/page.js:101`. PRs #66-#69 found merged unreviewed.
+  → **D-064, T52/T53/T54**. Base main `fe616c1`. Decisions through **D-064**, next free **D-065**; tasks through
+  **T54**, next free **T55**.
+- 2026-10-19: **T52 and T53 reviewed and approved, merge as-is.** Both are based on main `fe616c1` and within scope. The planner re-ran
+  `run_all.sh` in scratch clones: all suites PASS (42 suite lines each = main's set + the new suite). Mutation probes, each
+  with a positive control: T52 `pressed = pink` turns `gameover_buttons_test` red ("not darker than normal"); T53 without
+  `launched.emit` turns `plunger_test` red ("launched count 0"). T52's floor change (122.9 → 92.16) and its
+  `_assert_pink_button` relaxation were accepted as D-064's intent; the darker-pressed guarantee moved to the new suite.
+  T53's table.tscn diff is a pure addition. T53's capture ran outside the runner and rewrote the real `highscore.save`;
+  the planner read it (14300 / 6248200, sane, and HIGH reconciles to the server per D-057). New: **T55** (active_player_test
+  race, pre-existing). Tasks through **T55**, next free **T56**.
+- 2026-10-19: #72 and #71 merged by Steve (main `7e8da6c`). **T54 reviewed and approved, merge as-is** (PR #73, `1a4f91a`, base
+  `fe616c1`). `git merge-tree` against `7e8da6c` is clean; the planner gated the merged tree: all suites PASS, 44 suite lines
+  (main + intro, plunger, gameover_buttons). Font sha256 `42144b97…` is identical to the page.js Latin subset. Mutants:
+  removing the flipper physics gating → intro_test red; removing the touch_controls clause, and also Intro's touch swallow →
+  still green, because blocking is enforced where input is consumed (flipper physics off, launcher unhandled input off) and the
+  touch filters are extra layers. Behaviour change accepted per D-064: Play no longer launches; the ball waits.
+  T54's active_player_test edit hides the T55 race in the suite; **T55 is reframed** as a product question needing a repro.
+  After #73 merges, mark this PR ready and merge it to close Phase 15. Static web redeploy not yet done or verified.
+
