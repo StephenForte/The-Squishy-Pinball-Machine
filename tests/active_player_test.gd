@@ -8,7 +8,8 @@ extends SceneTree
 const PORT := 18798
 const SENTINEL := "http://127.0.0.1:1"
 const LONG_NAME := "ABCDEFGHIJKLMNOP"
-const MIN_TOUCH := 64.0
+## 48 pt at 375 pt wide, in 720-canvas pixels (D-064). 48 * 720 / 375 = 92.16.
+const MIN_TOUCH := 48.0 * 720.0 / 375.0
 
 var _cases_passed: int = 0
 var _profile: Node
@@ -299,7 +300,7 @@ func _case_saved_binding() -> bool:
 	if not not_you.visible:
 		return _fail("saved: Not you? hidden")
 	if not_you.size.y < MIN_TOUCH:
-		return _fail("Not you? height %.1f < 64" % not_you.size.y)
+		return _fail("Not you? height %.1f < %.2f" % [not_you.size.y, MIN_TOUCH])
 	if not _assert_one_line(saved, "saved Dad"):
 		return false
 	if not _assert_overlap(panel, "saved", _HEADER_SEAM):

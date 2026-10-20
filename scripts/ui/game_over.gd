@@ -172,16 +172,37 @@ func _apply_theme(_id: String = "") -> void:
 func _style_button(button: Button, theme_node: Node) -> void:
 	if button == null:
 		return
-	var style := StyleBoxFlat.new()
-	style.bg_color = theme_node.color("object_pink")
-	style.corner_radius_top_left = 8
-	style.corner_radius_top_right = 8
-	style.corner_radius_bottom_left = 8
-	style.corner_radius_bottom_right = 8
-	button.add_theme_stylebox_override("normal", style)
-	button.add_theme_stylebox_override("hover", style)
-	button.add_theme_stylebox_override("pressed", style)
-	button.add_theme_color_override("font_color", theme_node.color("text_on_color"))
+	var pink: Color = theme_node.color("object_pink")
+	var on_color: Color = theme_node.color("text_on_color")
+	var normal := StyleBoxFlat.new()
+	var hover := StyleBoxFlat.new()
+	var pressed := StyleBoxFlat.new()
+	# Normal stays object_pink (D-051). Hover is lighter; pressed is darker
+	# so a tap is visible (D-064). One shared box used to paint all three.
+	normal.bg_color = pink
+	hover.bg_color = pink.lightened(0.12)
+	pressed.bg_color = pink.darkened(0.22)
+	for style in [normal, hover, pressed]:
+		style.corner_radius_top_left = 18
+		style.corner_radius_top_right = 18
+		style.corner_radius_bottom_left = 18
+		style.corner_radius_bottom_right = 18
+		style.content_margin_left = 16
+		style.content_margin_right = 16
+		style.content_margin_top = 6
+		style.content_margin_bottom = 6
+		style.shadow_color = Color(0, 0, 0, 0.38)
+		style.shadow_size = 4
+		style.shadow_offset = Vector2(0, 3)
+	pressed.shadow_size = 2
+	pressed.shadow_offset = Vector2(0, 1)
+	button.add_theme_stylebox_override("normal", normal)
+	button.add_theme_stylebox_override("hover", hover)
+	button.add_theme_stylebox_override("pressed", pressed)
+	button.add_theme_color_override("font_color", on_color)
+	button.add_theme_color_override("font_hover_color", on_color)
+	button.add_theme_color_override("font_pressed_color", on_color)
+	button.add_theme_color_override("font_focus_color", on_color)
 
 
 func _style_name_edit(theme_node: Node) -> void:

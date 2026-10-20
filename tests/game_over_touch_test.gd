@@ -5,8 +5,8 @@ extends SceneTree
 ## pressed.emit() / text_submitted.emit(), and geometry is asserted directly.
 
 const DESKTOP_HINT := "R restart · Esc menu"
-## 64 CSS px at a 375-wide phone, mapped onto the 720-wide viewport.
-const MIN_PX := 64.0 * 720.0 / 375.0
+## 48 CSS px at a 375-wide phone, mapped onto the 720-wide viewport (D-064).
+const MIN_PX := 48.0 * 720.0 / 375.0
 const FLOOR_Y := 1150.0
 ## Stand-in for a keyboard on the bottom half. A control that ends above this
 ## is still on screen while the field is focused.
@@ -488,15 +488,26 @@ func _assert_save_adjacent(edit: LineEdit, save: Button) -> bool:
 
 
 func _assert_pink_button(button: Button, pink: Color, on_color: Color, default_bg: Color, label: String) -> bool:
-	for state in ["normal", "hover", "pressed"]:
+	# D-051: the resting fill is object_pink, never the default dark box.
+	# D-064: hover and pressed are their own boxes, so only normal must match
+	# pink exactly. Those states still have to be real StyleBoxFlats.
+	var normal := button.get_theme_stylebox("normal")
+	if not (normal is StyleBoxFlat):
+		_fail("%s: %s normal style is not StyleBoxFlat" % [label, button.name])
+		return false
+	var normal_bg: Color = (normal as StyleBoxFlat).bg_color
+	if normal_bg != pink:
+		_fail("%s: %s normal bg %s is not object_pink %s" % [label, button.name, normal_bg, pink])
+		return false
+	if normal_bg == default_bg:
+		_fail("%s: %s normal bg is the default button colour" % [label, button.name])
+		return false
+	for state in ["hover", "pressed"]:
 		var style := button.get_theme_stylebox(state)
 		if not (style is StyleBoxFlat):
 			_fail("%s: %s %s style is not StyleBoxFlat" % [label, button.name, state])
 			return false
 		var bg: Color = (style as StyleBoxFlat).bg_color
-		if bg != pink:
-			_fail("%s: %s %s bg %s is not object_pink %s" % [label, button.name, state, bg, pink])
-			return false
 		if bg == default_bg:
 			_fail("%s: %s %s bg is the default button colour" % [label, button.name, state])
 			return false

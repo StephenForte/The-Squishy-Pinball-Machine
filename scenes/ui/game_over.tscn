@@ -219,35 +219,35 @@ alignment = 1
 offset_left = 40.0
 offset_top = 508.0
 offset_right = 350.0
-offset_bottom = 632.0
+offset_bottom = 604.0
 focus_mode = 0
-theme_override_font_sizes/font_size = 36
+theme_override_font_sizes/font_size = 28
 text = "Restart"
 
 [node name="MenuButton" type="Button" parent="."]
 offset_left = 370.0
 offset_top = 508.0
 offset_right = 680.0
-offset_bottom = 632.0
+offset_bottom = 604.0
 focus_mode = 0
-theme_override_font_sizes/font_size = 36
+theme_override_font_sizes/font_size = 28
 text = "Menu"
 
 [node name="NotYouButton" type="Button" parent="."]
 visible = false
-offset_left = 40.0
-offset_top = 748.0
-offset_right = 680.0
-offset_bottom = 876.0
+offset_left = 200.0
+offset_top = 744.0
+offset_right = 520.0
+offset_bottom = 840.0
 focus_mode = 2
-theme_override_font_sizes/font_size = 32
+theme_override_font_sizes/font_size = 28
 text = "Not you?"
 
 [node name="HintLabel" type="Label" parent="."]
 offset_left = 40.0
-offset_top = 640.0
+offset_top = 612.0
 offset_right = 680.0
-offset_bottom = 688.0
+offset_bottom = 652.0
 mouse_filter = 2
 theme_override_colors/font_color = Color(0.92, 0.92, 0.92, 1)
 theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
