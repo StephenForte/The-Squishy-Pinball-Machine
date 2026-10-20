@@ -297,6 +297,10 @@ func _blocked() -> bool:
 	var settings := main.get_node_or_null("Title/Settings")
 	if settings != null and settings.has_method("is_open") and settings.is_open():
 		return true
+	# D-064: the intro card sits above this layer and must own the touch too.
+	var intro := main.get_node_or_null("Intro")
+	if intro != null and intro.visible:
+		return true
 	return false
 
 
