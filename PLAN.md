@@ -71,10 +71,10 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T41 | Name lookup should be read-only: the title probe POSTs to the creating resolve route and rebuilds its own HTTP path (D-056) | 12 | **done** 2026-09-28 — merged (PR #51, 575e7d3); server `dep-dastu7fpn0mc73a22ug0` live 03:30:14, static live 03:27:34 (before the server; no player traffic in between); lookup verified live | cheap-mid | T40 |
 | T40 | A refused identity (404 then PUT 409 `name_taken`) is never reconciled and silently loses runs: confirm at boot, route game over through the save-your-score invite (D-056, D-058). CORS half closed (D-057) | 12 | **done** 2026-09-27 — merged (PR #49, 597a7e8), deployed `dep-dasqsk0473hc739ip58g` | mid | — |
 | T38 | Name holders are undiagnosable: resolve hides the blocker, admin scores caps at 50 with no paging, and a score row locks a name forever (D-055) | 11 | **done** 2026-09-28 — merged (PR #52, ea0c508); server live (holders 401 without key, verified 2026-10-04) | mid | — |
-| T52 | Game Over Restart/Menu/Not you? smaller and nicer: 96 px tall, real pressed/hover states; floor 48 pt (D-064) | 15 | **approved** 2026-10-19 — PR #72 (`2d56981`), merge as-is | cheap (Sonnet) | — |
-| T53 | Drawn plunger in the shooter lane: "pull" cue while a ball waits, release animation on launch; visual only (D-064) | 15 | **approved** 2026-10-19 — PR #71 (`cd5e482`), merge as-is | mid | — |
-| T54 | "Ready Player One.." intro card on Play and Restart, arcade font/style, input blocked ~2 s (D-064) | 15 | **dispatched** 2026-10-19 | mid | — |
-| T55 | `active_player_test` races: a restart out of the unconfirmed invite adopts "Dad" after the test switches to Mom, failing the saved-binding case (3 of 5 runs on main `fe616c1`, reported by the T52 worker) | hygiene | **open** — not dispatched | mid | — |
+| T52 | Game Over Restart/Menu/Not you? smaller and nicer: 96 px tall, real pressed/hover states; floor 48 pt (D-064) | 15 | **done** 2026-10-19 — merged (PR #72 → 7e8da6c) | cheap (Sonnet) | — |
+| T53 | Drawn plunger in the shooter lane: "pull" cue while a ball waits, release animation on launch; visual only (D-064) | 15 | **done** 2026-10-19 — merged (PR #71 → 6c2c595) | mid | — |
+| T54 | "Ready Player One.." intro card on Play and Restart, arcade font/style, input blocked ~2 s (D-064) | 15 | **approved** 2026-10-19 — PR #73 (`1a4f91a`), merge as-is | mid | — |
+| T55 | `active_player_test` races: a restart out of the unconfirmed invite adopts "Dad" after the test switches to Mom, failing the saved-binding case (3 of 5 runs on main `fe616c1`, reported by the T52 worker) | hygiene  T54 retired the in-flight resolve in the test, so the suite no longer shows it; open question: can a late resolve adopt the wrong player in real play (e.g. "Not you?" while a resolve is in flight)? | **open** — not dispatched; needs a planner repro before a brief | mid | — |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8 → T10 → T9 →
 **Phase 5:** T11 ∥ T12 → T11.1 (deploy) → T13.
@@ -1593,4 +1593,12 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   T53's table.tscn diff is a pure addition. T53's capture ran outside the runner and rewrote the real `highscore.save`;
   the planner read it (14300 / 6248200, sane, and HIGH reconciles to the server per D-057). New: **T55** (active_player_test
   race, pre-existing). Tasks through **T55**, next free **T56**.
+- 2026-10-19: #72 and #71 merged by Steve (main `7e8da6c`). **T54 reviewed and approved, merge as-is** (PR #73, `1a4f91a`, base
+  `fe616c1`). `git merge-tree` against `7e8da6c` is clean; the planner gated the merged tree: all suites PASS, 44 suite lines
+  (main + intro, plunger, gameover_buttons). Font sha256 `42144b97…` is identical to the page.js Latin subset. Mutants:
+  removing the flipper physics gating → intro_test red; removing the touch_controls clause, and also Intro's touch swallow →
+  still green, because blocking is enforced where input is consumed (flipper physics off, launcher unhandled input off) and the
+  touch filters are extra layers. Behaviour change accepted per D-064: Play no longer launches; the ball waits.
+  T54's active_player_test edit hides the T55 race in the suite; **T55 is reframed** as a product question needing a repro.
+  After #73 merges, mark this PR ready and merge it to close Phase 15. Static web redeploy not yet done or verified.
 
