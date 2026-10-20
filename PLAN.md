@@ -71,9 +71,10 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T41 | Name lookup should be read-only: the title probe POSTs to the creating resolve route and rebuilds its own HTTP path (D-056) | 12 | **done** 2026-09-28 — merged (PR #51, 575e7d3); server `dep-dastu7fpn0mc73a22ug0` live 03:30:14, static live 03:27:34 (before the server; no player traffic in between); lookup verified live | cheap-mid | T40 |
 | T40 | A refused identity (404 then PUT 409 `name_taken`) is never reconciled and silently loses runs: confirm at boot, route game over through the save-your-score invite (D-056, D-058). CORS half closed (D-057) | 12 | **done** 2026-09-27 — merged (PR #49, 597a7e8), deployed `dep-dasqsk0473hc739ip58g` | mid | — |
 | T38 | Name holders are undiagnosable: resolve hides the blocker, admin scores caps at 50 with no paging, and a score row locks a name forever (D-055) | 11 | **done** 2026-09-28 — merged (PR #52, ea0c508); server live (holders 401 without key, verified 2026-10-04) | mid | — |
-| T52 | Game Over Restart/Menu/Not you? smaller and nicer: 96 px tall, real pressed/hover states; floor 48 pt (D-064) | 15 | **dispatched** 2026-10-19 | cheap (Sonnet) | — |
-| T53 | Drawn plunger in the shooter lane: "pull" cue while a ball waits, release animation on launch; visual only (D-064) | 15 | **dispatched** 2026-10-19 | mid | — |
+| T52 | Game Over Restart/Menu/Not you? smaller and nicer: 96 px tall, real pressed/hover states; floor 48 pt (D-064) | 15 | **approved** 2026-10-19 — PR #72 (`2d56981`), merge as-is | cheap (Sonnet) | — |
+| T53 | Drawn plunger in the shooter lane: "pull" cue while a ball waits, release animation on launch; visual only (D-064) | 15 | **approved** 2026-10-19 — PR #71 (`cd5e482`), merge as-is | mid | — |
 | T54 | "Ready Player One.." intro card on Play and Restart, arcade font/style, input blocked ~2 s (D-064) | 15 | **dispatched** 2026-10-19 | mid | — |
+| T55 | `active_player_test` races: a restart out of the unconfirmed invite adopts "Dad" after the test switches to Mom, failing the saved-binding case (3 of 5 runs on main `fe616c1`, reported by the T52 worker) | hygiene | **open** — not dispatched | mid | — |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8 → T10 → T9 →
 **Phase 5:** T11 ∥ T12 → T11.1 (deploy) → T13.
@@ -1584,4 +1585,12 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   Press Start 2P Latin subset is embedded in `server/src/page.js:101`. PRs #66-#69 found merged unreviewed.
   → **D-064, T52/T53/T54**. Base main `fe616c1`. Decisions through **D-064**, next free **D-065**; tasks through
   **T54**, next free **T55**.
+- 2026-10-19: **T52 and T53 reviewed and approved, merge as-is.** Both are based on main `fe616c1` and within scope. The planner re-ran
+  `run_all.sh` in scratch clones: all suites PASS (42 suite lines each = main's set + the new suite). Mutation probes, each
+  with a positive control: T52 `pressed = pink` turns `gameover_buttons_test` red ("not darker than normal"); T53 without
+  `launched.emit` turns `plunger_test` red ("launched count 0"). T52's floor change (122.9 → 92.16) and its
+  `_assert_pink_button` relaxation were accepted as D-064's intent; the darker-pressed guarantee moved to the new suite.
+  T53's table.tscn diff is a pure addition. T53's capture ran outside the runner and rewrote the real `highscore.save`;
+  the planner read it (14300 / 6248200, sane, and HIGH reconciles to the server per D-057). New: **T55** (active_player_test
+  race, pre-existing). Tasks through **T55**, next free **T56**.
 
