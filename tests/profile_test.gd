@@ -301,17 +301,25 @@ func _case_6_launch(main: Node) -> bool:
 	if ball == null:
 		return false
 	_push_action(main, "launch_ball")
-	var launched := false
 	for _f in 5:
+		await physics_frame
+	_push_action(main, "launch_ball", false)
+	if title.visible:
+		return _fail("case 6: Title should hide on first Space after a name is set")
+	if bool(ball.get("launched")):
+		return _fail("case 6: Space launched during the intro")
+	if not await _wait_intro_clear(main):
+		return false
+	_push_action(main, "launch_ball")
+	var launched := false
+	for _f in 8:
 		await physics_frame
 		if bool(ball.get("launched")):
 			launched = true
 			break
 	_push_action(main, "launch_ball", false)
-	if title.visible:
-		return _fail("case 6: Title should hide on first Space after a name is set")
 	if not launched:
-		return _fail("case 6: Space did not launch after a name is set")
+		return _fail("case 6: Space did not launch after the intro")
 	_cases_passed += 1
 	print("PROFILE case 6 pass")
 	return true
@@ -587,6 +595,17 @@ func _type_char(main: Node, keycode: Key, unicode: int) -> void:
 	main.get_viewport().push_input(ev)
 	ev.pressed = false
 	main.get_viewport().push_input(ev)
+
+
+func _wait_intro_clear(main: Node) -> bool:
+	var intro := main.get_node_or_null("Intro")
+	if intro == null:
+		return true
+	for _i in 400:
+		if not intro.visible:
+			return true
+		await process_frame
+	return _fail("intro did not clear")
 
 
 func _push_action(main: Node, action: StringName, pressed: bool = true) -> void:

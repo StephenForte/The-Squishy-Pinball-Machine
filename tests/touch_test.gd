@@ -209,22 +209,41 @@ func _case_tap_launches_and_dismisses(main: Node, game: Node) -> bool:
 		return false
 	_touch(0, LAUNCH_ZONE, true)
 	_touch(0, LAUNCH_ZONE, false)
+	for _f in 8:
+		await physics_frame
+	if title.visible:
+		return _fail("case 6: tap did not dismiss the title")
+	if bool(ball.get("launched")):
+		return _fail("case 6: tap launched during the intro")
+	if not await _wait_intro_clear(main):
+		return false
+	_touch(0, LAUNCH_ZONE, true)
+	_touch(0, LAUNCH_ZONE, false)
 	var launched := false
 	for _f in 8:
 		await physics_frame
 		if is_instance_valid(ball) and bool(ball.get("launched")):
 			launched = true
 			break
-	if title.visible:
-		return _fail("case 6: tap did not dismiss the title")
 	if not launched:
-		return _fail("case 6: tap did not launch the waiting ball")
+		return _fail("case 6: tap did not launch after the intro")
 
 	game.restart()
 	await process_frame
 	await process_frame
+	var intro := main.get_node_or_null("Intro")
+	if intro == null or not intro.visible:
+		return _fail("case 6: restart did not show the intro")
 	ball = await _wait_lane_ball(main)
 	if ball == null:
+		return false
+	_touch(3, LAUNCH_ZONE, true)
+	_touch(3, LAUNCH_ZONE, false)
+	for _f in 8:
+		await physics_frame
+	if bool(ball.get("launched")):
+		return _fail("case 6: tap during the intro launched")
+	if not await _wait_intro_clear(main):
 		return false
 	_touch(3, LAUNCH_ZONE, true)
 	_touch(3, LAUNCH_ZONE, false)
@@ -235,7 +254,7 @@ func _case_tap_launches_and_dismisses(main: Node, game: Node) -> bool:
 			launched = true
 			break
 	if not launched:
-		return _fail("case 6: tap outside zones did not launch after restart")
+		return _fail("case 6: tap after restart intro did not launch")
 	_cases_passed += 1
 	print("TOUCH case 6 pass")
 	return true
@@ -480,11 +499,15 @@ func _case_restart_clears_touch(main: Node, game: Node) -> bool:
 		game.restart()
 		await process_frame
 		await process_frame
+		if not await _wait_intro_clear(main):
+			return false
 	if title.visible:
 		_touch(0, LAUNCH_ZONE, true)
 		_touch(0, LAUNCH_ZONE, false)
 		for _f in 8:
 			await physics_frame
+		if not await _wait_intro_clear(main):
+			return false
 	_touch(4, LEFT_ZONE, true)
 	await process_frame
 	for _i in HOLD_FRAMES:
@@ -514,6 +537,17 @@ func _is_raised(flipper: Node) -> bool:
 	if flipper == null or not ("rest_rad" in flipper):
 		return false
 	return absf(float(flipper.rotation) - float(flipper.rest_rad)) > 0.08
+
+
+func _wait_intro_clear(main: Node) -> bool:
+	var intro := main.get_node_or_null("Intro")
+	if intro == null:
+		return true
+	for _i in 400:
+		if not intro.visible:
+			return true
+		await process_frame
+	return _fail("intro did not clear")
 
 
 func _touch(index: int, pos: Vector2, pressed: bool) -> void:

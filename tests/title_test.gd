@@ -80,20 +80,33 @@ func _case_2_launch(main: Node) -> bool:
 	ev.action = "launch_ball"
 	ev.pressed = true
 	main.get_viewport().push_input(ev)
-	var launched := false
 	for _f in 5:
+		await physics_frame
+	ev.pressed = false
+	main.get_viewport().push_input(ev)
+	if title.visible:
+		return _fail("case 2: Title should be hidden after launch_ball")
+	# D-064: the press that dismisses the title shows the intro and does not
+	# launch. A later press, after the card, still launches.
+	if bool(ball.get("launched")):
+		return _fail("case 2: dismiss launch fired the ball during the intro")
+	var intro := main.get_node_or_null("Intro")
+	if intro == null or not intro.visible:
+		return _fail("case 2: intro should be up after the title hides")
+	if not await _wait_intro_clear(main):
+		return false
+	ev.pressed = true
+	main.get_viewport().push_input(ev)
+	var launched := false
+	for _f in 8:
 		await physics_frame
 		if bool(ball.get("launched")):
 			launched = true
 			break
 	ev.pressed = false
 	main.get_viewport().push_input(ev)
-	if title.visible:
-		return _fail("case 2: Title should be hidden after launch_ball")
 	if not launched:
-		return _fail(
-			"case 2: ball was not launched within 5 frames (title may have swallowed input)"
-		)
+		return _fail("case 2: ball did not launch after the intro")
 	_cases_passed += 1
 	print("TITLE case 2 pass")
 	return true
@@ -114,6 +127,20 @@ func _case_3_menu_returns_r_stays_hidden(main: Node, game: Node) -> bool:
 	await process_frame
 	if title.visible:
 		return _fail("case 3: Title should stay hidden after restart (R)")
+	var intro := main.get_node_or_null("Intro")
+	if intro != null and intro.visible:
+		var blocked := InputEventAction.new()
+		blocked.action = "menu"
+		blocked.pressed = true
+		main.get_viewport().push_input(blocked)
+		await process_frame
+		await process_frame
+		blocked.pressed = false
+		main.get_viewport().push_input(blocked)
+		if title.visible:
+			return _fail("case 3: menu during the intro should not return the title")
+		if not await _wait_intro_clear(main):
+			return false
 	var ev := InputEventAction.new()
 	ev.action = "menu"
 	ev.pressed = true
@@ -190,6 +217,17 @@ func _delete_save() -> void:
 	var dir := DirAccess.open("user://")
 	if dir != null and dir.file_exists("highscore.save"):
 		dir.remove("highscore.save")
+
+
+func _wait_intro_clear(main: Node) -> bool:
+	var intro := main.get_node_or_null("Intro")
+	if intro == null:
+		return true
+	for _i in 400:
+		if not intro.visible:
+			return true
+		await process_frame
+	return _fail("intro did not clear")
 
 
 func _fail(message: String) -> bool:

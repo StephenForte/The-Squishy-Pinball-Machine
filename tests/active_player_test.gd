@@ -276,6 +276,12 @@ func _case_saved_binding() -> bool:
 		return _fail("saving: Not you? showed before the save landed")
 	if not _assert_overlap(panel, "saving", _HEADER_SEAM):
 		return false
+	# Restart of the still-open unconfirmed invite commits "Dad" and starts
+	# resolve_name. That response adopts whoever it returns. It is not this
+	# score's POST. Drop it so a late 200 cannot put Dad back over Mom
+	# before the saved line is checked. The POST id was already captured.
+	if _leaderboard.has_method("retire_name_resolve"):
+		_leaderboard.retire_name_resolve()
 	if not await _wait_saved(saved):
 		return _fail("saved line '%s' submit=%s ids=%s" % [saved.text, _last_submit, _leaderboard.score_post_ids])
 	var rank := int(_last_submit.get("rank", 0))
