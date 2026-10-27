@@ -1,11 +1,18 @@
 # Squish leaderboard server
 
-Node 24 HTTP service for the shared leaderboard (D-026), cloud profiles (D-037),
+Node 26.12.1 HTTP service for the shared leaderboard (D-026), cloud profiles (D-037),
 CORS for a browser build (D-044), admin cleanup (D-046 / D-047), and admin
 name-hold inspection (D-060).
 Zero npm dependencies: `node:http` + `node:sqlite`. Schema and indexes are
 created on boot. `scores` is never altered; `profiles` is added with
 `CREATE TABLE IF NOT EXISTS`.
+
+Render is pinned with `NODE_VERSION=26.12.1`. That env var wins over a
+`.node-version` file, and the service root is the repo root, so the pin is
+also in `/.node-version` and `server/.node-version`. `engines.node` is
+`>=26.12.1 <27`: 26.12.1 is the October 2026 security floor, and the upper
+bound keeps a missing env var from floating onto Node 27. `DatabaseSync`
+stays the import. On 26.11+ it is an alias of `Database`.
 
 ## Local run (memory mode)
 
