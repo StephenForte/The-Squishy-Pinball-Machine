@@ -69,10 +69,13 @@ answer a preflight.
 ## Rate limits
 
 - Per `player_id`: 30 writes / 60 s on `POST /v1/scores` and `PUT /v1/profile` (D-026).
-- Per IP: 60 writes / 60 s on the same two routes (D-046). Address is the
-  left-most `X-Forwarded-For` entry when present, otherwise the socket;
-  a missing address shares one `unknown` bucket. This is a speed bump, not
-  authorization — `X-Forwarded-For` is client-controlled on a direct connection.
+- Per IP: 60 writes / 60 s on the same two routes (D-046). Address resolution
+  (D-065) prefers `CF-Connecting-IP` when non-empty after trimming, then the
+  right-most non-empty `X-Forwarded-For` hop (trimmed), then the socket address.
+  A missing/empty address shares one `unknown` bucket. Changing only a
+  client-supplied left-most XFF hop cannot open a fresh bucket when the edge
+  assertion stays the same. This is a speed bump, not authorization; the
+  forwarding headers rely on the edge proxy asserting the client address.
 - Per IP: 60 requests / 60 s shared by `GET /v1/players/lookup`,
   `POST /v1/players/resolve`, and `GET /player` (D-059, D-063). Same address
   rule as the write limit. Over the limit, the player page answers `429` HTML.
