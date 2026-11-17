@@ -1465,3 +1465,79 @@ Steve asked for three polish items; each was mapped to the code and the open cho
   merged 2026-10-14 to 2026-10-18 from `cursor/` branches without a planner review or a PLAN row.
 - Tasks **T52**, **T53**, **T54**.
 
+
+## D-065 — Per-IP rate limits key on the edge-asserted client address (planner, 2026-11-17)
+Security scan of main `9a22695` plus a live probe against `https://squish-leaderboard.onrender.com`
+showed D-046's griefing cap does not hold. `clientAddress` in `server/src/index.js` used the
+**left-most** `X-Forwarded-For` hop. On Render (Cloudflare in front of the service) that hop is
+client-controlled: the edge appends, it does not replace. Measured on live lookup (D-059's shared
+per-IP limiter, 60 / 60 s): 60 requests with `X-Forwarded-For: 203.0.113.50` returned 200/400, the
+61st returned 429; the next request with only the header changed to `198.51.100.50` returned 200.
+Same pattern was reported for resolve and score POST in the scanner's local harness.
+
+**Supersedes the address rule in D-046** (limits, ceilings, and admin cleanup stay). The client
+address used for every per-IP limiter (write routes, lookup/resolve/player-page) is resolved in
+this order:
+1. **`CF-Connecting-IP`** when present and non-empty after trim — Cloudflare overwrites this; a
+   client cannot set it through the live edge (a probe that sent the header got Cloudflare 403
+   before the origin).
+2. Else the **right-most** non-empty `X-Forwarded-For` hop (the address the nearest trusted proxy
+   appended).
+3. Else `req.socket.remoteAddress`.
+4. Missing / empty → one shared `unknown` bucket (unchanged).
+
+Changing only a client-supplied left-most XFF hop must not open a fresh bucket. Two distinct
+edge-asserted addresses must still be independent buckets. This remains a speed bump, not
+authorization.
+
+**Not in scope, and correctly not filed as new issues by the scan:** the shared client write key
+(D-026 / D-046 accepted risk) and unauthenticated name-claim (D-053). Those stand as product
+choices. No change to ceilings (30/min per player_id, 60/min per IP), route shapes, or admin gates.
+
+
+## D-066 — Do not key per-IP limits on X-Forwarded-For on this Render ingress (planner, 2026-11-17)
+T56 / D-065 shipped (PR #76 → `bf7844e`) and deployed. Live re-probe on
+`https://squish-leaderboard.onrender.com` failed:
+
+- Plain `GET /v1/players/lookup` exhausts the real client bucket → **429** (hit at request 60/61).
+- Immediately after, the same client with only `X-Forwarded-For` set/changed → **200** (15/15;
+  clean-window interleave 10/10 `plain=429` / `spoof=200`). Plain stickiness stays 429, so this is
+  not multi-instance limiter drift.
+- Client-sent `CF-Connecting-IP` is still rejected by Cloudflare with **403** / `error code: 1000`
+  before the origin (unchanged).
+
+**Reading:** D-065's unit contract is fine; the production assumption is not. On this ingress the
+Node process does not receive an unforgeable client IP via `CF-Connecting-IP` (or if it does, it is
+not what the limiter is effectively using). `X-Forwarded-For` as seen by the app is
+client-replaceable end-to-end: a caller who omits it is keyed on whatever the edge injects; a
+caller who sends it gets a fresh bucket. Preferring right-most XFF therefore does not close the
+hole D-065 named.
+
+**Supersedes the XFF fallback in D-065** (CF preference and the unknown bucket stay as ideas;
+ceilings and admin cleanup stay). New address rule for every per-IP limiter:
+
+1. **`CF-Connecting-IP`** when present and non-empty after trim (edge-overwritten when it reaches
+   the app; clients cannot inject it through this host's Cloudflare front door).
+2. Else **`req.socket.remoteAddress`** when non-empty.
+3. Else shared **`unknown`**.
+
+**Do not read `X-Forwarded-For` or `True-Client-IP` for rate-limit keys.** Measured: client
+`True-Client-IP` reaches the origin; client XFF changes the bucket. Using either reopens the bypass.
+
+**Accepted consequence:** when `CF-Connecting-IP` is absent (as live behaviour implies today), all
+clients sharing the same socket peer (Render's proxy) share one bucket. That coarsens D-046's
+"two people on one NAT" intent into a service-wide speed bump, but it restores the griefing cap.
+If a later dump shows `CF-Connecting-IP` reaching Node, per-client buckets return automatically
+under rule 1.
+
+**Required diagnostic (permanent, admin-gated):** `GET /v1/admin/client-ip` — identical gate to
+every other admin route (D-046): blank `SQUISH_ADMIN_KEY` → 404; wrong/missing `X-Squish-Admin`
+→ 401; no CORS / no preflight. Body is JSON naming the **resolved** limiter address, the socket
+address, and the raw values of `cf-connecting-ip`, `x-forwarded-for`, and `true-client-ip` as the
+process saw them (string, array, or null). It writes nothing and is not itself rate-limited by the
+IP limiter (otherwise you cannot inspect a tripped bucket). Purpose: prove what production
+receives; not a public API.
+
+**Live close condition for the follow-up task:** after deploy, exhaust plain lookup to 429; a
+follow-up lookup that only adds or changes `X-Forwarded-For` must stay **429**. Client
+`CF-Connecting-IP` must still be Cloudflare 403.
