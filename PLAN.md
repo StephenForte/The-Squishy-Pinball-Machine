@@ -75,6 +75,7 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T53 | Drawn plunger in the shooter lane: "pull" cue while a ball waits, release animation on launch; visual only (D-064) | 15 | **done** 2026-10-19 — merged (PR #71 → 6c2c595) | mid | — |
 | T54 | "Ready Player One.." intro card on Play and Restart, arcade font/style, input blocked ~2 s (D-064) | 15 | **approved** 2026-10-19 — PR #73 (`1a4f91a`), merge as-is | mid | — |
 | T55 | `active_player_test` races: a restart out of the unconfirmed invite adopts "Dad" after the test switches to Mom, failing the saved-binding case (3 of 5 runs on main `fe616c1`, reported by the T52 worker) | hygiene  T54 retired the in-flight resolve in the test, so the suite no longer shows it; open question: can a late resolve adopt the wrong player in real play (e.g. "Not you?" while a resolve is in flight)? | **open** — not dispatched; needs a planner repro before a brief | mid | — |
+| T56 | Per-IP rate limits key off a client-controlled left-most `X-Forwarded-For` hop — D-046 griefing cap bypassed on live Render/Cloudflare (D-065) | 16 | **dispatched** — brief ready; clone `Pinball-T56` | mid | — |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8 → T10 → T9 →
 **Phase 5:** T11 ∥ T12 → T11.1 (deploy) → T13.
@@ -82,6 +83,8 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 **Phase 7:** T19 → T20a → *(planner deploys)* → T20b. Sequential, all in the main checkout: they share `profile.gd`, and the
 clone rule has now been ignored by two separate workers (T13b, T18) — do not run them in parallel.
 **Phase 15 (D-064):** T52 ∥ T53 ∥ T54 — disjoint files (T52 `game_over.*` + two tests; T53 `launcher.gd`, `table.tscn`, new plunger files; T54 new intro files, `main.tscn`, `touch_controls.gd`, font asset). Each in its own clone `Pinball-T5x` if run at the same time.
+
+**Phase 16 (D-065):** T56 — server-only client-address fix for per-IP limiters. Clone `Pinball-T56`. Parallel with nothing else touching `server/**`.
 T5 and T6 are the only truly parallel pair; ownership below is drawn to keep them apart.
 
 ## Running the game after a pull
@@ -1602,3 +1605,4 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
   T54's active_player_test edit hides the T55 race in the suite; **T55 is reframed** as a product question needing a repro.
   After #73 merges, mark this PR ready and merge it to close Phase 15. Static web redeploy not yet done or verified.
 
+- 2026-11-17: **Security scan HIGH on main `9a22695`:** per-IP rate limits key on left-most `X-Forwarded-For`. Live probe on `squish-leaderboard.onrender.com` confirmed: lookup exhausted for spoofed `203.0.113.50` (60 then 429); only changing the header to `198.51.100.50` returned 200. Response headers show Cloudflare in front of Render. → **D-065, T56**. Shared write key (D-026/D-046) and unauthenticated name-claim (D-053) remain accepted product risks and were correctly not filed. Decisions through **D-065**, next free **D-066**; tasks through **T56**, next free **T57**. T55 still open (product repro). After T56 merges: Render server deploy (D-028) and a live spoof re-probe.
