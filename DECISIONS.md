@@ -1465,3 +1465,31 @@ Steve asked for three polish items; each was mapped to the code and the open cho
   merged 2026-10-14 to 2026-10-18 from `cursor/` branches without a planner review or a PLAN row.
 - Tasks **T52**, **T53**, **T54**.
 
+
+## D-065 — Per-IP rate limits key on the edge-asserted client address (planner, 2026-11-17)
+Security scan of main `9a22695` plus a live probe against `https://squish-leaderboard.onrender.com`
+showed D-046's griefing cap does not hold. `clientAddress` in `server/src/index.js` used the
+**left-most** `X-Forwarded-For` hop. On Render (Cloudflare in front of the service) that hop is
+client-controlled: the edge appends, it does not replace. Measured on live lookup (D-059's shared
+per-IP limiter, 60 / 60 s): 60 requests with `X-Forwarded-For: 203.0.113.50` returned 200/400, the
+61st returned 429; the next request with only the header changed to `198.51.100.50` returned 200.
+Same pattern was reported for resolve and score POST in the scanner's local harness.
+
+**Supersedes the address rule in D-046** (limits, ceilings, and admin cleanup stay). The client
+address used for every per-IP limiter (write routes, lookup/resolve/player-page) is resolved in
+this order:
+1. **`CF-Connecting-IP`** when present and non-empty after trim — Cloudflare overwrites this; a
+   client cannot set it through the live edge (a probe that sent the header got Cloudflare 403
+   before the origin).
+2. Else the **right-most** non-empty `X-Forwarded-For` hop (the address the nearest trusted proxy
+   appended).
+3. Else `req.socket.remoteAddress`.
+4. Missing / empty → one shared `unknown` bucket (unchanged).
+
+Changing only a client-supplied left-most XFF hop must not open a fresh bucket. Two distinct
+edge-asserted addresses must still be independent buckets. This remains a speed bump, not
+authorization.
+
+**Not in scope, and correctly not filed as new issues by the scan:** the shared client write key
+(D-026 / D-046 accepted risk) and unauthenticated name-claim (D-053). Those stand as product
+choices. No change to ceilings (30/min per player_id, 60/min per IP), route shapes, or admin gates.
