@@ -76,6 +76,7 @@ workers never edit it. Companion: [DECISIONS.md](DECISIONS.md) (numbered, append
 | T54 | "Ready Player One.." intro card on Play and Restart, arcade font/style, input blocked ~2 s (D-064) | 15 | **approved** 2026-10-19 — PR #73 (`1a4f91a`), merge as-is | mid | — |
 | T55 | `active_player_test` races: a restart out of the unconfirmed invite adopts "Dad" after the test switches to Mom, failing the saved-binding case (3 of 5 runs on main `fe616c1`, reported by the T52 worker) | hygiene  T54 retired the in-flight resolve in the test, so the suite no longer shows it; open question: can a late resolve adopt the wrong player in real play (e.g. "Not you?" while a resolve is in flight)? | **open** — not dispatched; needs a planner repro before a brief | mid | — |
 | T56 | Per-IP rate limits key off a client-controlled left-most `X-Forwarded-For` hop — D-046 griefing cap bypassed on live Render/Cloudflare (D-065) | 16 | **merged** (#76 → `bf7844e`) but **live re-probe FAILED** — XFF spoof still 200 after plain 429; hold docs #75; needs T57 | mid | — |
+| T57 | Live D-065 deploy still allows XFF spoof to mint a fresh per-IP bucket; stop keying on XFF, add admin client-ip dump (D-066) | 16 | **dispatched** — brief ready; clone `Pinball-T57` | mid | T56 |
 
 **Run order:** T1 → T2 → (T3, T4) → T5 ∥ T6 → T3.1 → T7a → T7b ∥ T7c → T8 → T10 → T9 →
 **Phase 5:** T11 ∥ T12 → T11.1 (deploy) → T13.
@@ -85,6 +86,8 @@ clone rule has now been ignored by two separate workers (T13b, T18) — do not r
 **Phase 15 (D-064):** T52 ∥ T53 ∥ T54 — disjoint files (T52 `game_over.*` + two tests; T53 `launcher.gd`, `table.tscn`, new plunger files; T54 new intro files, `main.tscn`, `touch_controls.gd`, font asset). Each in its own clone `Pinball-T5x` if run at the same time.
 
 **Phase 16 (D-065):** T56 — server-only client-address fix for per-IP limiters. Clone `Pinball-T56`. Parallel with nothing else touching `server/**`.
+
+**Phase 16b (D-066):** T57 — supersede XFF fallback; admin `GET /v1/admin/client-ip`; clone `Pinball-T57`.
 T5 and T6 are the only truly parallel pair; ownership below is drawn to keep them apart.
 
 ## Running the game after a pull
@@ -1608,3 +1611,4 @@ suggests pivots ~270/450 (narrower gap) or a lower drain box; tip shots feel a b
 - 2026-11-17: **Security scan HIGH on main `9a22695`:** per-IP rate limits key on left-most `X-Forwarded-For`. Live probe on `squish-leaderboard.onrender.com` confirmed: lookup exhausted for spoofed `203.0.113.50` (60 then 429); only changing the header to `198.51.100.50` returned 200. Response headers show Cloudflare in front of Render. → **D-065, T56**. Shared write key (D-026/D-046) and unauthenticated name-claim (D-053) remain accepted product risks and were correctly not filed. Decisions through **D-065**, next free **D-066**; tasks through **T56**, next free **T57**. T55 still open (product repro). After T56 merges: Render server deploy (D-028) and a live spoof re-probe.
 - 2026-11-17: **T56 reviewed — approved, merge as-is** (PR #76, `3185dbb`, base `9a22695` = main). Scratch `npm test` 155/155/50. Mutation: left-most restore → 15 red; drop CF preference → 6 red. Existing admin XFF test strengthened (spoof resistance). Live ingress: client `CF-Connecting-IP` → Cloudflare 403/1000 (never origin), so Security Reviewer spoof claim is false for this host. After merge: Render server deploy + live left-most XFF re-probe; then merge docs PR #75.
 - 2026-11-17: **T56 live re-probe FAILED** after merge+deploy (`bf7844e`). Plain lookup → 429; same burst with only `X-Forwarded-For` changed → 200 (15/15; reconfirmed). Plain stickiness stays 429 (not multi-instance). Client `CF-Connecting-IP` still Cloudflare 403. D-065 unit contract holds; production keying does not. **Hold docs PR #75.** Next free task **T57** / decision **D-066** (observe real ingress headers on Render, then fix). Comment on #76.
+- 2026-11-17: **T57 dispatched (D-066).** Live proof after #76: plain lookup 429, XFF spoof 200 (sticky plain 429; interleave 10/10). XFF is not a safe limiter key on this Render ingress; CF-Connecting-IP does not appear to reach Node. Contract: CF → socket → unknown; never XFF/True-Client-IP; add admin `GET /v1/admin/client-ip`. Hold docs PR #75 until T57 live probe passes. Decisions through **D-066**, next free **D-067**; tasks through **T57**, next free **T58**.
