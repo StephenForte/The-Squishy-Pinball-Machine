@@ -593,22 +593,22 @@ describe('per-IP write limiting (D-046)', () => {
     });
   });
 
-  it('different addresses are independent buckets', async () => {
+  it('right-most XFF addresses are independent; changing only the left-most hop stays limited', async () => {
     await withServer(async ({ port }) => {
       const a1 = await request(port, 'POST', '/v1/scores', {
         key: WRITE_KEY,
         body: scoreBody({ player_id: NATASHA, score: 1 }),
-        headers: { 'X-Forwarded-For': '203.0.113.1' },
+        headers: { 'X-Forwarded-For': '192.0.2.1, 203.0.113.1' },
       });
       const a2 = await request(port, 'POST', '/v1/scores', {
         key: WRITE_KEY,
         body: scoreBody({ player_id: NATASHA, score: 2 }),
-        headers: { 'X-Forwarded-For': '203.0.113.1' },
+        headers: { 'X-Forwarded-For': '192.0.2.2, 203.0.113.1' },
       });
       const b1 = await request(port, 'POST', '/v1/scores', {
         key: WRITE_KEY,
         body: scoreBody({ player_id: STEVE, name: 'Steve', score: 1 }),
-        headers: { 'X-Forwarded-For': '198.51.100.9, 10.0.0.1' },
+        headers: { 'X-Forwarded-For': '192.0.2.2, 198.51.100.9' },
       });
       assert.equal(a1.status, 201);
       assert.equal(a2.status, 429);

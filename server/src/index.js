@@ -78,10 +78,13 @@ export function clientAddress(req, addressFor) {
     if (typeof injected === 'string' && injected !== '') return injected;
     return 'unknown';
   }
+  // D-065: prefer the edge assertion over client-supplied earlier XFF hops.
+  const cf = req.headers['cf-connecting-ip'];
+  if (typeof cf === 'string' && cf.trim()) return cf.trim();
   const xff = req.headers['x-forwarded-for'];
   if (typeof xff === 'string') {
-    const left = xff.split(',')[0].trim();
-    if (left) return left;
+    const right = xff.split(',').map((hop) => hop.trim()).filter(Boolean).at(-1);
+    if (right) return right;
   }
   const addr = req.socket && req.socket.remoteAddress;
   if (typeof addr === 'string' && addr !== '') return addr;
