@@ -78,14 +78,9 @@ export function clientAddress(req, addressFor) {
     if (typeof injected === 'string' && injected !== '') return injected;
     return 'unknown';
   }
-  // D-065: prefer the edge assertion over client-supplied earlier XFF hops.
+  // D-066: this ingress permits client values in X-Forwarded-For and True-Client-IP.
   const cf = req.headers['cf-connecting-ip'];
   if (typeof cf === 'string' && cf.trim()) return cf.trim();
-  const xff = req.headers['x-forwarded-for'];
-  if (typeof xff === 'string') {
-    const right = xff.split(',').map((hop) => hop.trim()).filter(Boolean).at(-1);
-    if (right) return right;
-  }
   const addr = req.socket && req.socket.remoteAddress;
   if (typeof addr === 'string' && addr !== '') return addr;
   return 'unknown';
@@ -103,6 +98,9 @@ function isAdminOptionsPath(path) {
 }
 
 function matchAdminRoute(method, path) {
+  if (method === 'GET' && path === '/v1/admin/client-ip') {
+    return { action: 'client_ip' };
+  }
   if (method === 'GET' && path === '/v1/admin/holders') {
     return { action: 'holders' };
   }
@@ -267,6 +265,19 @@ async function handleAdmin(req, res, ctx, route) {
   }
   if (!keysMatch(req.headers['x-squish-admin'], ctx.adminKey)) {
     send(res, 401, { error: 'unauthorized' });
+    return;
+  }
+
+  if (route.action === 'client_ip') {
+    send(res, 200, {
+      address: clientAddress(req, ctx.addressFor),
+      socket_address: req.socket?.remoteAddress ?? null,
+      headers: {
+        'cf-connecting-ip': req.headers['cf-connecting-ip'] ?? null,
+        'x-forwarded-for': req.headers['x-forwarded-for'] ?? null,
+        'true-client-ip': req.headers['true-client-ip'] ?? null,
+      },
+    }, { 'cache-control': 'no-store' });
     return;
   }
 

@@ -52,7 +52,7 @@ DB_PATH=/tmp/squish.db npm test  # same suite against a file DB
 | `DB_PATH` | `:memory:` | SQLite file, or `:memory:` |
 | `SQUISH_KEY` | (none) | Shared write key; required on `POST /v1/scores` and `PUT /v1/profile` as `X-Squish-Key` |
 | `SQUISH_ALLOWED_ORIGINS` | (empty) | Comma-separated exact origins for CORS (D-044). Empty = no CORS headers. `*` is never a wildcard. |
-| `SQUISH_ADMIN_KEY` | (empty) | Admin key for cleanup routes as `X-Squish-Admin` (D-046). Empty **disables** every admin route (404). |
+| `SQUISH_ADMIN_KEY` | (empty) | Key for admin routes as `X-Squish-Admin` (D-046). Empty **disables** every admin route (404). |
 
 See `.env.example`. Do not commit `.env`.
 
@@ -70,17 +70,16 @@ answer a preflight.
 
 - Per `player_id`: 30 writes / 60 s on `POST /v1/scores` and `PUT /v1/profile` (D-026).
 - Per IP: 60 writes / 60 s on the same two routes (D-046). Address resolution
-  (D-065) prefers `CF-Connecting-IP` when non-empty after trimming, then the
-  right-most non-empty `X-Forwarded-For` hop (trimmed), then the socket address.
-  A missing/empty address shares one `unknown` bucket. Changing only a
-  client-supplied left-most XFF hop cannot open a fresh bucket when the edge
-  assertion stays the same. This is a speed bump, not authorization; the
-  forwarding headers rely on the edge proxy asserting the client address.
+  (D-066) uses `CF-Connecting-IP` when non-empty after trimming, then the
+  socket peer address, then the shared `unknown` bucket. The ingress allows
+  client-controlled values in `X-Forwarded-For` and `True-Client-IP`, so neither
+  affects the bucket. When `CF-Connecting-IP` is absent, requests arriving
+  from the same Render proxy address share a bucket.
 - Per IP: 60 requests / 60 s shared by `GET /v1/players/lookup`,
   `POST /v1/players/resolve`, and `GET /player` (D-059, D-063). Same address
   rule as the write limit. Over the limit, the player page answers `429` HTML.
 
-## Routes (D-026, amended by D-037, D-044, D-046, D-047, D-059, D-060, D-063)
+## Routes (D-026, amended by D-037, D-044, D-046, D-047, D-059, D-060, D-063, D-066)
 
 - `GET /` → HTML top-10 arcade high-score table (D-061): black background, neon, embedded Press Start 2P with a monospace fallback (no third-party request), columns RANK / NAME / SCORE (ordinal ranks; no relative-time column). Same data as `/v1/leaderboard`; `Cache-Control: no-store`. Each row's avatar is a same-origin `<img src="/avatars/<id>.png">` when set. Each name links to `/player?name=` plus that cell's URL-encoded display name (D-063). The link does not carry `player_id`.
 - `GET /player?name=<url-encoded>` → HTML page for that one player (D-063), the same arcade shell as `/` (inline CSS, no third-party requests, `Cache-Control: no-store`). The name is validated like lookup: a control character is `400`; a missing `name`, or one that is empty after sanitising, is `404`. A name longer than 16 characters is clamped by that same sanitising, then looked up. An unknown name or more than one holder is `404`. The page writes nothing. It shows the current display name (profile name, otherwise the latest score name) and a same-origin avatar only when one is set, then best score, board rank, and total games. Games are every `scores` row for that player, including rows posted under an earlier name, newest first (`created_at DESC, id DESC`), at most the 100 newest. Each row is that game's date and time and the score; the best game is marked once. The markup keeps a UTC fallback inside `<time datetime>` (the stored instant). One static inline script, with no user data in it, replaces the visible text with the date and time the browser reports for the viewer's own zone and locale. A page with no games has no script. The total is always shown (`showing 100 of 240`). A link returns to `/`. `player_id` is not in the page. The route uses the lookup per-IP limiter; over the limit is `429` HTML.
@@ -95,6 +94,7 @@ answer a preflight.
 - `GET /avatars/<id>.png` → catalogued art only (`image/png`, `Cache-Control: public, max-age=86400`). The id is looked up in `assets/design/squishes/squishies_catalog.json`; the file path comes from that entry, never from the URL segment. PNGs stay in the repo — they are not copied into `server/`.
 
 - `OPTIONS` on the public routes above → `204` when CORS applies (or without CORS headers for an unlisted origin).
+- `GET /v1/admin/client-ip` → `200` `{ address, socket_address, headers }` (admin, D-066). `address` is the resolved limiter key and `socket_address` is the socket peer address or `null` when absent. `headers` contains exactly `cf-connecting-ip`, `x-forwarded-for`, and `true-client-ip` as Node received them (string, array, or `null` when absent). This read-only diagnostic stays available when a per-IP bucket is exhausted and sends `Cache-Control: no-store`.
 - `GET /v1/admin/holders?name=<url-encoded>` → `200` `{ key, holders }` (admin, D-060). `name` is validated like lookup: a control character, a missing `name`, or a name that is empty after sanitising is `400` `invalid_name`. `key` is the normalised name. `holders` is one entry per player who holds it (a profile `name_key`, or any score row whose name normalises to that key). Each entry is `{ player_id, profile, score_rows }`. `profile` is `{ name, avatar }` or `null` when that player has no profile. `score_rows` is every score of that player whose name normalises to the key: `{ id, name, score, created_at }`. A free name is `holders: []`. Read-only: no profile, no score, and no name-index change.
 - `GET /v1/admin/scores` → `200` `{ rows, total, offset }` (admin, D-047, D-060). Raw score rows, newest first (`created_at DESC, id DESC`, so rows that share a timestamp cannot land on two pages or on none): `{ id, player_id, name, score, client, created_at }`. Optional `player_id` (uuid v4, else `400` `invalid_player_id`); optional `limit` uses the same 1..50 clamp as the public board. Optional `offset` is an integer ≥ 0 (omitted means `0` and is echoed); anything else is `400` `invalid_offset`. `total` is the matching row count, not the page size. An offset past the end returns `rows: []` with the true `total`. `player_id` and `offset` combine. This is how a delete or relabel target is found — the public board has no row `id`.
 - `POST /v1/admin/scores/:id/relabel` → `200` `{ ok: true, id, player_id, name_before, name_after }` (admin, D-060). No body. Sets that row's `name` to its own player's current profile name and nothing else — there is no name argument, because an arbitrary rename can hand the hold to a different player. A missing or malformed id is `404`, the same as `DELETE /v1/scores/:id`. `409` `no_profile` when that player has no profile, and the row is left unchanged. `score`, `player_id`, `client`, and `created_at` stay as they were, and no other row changes.

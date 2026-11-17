@@ -18,6 +18,7 @@ const ADMIN_KEY = 'admin-secret';
 const ORIGIN = 'https://play.example';
 
 const ADMIN_PATHS = [
+  ['GET', '/v1/admin/client-ip'],
   ['GET', '/v1/admin/scores'],
   ['GET', '/v1/admin/holders?name=Dad'],
   ['POST', '/v1/admin/scores/999999/relabel'],
@@ -115,6 +116,60 @@ describe('admin auth when the key is set', () => {
       assert.equal(profile.status, 401);
       assert.equal(profile.json.error, 'unauthorized');
     }, { adminKey: ADMIN_KEY });
+  });
+});
+
+describe('GET /v1/admin/client-ip (D-066)', () => {
+  it('reports the limiter address and observed headers even with both IP buckets exhausted', async () => {
+    await withServer(async ({ port }) => {
+      const lookup = '/v1/players/lookup?name=Probe';
+      assert.equal((await request(port, 'GET', lookup)).status, 200);
+      assert.equal((await request(port, 'GET', lookup)).status, 429);
+      assert.equal((await postScore(port, { player_id: NATASHA })).status, 201);
+      assert.equal((await postScore(port, { player_id: STEVE })).status, 429);
+
+      const path = '/v1/admin/client-ip';
+      const auth = { 'X-Squish-Admin': ADMIN_KEY, Origin: ORIGIN };
+      const socket = await request(port, 'GET', path, { headers: auth });
+      assert.equal(socket.status, 200);
+      assert.deepEqual(socket.json, {
+        address: '127.0.0.1',
+        socket_address: '127.0.0.1',
+        headers: { 'cf-connecting-ip': null, 'x-forwarded-for': null, 'true-client-ip': null },
+      });
+      assert.deepEqual(corsNames(socket.headers), []);
+      assert.equal(socket.headers.get('cache-control'), 'no-store');
+
+      const edge = await request(port, 'GET', path, {
+        headers: {
+          ...auth,
+          'CF-Connecting-IP': '203.0.113.1',
+          'X-Forwarded-For': '192.0.2.1, 198.51.100.1',
+          'True-Client-IP': '192.0.2.2',
+        },
+      });
+      assert.equal(edge.status, 200);
+      assert.deepEqual(edge.json, {
+        address: '203.0.113.1',
+        socket_address: '127.0.0.1',
+        headers: {
+          'cf-connecting-ip': '203.0.113.1',
+          'x-forwarded-for': '192.0.2.1, 198.51.100.1',
+          'true-client-ip': '192.0.2.2',
+        },
+      });
+
+      const preflight = await request(port, 'OPTIONS', path, {
+        headers: { Origin: ORIGIN, 'Access-Control-Request-Method': 'GET' },
+      });
+      assert.equal(preflight.status, 404);
+      assert.deepEqual(corsNames(preflight.headers), []);
+    }, {
+      adminKey: ADMIN_KEY,
+      allowedOrigins: [ORIGIN],
+      ipLimiter: createRateLimiter({ windowMs: 60_000, max: 1 }),
+      resolveLimiter: createRateLimiter({ windowMs: 60_000, max: 1 }),
+    });
   });
 });
 
@@ -593,7 +648,7 @@ describe('per-IP write limiting (D-046)', () => {
     });
   });
 
-  it('right-most XFF addresses are independent; changing only the left-most hop stays limited', async () => {
+  it('changing either XFF hop shares a socket bucket across player_ids', async () => {
     await withServer(async ({ port }) => {
       const a1 = await request(port, 'POST', '/v1/scores', {
         key: WRITE_KEY,
@@ -612,7 +667,8 @@ describe('per-IP write limiting (D-046)', () => {
       });
       assert.equal(a1.status, 201);
       assert.equal(a2.status, 429);
-      assert.equal(b1.status, 201);
+      assert.equal(b1.status, 429);
+      assert.equal(b1.json.error, 'rate_limited');
     }, {
       limiter: { allow: () => true },
       ipLimiter: createRateLimiter({ windowMs: 60_000, max: 1 }),

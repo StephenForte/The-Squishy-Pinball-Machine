@@ -3,22 +3,27 @@ import { describe, it } from 'node:test';
 import { clientAddress, createRateLimiter } from '../src/index.js';
 import { profileBody, request, scoreBody, withServer } from './helpers.js';
 
-describe('client address resolution (D-065)', () => {
+describe('client address resolution (D-066)', () => {
   const cases = [
     ['CF takes precedence over all XFF hops', {
       'cf-connecting-ip': ' 203.0.113.1 ',
       'x-forwarded-for': '192.0.2.1, 198.51.100.1',
     }, '203.0.113.1'],
-    ['empty CF falls through to XFF', {
+    ['empty CF falls through to the socket', {
       'cf-connecting-ip': '', 'x-forwarded-for': '192.0.2.1, 198.51.100.1',
-    }, '198.51.100.1'],
-    ['whitespace CF falls through to XFF', {
+    }, 'socket-address'],
+    ['whitespace CF falls through to the socket', {
       'cf-connecting-ip': ' \t ', 'x-forwarded-for': '192.0.2.1, 198.51.100.1',
-    }, '198.51.100.1'],
-    ['right-most non-empty XFF hop is trimmed', {
+    }, 'socket-address'],
+    ['multi-hop XFF falls through to the socket', {
       'x-forwarded-for': ', 192.0.2.1, , 198.51.100.1 , , ',
-    }, '198.51.100.1'],
-    ['single-hop XFF is supported', { 'x-forwarded-for': ' 198.51.100.1 ' }, '198.51.100.1'],
+    }, 'socket-address'],
+    ['single-hop XFF falls through to the same socket', {
+      'x-forwarded-for': '198.51.100.2',
+    }, 'socket-address'],
+    ['True-Client-IP falls through to the socket', {
+      'true-client-ip': '198.51.100.1',
+    }, 'socket-address'],
     ['missing headers fall through to the socket', {}, 'socket-address'],
     ['empty headers fall through to the socket', {
       'cf-connecting-ip': ' ', 'x-forwarded-for': ', , ',
@@ -31,8 +36,12 @@ describe('client address resolution (D-065)', () => {
   }
 
   it('missing or empty socket addresses share unknown', () => {
+    const headers = {
+      'x-forwarded-for': '192.0.2.1',
+      'true-client-ip': '198.51.100.1',
+    };
     for (const socket of [undefined, {}, { remoteAddress: '' }]) {
-      assert.equal(clientAddress({ headers: {}, socket }), 'unknown');
+      assert.equal(clientAddress({ headers, socket }), 'unknown');
     }
   });
 
@@ -48,7 +57,7 @@ describe('client address resolution (D-065)', () => {
   });
 });
 
-describe('edge-asserted buckets on every per-IP route (D-065)', () => {
+describe('client address buckets on every per-IP route (D-066)', () => {
   const routes = [
     ['POST', '/v1/scores', scoreBody(), 201],
     ['PUT', '/v1/profile', profileBody(), 200],
@@ -57,20 +66,14 @@ describe('edge-asserted buckets on every per-IP route (D-065)', () => {
     ['GET', '/player?name=Probe', undefined, 404],
   ];
   for (const [method, path, body, initialStatus] of routes) {
-    for (const edge of ['CF', 'XFF']) {
-      it(`${method} ${path}: ${edge} prevents XFF spoofing and keeps edge addresses independent`, async () => {
-        await withServer(async ({ port, key }) => {
-          const headersFor = (spoof, address) => edge === 'CF'
-            ? { 'CF-Connecting-IP': address, 'X-Forwarded-For': spoof }
-            : { 'X-Forwarded-For': `${spoof}, ${address}, , ` };
-          const first = await request(port, method, path, {
-            key, body, headers: headersFor('192.0.2.1', '203.0.113.1'),
-          });
-          assert.equal(first.status, initialStatus);
-          // With CF set, this replaces the entire XFF header. Otherwise only
-          // the client-supplied left-most hop changes; the edge hop stays put.
+    it(`${method} ${path}: adding or changing XFF leaves the socket bucket exhausted`, async () => {
+      await withServer(async ({ port, key }) => {
+        const first = await request(port, method, path, { key, body });
+        assert.equal(first.status, initialStatus);
+
+        for (const xff of ['192.0.2.1', '192.0.2.2, 198.51.100.1']) {
           const blocked = await request(port, method, path, {
-            key, body, headers: headersFor('192.0.2.2', '203.0.113.1'),
+            key, body, headers: { 'X-Forwarded-For': xff },
           });
           assert.equal(blocked.status, 429);
           if (path.startsWith('/player?')) {
@@ -78,15 +81,33 @@ describe('edge-asserted buckets on every per-IP route (D-065)', () => {
           } else {
             assert.equal(blocked.json.error, 'rate_limited');
           }
-          const independent = await request(port, method, path, {
-            key, body, headers: headersFor('192.0.2.2', '198.51.100.1'),
-          });
-          assert.equal(independent.status, path === '/v1/players/resolve' ? 200 : initialStatus);
-        }, {
-          ipLimiter: createRateLimiter({ windowMs: 60_000, max: 1 }),
-          resolveLimiter: createRateLimiter({ windowMs: 60_000, max: 1 }),
-        });
+        }
+      }, {
+        ipLimiter: createRateLimiter({ windowMs: 60_000, max: 1 }),
+        resolveLimiter: createRateLimiter({ windowMs: 60_000, max: 1 }),
       });
-    }
+    });
+
+    it(`${method} ${path}: CF addresses get independent buckets and ignore XFF`, async () => {
+      await withServer(async ({ port, key }) => {
+        const send = (cf, xff) => request(port, method, path, {
+          key, body, headers: { 'CF-Connecting-IP': cf, 'X-Forwarded-For': xff },
+        });
+        const first = await send('203.0.113.1', '192.0.2.1');
+        assert.equal(first.status, initialStatus);
+        const blocked = await send('203.0.113.1', '192.0.2.2');
+        assert.equal(blocked.status, 429);
+        if (path.startsWith('/player?')) {
+          assert.match(blocked.headers.get('content-type'), /text\/html/);
+        } else {
+          assert.equal(blocked.json.error, 'rate_limited');
+        }
+        const independent = await send('198.51.100.1', '192.0.2.2');
+        assert.equal(independent.status, path === '/v1/players/resolve' ? 200 : initialStatus);
+      }, {
+        ipLimiter: createRateLimiter({ windowMs: 60_000, max: 1 }),
+        resolveLimiter: createRateLimiter({ windowMs: 60_000, max: 1 }),
+      });
+    });
   }
 });
